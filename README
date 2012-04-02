@@ -1,0 +1,3 @@
+This developement formalizes the IS5 logic. Two formalizations are used:
+* "A Symetric Modal Lambda calculus for Distributed Computing" by Tom Murphy VII, Karl Crary, Robert Harper and Frank Pfenning provides labeled approach
+* "Label-free Proof Systems for Intuitionistic Modal Logic IS5" by Didier Galmiche and Yakoub Salhi provides label-free approach
