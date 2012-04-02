@@ -1,0 +1,6 @@
+*.vo
+.#*
+*~
+*.glob
+todo
+notes
