@@ -1,3 +1,6 @@
+I. Statics
+----------
+
 1. Variable
 
   
@@ -58,3 +61,48 @@
  Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma' |- N : C
 --------------------------------------------------------------------------------------------------- (<> E2)
                               G |= Gamma' |- letdia_get M in N : C
+
+
+II. Dynamics
+------------
+
+A. Values
+
+value (lam A, M)
+
+value (box M)
+
+value M ==> value (here M)
+
+value M ==> value (get_here M)
+
+
+B. Reductions
+
+appl (lam A, M) N |--> [N // 0] M
+
+unbox (box M) |--> M
+
+unbox_fetch (box M) | --> M
+
+letd (here M) in N |--> [M // 0] N
+
+letd (get_here) in N |--> [M // 0] N
+
+letd_get (here M) in N |--> [M // 0] N 
+
+letd_get (get_here M) in N |--> [M // 0] N
+
+(M |--> M') ==> (appl M N |--> appl M' N)
+
+(M |--> M') ==> (unbox M |--> unbox M')
+
+(M |--> M') ==> (unbox_fetch M |--> unbox_fetch M')
+
+(M |--> M') ==> (here M |--> here M')
+
+(M |--> M') ==> (get_here M |--> get_here M')
+
+(M |--> M') ==> (letd M in N |--> letd M' in N)
+
+(M |--> M') ==> (letd_get M in N |--> letd_get M' in N)
