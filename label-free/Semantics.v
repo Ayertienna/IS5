@@ -10,8 +10,6 @@ Global Reserved Notation " G '|=' Gamma '|-' M ':::' A " (at level 70).
 
 Definition Context := list ty.
 
-Definition EmptySet s := forall a:Context, a \notin s.
-
 (* Statics *)
 
 Inductive types: fset Context -> Context -> te -> ty -> Prop :=
@@ -80,5 +78,91 @@ Inductive step: te -> te -> Prop :=
 | red_letdia: forall M N M' (HT: M |-> M'), letdia M N |-> letdia M' N
 | red_letdia_move: forall M N M' (HT: M |-> M'), letdia_get M N |-> letdia_get M' N
 where " M |-> N " := (step M N ) : is5_scope.
+
+
+Section Lemmas.
+
+Lemma eq_context_dec:
+forall Gamma Gamma': Context, {Gamma = Gamma'} + {Gamma <> Gamma'}.
+  intros; decide equality; decide equality.
+Qed.
+
+Lemma BackgroundImpl:
+forall G G' Gamma M A
+  (HEq: forall A, A \in G -> A \in G')
+  (HT: G |= Gamma |- M ::: A),
+  G' |= Gamma |- M ::: A.
+intros; generalize dependent G'; induction HT; intros; eauto using types.
+(* box *)
+constructor; apply IHHT;
+intros.
+rewrite in_union in H; destruct H; rewrite in_union; 
+try (right; apply HEq; assumption); 
+rewrite in_singleton in H; subst; left; rewrite in_singleton; reflexivity.
+(* unbox_fetch *)
+apply t_unbox_fetch with (Gamma2:=Gamma2);
+[apply HEq; assumption | apply IHHT];
+intros; destruct (eq_context_dec A0 Gamma2).
+(* A0 = Gamma2 *)
+subst; intros; rewrite in_union in H.
+  destruct H; rewrite in_union;
+  [rewrite in_singleton in H; subst | rewrite in_remove in H; destruct H].
+    left; rewrite in_singleton; reflexivity.
+    rewrite notin_singleton in H0; elim H0; reflexivity.
+(* A0 <> Gamma *)
+intros; rewrite in_union in H; rewrite in_union; destruct H.
+  left; assumption. 
+  right; rewrite in_remove in H; rewrite in_remove; destruct H; split;
+  [apply HEq| ]; assumption.
+(* get_here *)
+apply t_get_here with (Gamma2:=Gamma2);
+[apply HEq; assumption | apply IHHT]; 
+intros; destruct (eq_context_dec A0 Gamma2).
+(* A0 = Gamma2 *)
+subst; intros; rewrite in_union in H.
+  destruct H; rewrite in_union;
+  [rewrite in_singleton in H; subst | rewrite in_remove in H; destruct H].
+    left; rewrite in_singleton; reflexivity.
+    rewrite notin_singleton in H0; elim H0; reflexivity.
+(* A0 <> Gamma *)
+intros; rewrite in_union in H; rewrite in_union; destruct H.
+  left; assumption. 
+  right; rewrite in_remove in H; rewrite in_remove; destruct H; split;
+  [apply HEq| ]; assumption.
+(* letdia *)
+apply t_letdia with (A:=A).
+  apply IHHT1; assumption.
+  apply IHHT2; intros; 
+    rewrite in_union in H; destruct H; rewrite in_union.
+      left; assumption.
+      right; apply HEq; assumption.
+(* letdia_get *)
+apply t_letdia_get with (A:=A) (Gamma:=Gamma).
+  apply HEq; assumption.
+  apply IHHT1; intros.
+    rewrite in_union in H; destruct H; rewrite in_union.
+      left; assumption.
+      rewrite in_remove in H; destruct H;
+      right; rewrite in_remove; split.
+        apply HEq; assumption.
+        assumption.
+   apply IHHT2; intros.
+    rewrite in_union in H; destruct H; rewrite in_union.
+      left; assumption.
+      right; apply HEq; assumption.
+Qed.
+
+Lemma GlobalWeakening:
+forall G Gamma M A Ctx
+  (HT: G |= Gamma |- M ::: A),
+  G \u \{Ctx} |= Gamma |- M ::: A.
+intros.
+apply BackgroundImpl with (G:=G).
+intros.
+rewrite in_union; left; assumption.
+assumption.
+Qed.
+
+End Lemmas.
 
 Close Scope is5_scope.
