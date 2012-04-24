@@ -1,3 +1,6 @@
+I. Statics
+----------
+
 1. Variable
 
 
@@ -56,3 +59,41 @@
  w \in Omega   Omega; Gamma |- M : [] A @ w'
 --------------------------------------------- (fetch)
     Omega; Gamma |- fetch w' M : [] A @ w
+
+
+
+II. Dynamics
+------------
+
+A. Values
+
+value (lam A, M)
+
+value (box M)
+
+value M ==> value (here M)
+
+
+B. Reductions (defined for locally closed terms)
+
+appl (lam A, M) N, w |--> [N // 0] M, w
+
+unbox (box M), w |--> M ^ w, w
+
+letd (here M) in N, w |--> [M // 0] N ^ w, w
+
+(M, w |--> M', w) ==> (appl M N, w |--> appl M' N, w)
+
+(M, w |--> M', w) ==> (unbox M, w |--> unbox M', w)
+
+(M, w |--> M', w) ==> (here M, w |--> here M', w)
+
+(M, w |--> M', w) ==> (letd M in N, w |--> letd M' in N, w)
+
+(M, w |--> M', w) ==> (get w M, w' |--> get w M', w')
+
+value M ==> (get w (here M), w' |--> here ({w' // w} M), w')
+
+(M, w |--> M', w) ==> (fetch w M, w' |--> fetch w M', w')
+
+value M ==> (fetch w M, w' |--> {w' // w} M, w')
