@@ -1,0 +1,58 @@
+1. Variable
+
+
+ w \in Omega   Gamma[n] == (A, w)
+---------------------------------- (hyp)
+   Omega; Gamma |- hyp n : A @ w
+
+
+2. Arrow
+
+
+   Omega; (A, w)::Gamma |- M : B @ w
+--------------------------------------- (-> I)
+ Omega; Gamma |- lam A, M : A -> B @ w
+
+
+ Omega; Gamma |- N ::: A @ w   Omega; Gamma |- M ::: A -> B @ w
+---------------------------------------------------------------- (-> E)
+               Omega; Gamma |- appl M N : B @ w
+
+
+3. Box
+
+
+ w \in Omega   forall w', w' \notin L -> \{w'} \u Omega; Gamma |- M ^ w' : A @ w'
+---------------------------------------------------------------------------------- ([] I)
+                      Omega; Gamma |- box M : [] A @ w
+
+
+  Omega; Gamma |- M : [] A @ w
+--------------------------------- ([] E)
+ Omega; Gamma |- unbox M : A @ w
+
+
+4. Diamond
+
+
+     Omega; Gamma |- M : A @ w
+----------------------------------- (<> I)
+ Omega; Gamma |- here M : <> A @ w
+
+
+ Omega; Gamma |- M : <> A @ w   forall w', w' \notin L -> \{w'} \u Omega; (A, w') :: Gamma |- N ^ w' : B @ w
+------------------------------------------------------------------------------------------------------------- (<> E)
+                                    Omega; Gamma |- letd M in N : B @ w
+ 
+
+5. Moving between worlds
+
+
+ w \in Omega   Omega; Gamma |- M : <> A @ w'
+--------------------------------------------- (get)
+    Omega; Gamma |- get w' M : <> A @ w
+
+
+ w \in Omega   Omega; Gamma |- M : [] A @ w'
+--------------------------------------------- (fetch)
+    Omega; Gamma |- fetch w' M : [] A @ w
