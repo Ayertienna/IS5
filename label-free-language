@@ -1,0 +1,60 @@
+1. Variable
+
+  
+       Gamma[n] == A
+----------------------------- (Id)
+ G |= Gamma |- hyp n : A
+
+
+2. Arrow
+
+
+     G |= A::Gamma |- M : B 
+--------------------------------- (-> I)
+ G |= Gamma |- lam A, M : A -> B
+
+
+ G |= Gamma |- M : A -> B   G |= Gamma |- N : A
+------------------------------------------------- (-> E)
+           G |= Gamma |- appl M N : B
+
+
+3. Box
+
+
+ \{Gamma} \u G |= nil |- M : A
+------------------------------- ([] I)
+  G |= Gamma |- box M : [] A
+
+
+  G |= Gamma |- M : [] A
+--------------------------- ([] E1)
+ G |= Gamma |- unbox M : A
+
+
+ Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : [] A
+--------------------------------------------------------------- ([] E2)
+                G |= Gamma' |- unbox_fetch M : A
+
+
+4. Diamond
+
+
+     G |= Gamma |- M : A
+----------------------------- (<> I1)
+ G |= Gamma |- here M : <> A
+
+
+ Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : A
+------------------------------------------------------------ (<> I2)
+            G |= Gamma' |- get_here M : <> A
+
+
+ G |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma |- N : C
+----------------------------------------------------------- (<> E1)
+             G |= Gamma |- letdia M in N : C
+
+
+ Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma' |- N : C
+--------------------------------------------------------------------------------------------------- (<> E2)
+                              G |= Gamma' |- letdia_get M in N : C
