@@ -163,6 +163,51 @@ rewrite in_union; left; assumption.
 assumption.
 Qed.
 
+Lemma Progress:
+forall M A
+  (HT: \{} |= nil |- M ::: A),
+  value M \/ exists N, M |-> N.
+induction M; intros; eauto using value.
+(* hyp *)
+inversion HT; destruct n; discriminate.
+(* appl *)
+right.
+inversion HT; subst.
+destruct (IHM1 (A0 ---> A) HT1).
+  inversion H; subst; inversion HT1; subst; eexists; constructor.
+  destruct H; eexists; constructor; eapply H.
+(* unbox *)
+right.
+inversion HT; subst.
+destruct (IHM ([*]A) HT0).
+  inversion H; subst; inversion HT0; subst; eexists; constructor.
+  destruct H; eexists; constructor; eapply H.
+(* unbox_fetch *)
+inversion HT; subst;
+apply in_empty_elim in HIn;
+contradiction.
+(* here *)
+inversion HT; subst.
+destruct (IHM A0 HT0).
+left; apply val_here; assumption.
+right; destruct H. exists (here x); eauto using step.
+(* get_here *)
+inversion HT; subst;
+apply in_empty_elim in HIn;
+contradiction.
+(* letdia *)
+inversion HT; subst.
+destruct (IHM1 (<*>A0) HT1).
+inversion H; subst; inversion HT1; subst.
+  right. exists [M//0]M2; eauto using step.
+  right. exists [M//0]M2; eauto using step.
+destruct H; right; exists (letdia x M2); eauto using step.
+(* letdia_get *)
+inversion HT; subst;
+apply in_empty_elim in HIn;
+contradiction.
+Qed.
+
 End Lemmas.
 
 Close Scope is5_scope.
