@@ -163,6 +163,79 @@ rewrite in_union; left; assumption.
 assumption.
 Qed.
 
+Lemma Progress:
+forall G M A
+  (EmptyCtx: forall Ctx, Ctx \in G -> Ctx = nil)
+  (HT: G |= nil |- M ::: A),
+  value M \/ exists N, M |-> N.
+induction M; intros; eauto using value.
+(* hyp *)
+inversion HT; destruct n; discriminate.
+(* appl *)
+right.
+inversion HT; subst.
+destruct (IHM1 (A0 ---> A) EmptyCtx HT1).
+  inversion H; subst; inversion HT1; subst; eexists; constructor.
+  destruct H; eexists; constructor; eapply H.
+(* unbox *)
+right.
+inversion HT; subst.
+destruct (IHM ([*]A) EmptyCtx HT0).
+  inversion H; subst; inversion HT0; subst; eexists; constructor.
+  destruct H; eexists; constructor; eapply H.
+(* unbox_fetch *)
+right; inversion HT; subst.
+destruct (IHM ([*]A) EmptyCtx).
+apply BackgroundImpl with (G:=\{nil} \u G \- \{nil}).
+intros; rewrite in_union in H; rewrite in_remove in H; destruct H.
+rewrite in_singleton in H; subst.
+assert (Gamma2 = nil); auto.
+subst; assumption.
+destruct H; assumption.
+apply EmptyCtx in HIn; subst; assumption.
+inversion H; subst; inversion HT0; subst.
+  eexists; constructor.
+destruct H; eexists; constructor; eauto.
+(* here *)
+inversion HT; subst.
+destruct (IHM A0 EmptyCtx HT0).
+left; apply val_here; assumption.
+right; destruct H. exists (here x); eauto using step.
+(* get_here *)
+inversion HT; subst.
+destruct (IHM A0 EmptyCtx).
+apply BackgroundImpl with (G:=\{nil} \u G \- \{nil}).
+intros; rewrite in_union in H; rewrite in_remove in H; destruct H.
+rewrite in_singleton in H; subst.
+assert (Gamma2 = nil); auto.
+subst; assumption.
+destruct H; assumption.
+apply EmptyCtx in HIn; subst. assumption.
+left; econstructor; eassumption.
+right; destruct H; exists (get_here x); eauto using step.
+(* letdia *)
+right; inversion HT; subst.
+destruct (IHM1 (<*>A0) EmptyCtx HT1).
+inversion H; subst; inversion HT1; subst.
+  exists [M//0]M2; eauto using step.
+  exists [M//0]M2; eauto using step.
+destruct H; exists (letdia x M2); eauto using step.
+(* letdia_get *)
+right; inversion HT; subst.
+destruct (IHM1 (<*>A0) EmptyCtx).
+apply BackgroundImpl with (G:=\{nil} \u G \- \{nil}).
+intros; rewrite in_union in H; rewrite in_remove in H; destruct H.
+rewrite in_singleton in H; subst.
+assert (Gamma = nil); auto.
+subst; assumption.
+destruct H; assumption.
+apply EmptyCtx in HIn; subst. assumption.
+inversion H; subst; inversion HT1; subst.
+  exists [M//0]M2; eauto using step.
+  exists [M//0]M2; eauto using step.
+destruct H; exists (letdia_get x M2); eauto using step.
+Qed.
+
 End Lemmas.
 
 Close Scope is5_scope.
