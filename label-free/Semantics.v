@@ -441,13 +441,151 @@ inversion H; subst; inversion HT1; subst.
 destruct H; exists (letdia_get x M2); eauto using step.
 Qed.
 
+Fixpoint subst_typing G L D : Prop :=
+match L, D with
+| nil, nil => True
+| M::L', A::D' => G |= nil |- M ::: A /\ (subst_typing G L' D')
+| _, _ => False
+end.
+
+Lemma subst_t_type_preserv:
+forall Delta G L Gamma N A
+  (HT1: subst_typing G L Delta)
+  (HT2: G |= Gamma ++ Delta |- N ::: A),
+  G |= Gamma |- subst_list L (length Gamma) N ::: A.
+Admitted.
+
+Lemma WorldsCollapse:
+forall G Delta G' Gamma M A,
+  G & Delta ++ G'|= Gamma |- M ::: A
+    <->
+  G ++ G' |= Gamma ++ Delta |- M ::: A.
+Admitted.
+
 Lemma Preservation:
-forall G M A N
-  (EmptyCtx: forall Ctx, Mem Ctx G -> Ctx = nil)
+forall M A N G 
+  (EmptyCtx: forall X, Mem X G -> X = nil)
   (HType: G |= nil |- M ::: A)
   (HStep: M |-> N),
   G |= nil |- N ::: A.
-Admitted.
+intros.
+remember (@nil ty) as Gamma.
+generalize dependent N.
+induction HType; intros;
+inversion HStep; subst;
+eauto using types.
+(* red_appl_lam *)
+inversion HType1; subst.
+replace ([N//0]M0) with (subst_list (N::nil) (length (@nil te)) M0) by auto.
+apply subst_t_type_preserv with (Delta:=A::nil).
+  simpl; split; auto.
+assumption.
+(* red_unbox_box *)
+inversion HType; subst.
+replace (@nil ty) with ((@nil ty)++(@nil ty)).
+apply WorldsCollapse; assumption.
+rew_app; reflexivity.
+(* red_unbox_fetch_box *)
+inversion HType; subst.
+apply BackgroundSubsetImpl with (G':=G & nil ++ G' & Gamma) in HT.
+apply WorldsCollapse in HT.
+rew_app in HT.
+apply BackgroundSubsetImpl with (G := G ++ G' & Gamma).
+exists nil; permut_simpl.
+assumption.
+exists nil; permut_simpl.
+apply permut_trans with (l2:= G & nil ++ G').
+rewrite H0; permut_simpl.
+permut_simpl.
+(* red_unbox_fetch *)
+constructor.
+assert (Gamma = nil).
+  apply EmptyCtx.
+  rew_app; rewrite Mem_app_or_eq.
+  right; rewrite Mem_cons_eq; 
+  left; reflexivity.
+subst.
+apply IHHType; auto.
+(* red_get_here *)
+constructor.
+assert (Gamma = nil).
+  apply EmptyCtx.
+  rew_app; rewrite Mem_app_or_eq.
+  right; rewrite Mem_cons_eq; 
+  left; reflexivity.
+subst.
+apply IHHType; auto.
+(* red_letdia_here *)
+inversion HType1; subst.
+replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
+apply subst_t_type_preserv with (Delta:=A::nil).
+  simpl; split; auto.
+rew_app.
+replace (A::nil) with (nil ++ (A::nil)) by (rew_app; reflexivity).
+replace G with (G ++ nil) by (rew_app; reflexivity).
+apply WorldsCollapse.
+rew_app.
+apply BackgroundSubsetImpl with (G:=(A::nil)::G).
+exists nil; permut_simpl.
+assumption.
+(* red_letdia__get_here *)
+inversion HType1; subst.
+replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
+apply subst_t_type_preserv with (Delta:=A::nil).
+  simpl; split; auto.
+apply WorldsCollapse in HT.
+apply <- WorldsCollapse.
+rew_app in *.
+assumption.
+clear IHHType1 IHHType2 HType1 EmptyCtx.
+apply -> WorldsCollapse.
+apply BackgroundSubsetImpl with (G:=(A :: nil) :: G0 & Gamma ++ G').
+exists nil; permut_simpl.
+assumption.
+(* red_letdia_get__here *)
+inversion HType1; subst.
+replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
+apply subst_t_type_preserv with (Delta:=A::nil).
+  simpl; split; auto.
+apply WorldsCollapse in HT.
+apply <- WorldsCollapse.
+rew_app in *.
+assumption.
+apply GlobalWeakening.
+clear IHHType1 IHHType2 HType1 EmptyCtx.
+apply -> WorldsCollapse.
+apply BackgroundSubsetImpl with (G:=(A :: nil) :: G ++ G').
+exists nil; permut_simpl.
+assumption.
+(* red_letdia_get_get_here *)
+inversion HType1; subst.
+replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
+apply subst_t_type_preserv with (Delta:=A::nil).
+  simpl; split; auto.
+replace Gamma0 with (nil++Gamma0) in HT by auto.
+apply WorldsCollapse in HT.
+apply BackgroundSubsetImpl with (G':= G & Gamma & nil ++ G') in HT.
+replace (@nil ty) with ((@nil ty) ++ (@nil ty)) by auto.
+apply -> WorldsCollapse.
+assumption.
+exists nil. permut_simpl. rew_app in *. rewrite H0. permut_simpl.
+clear IHHType1 IHHType2 HType1 EmptyCtx HT H0.
+apply GlobalWeakening.
+apply -> WorldsCollapse.
+apply BackgroundSubsetImpl with (G:=(A :: nil) :: G ++ G').
+exists nil; permut_simpl.
+assumption.
+(* red_letia_get *)
+assert (Gamma = nil).
+  apply EmptyCtx.
+  rew_app; rewrite Mem_app_or_eq.
+  right; rewrite Mem_cons_eq; 
+  left; reflexivity.
+subst.
+apply t_letdia_get with (A:=A).
+apply IHHType1; auto.
+assumption.
+Qed.
 
 End Lemmas.
 
