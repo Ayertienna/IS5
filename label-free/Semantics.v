@@ -4,6 +4,63 @@ Require Import LibList.
 Require Import LibListSorted.
 Require Import LibRelation.
 
+(*
+(* Test standard permutations *)
+Require Import List.
+Require Import Sorting.Permutation.
+
+(* Notations & definitions *)
+Notation "l & x" := (l ++ (x::nil)) 
+  (at level 28, left associativity) : list_scope.
+Definition permut := (@Permutation (list ty)).
+
+Lemma PermutLastSame:
+forall G G' elem
+  (HT: permut (G & elem) (G' & elem)),
+  permut G G'.
+intros;
+apply Permutation_app_inv_r in HT.
+assumption.
+Qed.
+
+Lemma InConsNeq:
+forall A G (elem:A) elem',
+  elem<>elem' -> In elem (G&elem') -> In elem G.
+intros.
+apply in_app_or in H0.
+destruct H0.
+assumption.
+apply in_inv in H0. destruct H0.
+symmetry in H0; contradiction.
+apply in_nil in H0; contradiction.
+Qed.
+
+Lemma PermutationElementSplit_Neq:
+forall G G' H elem elem'
+  (HNeq: elem <> elem')
+  (HT: permut (G & elem ++ G') (H & elem')),
+  exists GH, exists GT, H = GH & elem ++ GT.
+intros.
+assert (exists G0, exists G1, H = G0 ++ elem::G1). 
+apply in_split.
+apply InConsNeq with (elem':=elem').
+assumption.
+apply Permutation_in with (l:=G & elem ++ G').
+assumption.
+apply in_or_app.
+left; apply in_or_app.
+right; apply in_eq.
+(* after assert *)
+destruct H0 as [GH]; destruct H0 as [GT];
+exists GH; exists GT.
+subst H;
+rewrite <- app_assoc.
+simpl; reflexivity.
+Qed.
+
+(* / *)
+*)
+
 Open Scope is5_scope.
 
 Global Reserved Notation " G '|=' Gamma '|-' M ':::' A " (at level 70).
@@ -11,7 +68,6 @@ Global Reserved Notation " G '|=' Gamma '|-' M ':::' A " (at level 70).
 Definition Context := list ty.
 
 (* Statics *)
-
 Inductive types: list Context -> Context -> te -> ty -> Prop :=
 | t_hyp: forall A G Gamma v_n
   (HT: nth_error Gamma v_n = Some A),
@@ -89,13 +145,13 @@ Qed.
 (* Permutation *)
 
 Lemma PermutLastSame:
-forall A G G' (elem: A)
+forall A G G' (elem:A)
   (HT: permut (G & elem) (G' & elem)),
   permut G G'.
 Admitted.
 
 Lemma PermutationElementSplit_Neq:
-forall A G G' H (elem: A) (elem': A)
+forall A G G' H (elem:A) (elem':A)
   (HNeq: elem <> elem')
   (HT: permut (G & elem ++ G') (H & elem')),
   exists GH, exists GT, H = GH & elem ++ GT.
