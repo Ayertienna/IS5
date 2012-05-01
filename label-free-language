@@ -25,8 +25,8 @@ I. Statics
 3. Box
 
 
- \{Gamma} \u G |= nil |- M : A
-------------------------------- ([] I)
+  G & Gamma |= nil |- M : A
+----------------------------- ([] I)
   G |= Gamma |- box M : [] A
 
 
@@ -35,9 +35,9 @@ I. Statics
  G |= Gamma |- unbox M : A
 
 
- Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : [] A
---------------------------------------------------------------- ([] E2)
-                G |= Gamma' |- unbox_fetch M : A
+ G & Gamma' |= Gamma |- M : [] A   Permutation (G & Gamma) G'
+-------------------------------------------------------------- ([] E2)
+            G' |= Gamma' |- unbox_fetch M : A
 
 
 4. Diamond
@@ -48,9 +48,9 @@ I. Statics
  G |= Gamma |- here M : <> A
 
 
- Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : A
+ G & Gamma' |= Gamma |- M : A   Permutation (G & Gamma) G'
 ------------------------------------------------------------ (<> I2)
-            G |= Gamma' |- get_here M : <> A
+            G' |= Gamma' |- get_here M : <> A
 
 
  G |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma |- N : C
@@ -58,9 +58,9 @@ I. Statics
              G |= Gamma |- letdia M in N : C
 
 
- Gamma \in G   \{Gamma'} \u G \- \{Gamma} |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma' |- N : C
---------------------------------------------------------------------------------------------------- (<> E2)
-                              G |= Gamma' |- letdia_get M in N : C
+ G & Gamma' |= Gamma |- M : <> A   (A::nil) :: G & Gamma |= Gamma' |- N : C   Permutation (G & Gamma) G'
+--------------------------------------------------------------------------------------------------------- (<> E2)
+                                G' |= Gamma' |- letdia_get M in N : C
 
 
 II. Dynamics
