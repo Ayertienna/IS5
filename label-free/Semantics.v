@@ -1,9 +1,8 @@
 Require Export Syntax.
 Require Export Substitution.
-Require Import List.
 Require Import LibList.
-Require Import LibNat.
 Require Import LibListSorted.
+Require Import LibRelation.
 
 Open Scope is5_scope.
 
@@ -24,29 +23,29 @@ Inductive types: list Context -> Context -> te -> ty -> Prop :=
   (HT1: G |= Gamma |- M ::: A ---> B)
   (HT2: G |= Gamma |- N ::: A),
   G |= Gamma |- (appl M N) ::: B
-| t_box: forall A G G' Gamma M
-  (HT: G & Gamma ++ G' |= nil |- M ::: A),
-  G ++ G' |= Gamma |- (box M) ::: [*] A
+| t_box: forall A G Gamma M
+  (HT: G & Gamma |= nil |- M ::: A),
+  G |= Gamma |- (box M) ::: [*] A
 | t_unbox: forall A G Gamma M
   (HT: G |= Gamma |- M ::: [*] A),
   G |= Gamma |- unbox M ::: A
-| t_unbox_fetch: forall A G G' Gamma Gamma' M
-  (HT: G & Gamma' ++ G' |= Gamma |- M ::: [*] A),
-  G & Gamma ++ G' |= Gamma' |- unbox_fetch M ::: A
+| t_unbox_fetch: forall A G Gamma Gamma' M
+  (HT: G & Gamma' |= Gamma |- M ::: [*] A),
+  forall G0, permut (G & Gamma) G0 -> G0 |= Gamma' |- unbox_fetch M ::: A
 | t_here: forall A G Gamma M
   (HT: G |= Gamma |- M ::: A),
   G |= Gamma |- here M ::: <*> A
-| t_get_here: forall A G G' Gamma Gamma' M
-  (HT: G & Gamma' ++ G' |= Gamma |- M ::: A),
-  G & Gamma ++ G' |= Gamma' |- get_here M ::: <*> A
+| t_get_here: forall A G Gamma Gamma' M
+  (HT: G & Gamma' |= Gamma |- M ::: A),
+  forall G0, permut (G & Gamma) G0 -> G0 |= Gamma' |- get_here M ::: <*> A
 | t_letdia: forall A B G Gamma M N
   (HT1: G |= Gamma |- M ::: <*> A)
   (HT2: (A :: nil) :: G |= Gamma |- N ::: B),
-  G |= Gamma |- letdia M N ::: B
-| t_letdia_get: forall A B G G' Gamma Gamma' M N
-  (HT1: G & Gamma' ++ G' |= Gamma |- M ::: <*> A)
-  (HT2: (A :: nil) :: G ++ G' |= Gamma' |- N ::: B),
-  G & Gamma ++ G' |= Gamma' |- letdia_get M N ::: B
+  G |= Gamma |- letdia M N ::: B 
+| t_letdia_get: forall A B G Gamma Gamma' M N
+  (HT1: G & Gamma' |= Gamma |- M ::: <*> A)
+  (HT2: (A :: nil) :: G & Gamma |= Gamma' |- N ::: B),
+  forall G0, permut (G & Gamma) G0 -> G0 |= Gamma' |- letdia_get M N ::: B
 where " G '|=' Gamma '|-' M ':::' A " := (types G Gamma M A).
 
 (* Dynamics *)
@@ -86,10 +85,13 @@ forall Gamma Gamma': Context, {Gamma = Gamma'} + {Gamma <> Gamma'}.
 Qed.
 
 (* TODO: this may be moved to a separate file *)
-Lemma PermutationElementSplit:
-forall A G G' H (elem: A)
-  (HT: permut (G & elem ++ G') H),
-  exists GH, exists GT, H = GH & elem ++ GT.
+
+(* Permutation *)
+
+Lemma PermutLastSame:
+forall A G G' (elem: A)
+  (HT: permut (G & elem) (G' & elem)),
+  permut G G'.
 Admitted.
 
 Lemma PermutationElementSplit_Neq:
@@ -99,79 +101,50 @@ forall A G G' H (elem: A) (elem': A)
   exists GH, exists GT, H = GH & elem ++ GT.
 Admitted.
 
-Lemma PermutationElemInside:
-forall A G G' H H' (elem: A)
-  (HP: permut (G & elem ++ G') (H & elem ++ H')),
-  permut (G++G') (H++H').
-Admitted.
+(* / Permutation *)
 
-(* TODO: ugly.. *)
+(* TODO: not automated enough *)
 Lemma BackgroundSubsetImpl:
 forall G G' Gamma M A
-  (HSubst: exists GT, permut (G++GT) G')
-  (HT: G |= Gamma |- M ::: A),
+  (HT: G |= Gamma |- M ::: A)
+  (HSubst: exists GT, permut (G++GT) G'),
   G' |= Gamma |- M ::: A.
 intros.
 generalize dependent G'.
 induction HT; intros; eauto using types.
 (* box *)
-replace G'0 with (G'0 ++ nil) by (rew_app; reflexivity);
-constructor; rew_app;
-apply IHHT;
 destruct HSubst as [GT];
-exists GT; permut_simpl;
-rew_app in H; assumption.
+constructor;
+apply IHHT;
+exists GT; permut_simpl; assumption.
 (* unbox_fetch *)
-destruct HSubst as [GT].
-replace ((G & Gamma ++ G') ++ GT) with (G & Gamma ++ (G'++GT)) in H by (rew_app; reflexivity).
-assert (exists GH0, exists GT0, G'0 = GH0 & Gamma ++ GT0).
-  apply PermutationElementSplit with (G:=G) (G':=G'++GT); assumption.
-destruct H0 as [GH0]; destruct H0 as [GT0]. 
-subst G'0.
-constructor.
-apply IHHT.
-exists GT; 
-permut_simpl.
-apply PermutationElemInside in H.
-assumption.
+destruct HSubst as [GT];
+apply t_unbox_fetch with (Gamma:=Gamma) (G:=G++GT).
+apply IHHT;
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G0 ++ GT); 
+[ permut_simpl | ]; assumption.
 (* get_here *)
-destruct HSubst as [GT].
-replace ((G & Gamma ++ G') ++ GT) with (G & Gamma ++ (G'++GT)) in H by (rew_app; reflexivity).
-assert (exists GH0, exists GT0, G'0 = GH0 & Gamma ++ GT0).
-  apply PermutationElementSplit with (G:=G) (G':=G'++GT); assumption.
-destruct H0 as [GH0]; destruct H0 as [GT0]. 
-subst G'0.
-constructor.
-apply IHHT.
-exists GT; 
-permut_simpl.
-apply PermutationElemInside in H.
-assumption.
+destruct HSubst as [GT];
+apply t_get_here with (Gamma:=Gamma) (G:=G++GT).
+apply IHHT;
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G0 ++ GT); 
+[ permut_simpl | ]; assumption.
 (* letdia *)
 apply t_letdia with (A:=A). 
 apply IHHT1; assumption.
-apply IHHT2.
-destruct HSubst as [GT];
-exists GT.
-permut_simpl; assumption.
+apply IHHT2; destruct HSubst as [GT];
+exists GT; permut_simpl; assumption.
 (* letdia_get *)
-destruct HSubst as [GT].
-replace ((G & Gamma ++ G') ++ GT) with (G & Gamma ++ (G'++GT)) in H by (rew_app; reflexivity).
-assert (exists GH0, exists GT0, G'0 = GH0 & Gamma ++ GT0).
-  apply PermutationElementSplit with (G:=G) (G':=G'++GT); assumption.
-destruct H0 as [GH0]; destruct H0 as [GT0]. 
-subst G'0.
-apply t_letdia_get with (A:=A).
-apply IHHT1.
-exists GT; 
-permut_simpl.
-apply PermutationElemInside in H.
-assumption.
-apply IHHT2.
-exists GT; 
-permut_simpl.
-apply PermutationElemInside in H.
-assumption.
+destruct HSubst as [GT];
+apply t_letdia_get with (A:=A)(Gamma:=Gamma) (G:=G++GT).
+apply IHHT1;
+  exists GT; permut_simpl.
+apply IHHT2;
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G0 ++ GT); 
+[ permut_simpl | ]; assumption.
 Qed.
 
 Lemma GlobalWeakening:
@@ -180,10 +153,10 @@ forall G G' Gamma M A Ctx
   G & Ctx ++ G' |= Gamma |- M ::: A.
 intros; rew_app;
 apply BackgroundSubsetImpl with (G:=G++G');
-[exists (Ctx::nil); permut_simpl | assumption].
+[assumption | exists (Ctx::nil); permut_simpl].
 Qed.
 
-(* TODO: uglier... *)
+(* TODO: ugly!!!... *)
 Lemma Weakening_general:
 forall G Gamma M A
   (HT: G |= Gamma |- M ::: A),
@@ -195,112 +168,92 @@ intros.
 induction HT; split; intros.
 (* hyp *)
 eauto using types.
-constructor.
-generalize dependent v_n.
+constructor; generalize dependent v_n;
 induction Gamma; destruct v_n; intros;
-simpl in HT; try discriminate; simpl.
-  assumption.
-  apply IHGamma; assumption.
+simpl in HT; try discriminate; simpl;
+[ | apply IHGamma]; assumption.
 (* lam *)
-constructor;
-eapply IHHT; eassumption.
-constructor;
-eapply IHHT; eassumption.
+constructor; eapply IHHT; eassumption.
+constructor; eapply IHHT; eassumption.
 (* appl *)
 econstructor; [eapply IHHT1| eapply IHHT2]; eauto.
 econstructor; [eapply IHHT1| eapply IHHT2]; eauto.
 (* box 1 *)
-constructor.
-apply IHHT.
-permut_simpl; assumption.
+constructor;
+apply BackgroundSubsetImpl with (G:=G' & Gamma & (Delta ++ Delta')).
+  eapply IHHT.
+    permut_simpl; assumption.
+  exists nil; permut_simpl; assumption.
 (* box 2 *)
-constructor.
-destruct IHHT as (IHHT1, IHHT2).
-apply BackgroundSubsetImpl with (G:= (G ++ G') & (Gamma ++ Gamma')).
-  exists nil; permut_simpl.
-apply IHHT1. permut_simpl. 
+constructor;
+apply IHHT; permut_simpl.
 (* unbox *)
 constructor; apply IHHT; assumption.
 constructor; apply IHHT; assumption.
 (* unbox_fetch 1 *)
 destruct (eq_context_dec Gamma Delta).
 (* = *)
-subst.
-apply BackgroundSubsetImpl with (G:=(G & (Delta ++ Delta') ++ G')).
-  exists nil. permut_simpl. 
-  replace (G'0 & Delta) with (G'0 & Delta ++ nil) in H by (rew_app; reflexivity).
-  apply PermutationElemInside in H. 
-  rew_app in H; assumption.
-constructor.
-apply IHHT.
+subst;
+apply t_unbox_fetch with (Gamma:=Delta++Delta') (G:=G).
+  apply IHHT.
+  apply permut_app_l;
+  apply PermutLastSame with (elem:=Delta); (* sad panda 8( *)
+  apply permut_trans with (l2:=G0); assumption.
 (* <> *)
-assert (exists G0, exists G1, G'0 = G0 & Gamma ++ G1).
-  apply PermutationElementSplit_Neq with (G:=G) (G':=G') (elem':=Delta); assumption.
-destruct H0 as [G0]; destruct H0 as [G1].
-subst G'0.
-replace ((G0 & Gamma ++ G1) & (Delta ++Delta')) with (G0 & Gamma ++ (G1 & (Delta ++Delta'))) by (rew_app; reflexivity).
-constructor .
-replace (G0 & Gamma' ++ G1 & (Delta ++Delta')) with ((G0 & Gamma' ++ G1) & (Delta ++Delta')) by (rew_app; reflexivity).
-apply IHHT.
+assert (exists G0, exists G1, G' = G0 & Gamma ++ G1).
+  (* very sad panda 8( *)
+  apply PermutationElementSplit_Neq with (G:=G) (G':=nil) (elem':=Delta).
+    assumption.
+    rew_app; apply permut_trans with (l2:=G0); assumption.
+destruct H1 as [GH]; destruct H1 as [GT]; subst G';
+apply t_unbox_fetch with (Gamma:=Gamma) (G:=GH ++ GT & (Delta ++ Delta')).
+apply BackgroundSubsetImpl with (G:= (GH ++ GT & Gamma') & (Delta ++ Delta')).
+  apply IHHT; permut_simpl;
+  apply PermutLastSame with (elem := Gamma);
+  apply permut_trans with (l2:=G0).
+    assumption.
+    apply permut_trans with (l2:=(GH & Gamma ++ GT) & Delta).
+      assumption.
+      permut_simpl.
+  exists nil; permut_simpl.
 permut_simpl.
-replace ((G0 & Gamma ++ G1) & Delta) with (G0 & Gamma ++ (G1 & Delta)) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-assumption. 
 (* unbox_fetch 2 *)
-constructor.
-assert (exists GG, permut (G & (Gamma' ++ Gamma'0) ++ G') (GG & (Gamma' ++Gamma'0))).
-exists (G++G'); permut_simpl.
-destruct IHHT as (IHHT1, IHHT2).
-destruct H as [GG]. 
-apply BackgroundSubsetImpl with (G:=GG & (Gamma' ++ Gamma'0)).
-exists nil; apply permut_sym; permut_simpl. rew_app in *; assumption.
-apply IHHT1.
-permut_simpl.
-replace (GG & (Gamma' ++Gamma'0)) with (GG & (Gamma' ++Gamma'0) ++ nil) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-rew_app in H.
-assumption.
+apply t_unbox_fetch with (G:=G) (Gamma:=Gamma).
+  apply IHHT; permut_simpl.
+  assumption.
 (* here *)
 constructor; apply IHHT; assumption.
 constructor; apply IHHT; assumption.
 (* get_here 1 *)
 destruct (eq_context_dec Gamma Delta).
 (* = *)
-subst.
-apply BackgroundSubsetImpl with (G:=(G & (Delta ++Delta') ++ G')).
-  exists nil. permut_simpl. 
-  replace (G'0 & Delta) with (G'0 & Delta ++ nil) in H by (rew_app; reflexivity).
-  apply PermutationElemInside in H. 
-  rew_app in H; assumption.
-constructor.
-apply IHHT.
+subst;
+apply t_get_here with (Gamma:=Delta++Delta') (G:=G).
+  apply IHHT.
+  apply permut_app_l;
+  apply PermutLastSame with (elem:=Delta); (* sad panda 8( *)
+  apply permut_trans with (l2:=G0); assumption.
 (* <> *)
-assert (exists G0, exists G1, G'0 = G0 & Gamma ++ G1).
-  apply PermutationElementSplit_Neq with (G:=G) (G':=G') (elem':=Delta); assumption.
-destruct H0 as [G0]; destruct H0 as [G1].
-subst G'0.
-replace ((G0 & Gamma ++ G1) & (Delta ++ Delta')) with (G0 & Gamma ++ (G1 & (Delta ++Delta'))) by (rew_app; reflexivity).
-constructor .
-replace (G0 & Gamma' ++ G1 & (Delta ++Delta')) with ((G0 & Gamma' ++ G1) & (Delta ++Delta')) by (rew_app; reflexivity).
-apply IHHT.
+assert (exists G0, exists G1, G' = G0 & Gamma ++ G1).
+  apply PermutationElementSplit_Neq with (G:=G) (G':=nil) (elem':=Delta).
+    assumption.
+    rew_app; apply permut_trans with (l2:=G0); assumption.
+destruct H1 as [GH]; destruct H1 as [GT]; subst G';
+apply t_get_here with (Gamma:=Gamma) (G:=GH ++ GT & (Delta ++ Delta')).
+apply BackgroundSubsetImpl with (G:= (GH ++ GT & Gamma') & (Delta ++ Delta')).
+  apply IHHT; permut_simpl;
+  apply PermutLastSame with (elem := Gamma);
+  apply permut_trans with (l2:=G0).
+    assumption.
+    apply permut_trans with (l2:=(GH & Gamma ++ GT) & Delta).
+      assumption.
+      permut_simpl.
+  exists nil; permut_simpl.
 permut_simpl.
-replace ((G0 & Gamma ++ G1) & Delta) with (G0 & Gamma ++ (G1 & Delta)) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-assumption. 
 (* get_here 2 *)
-constructor.
-assert (exists GG, permut (G & (Gamma' ++Gamma'0) ++ G') (GG & (Gamma'++Gamma'0))).
-exists (G++G'); permut_simpl.
-destruct IHHT as (IHHT1, IHHT2).
-destruct H as [GG]. 
-apply BackgroundSubsetImpl with (G:=GG & (Gamma' ++ Gamma'0)).
-exists nil; apply permut_sym; permut_simpl. rew_app in *; assumption.
-apply IHHT1.
-permut_simpl.
-replace (GG & (Gamma' ++ Gamma'0)) with (GG & (Gamma'  ++ Gamma'0) ++ nil) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-rew_app in H.
-assumption.
+apply t_get_here with (G:=G) (Gamma:=Gamma).
+  apply IHHT; permut_simpl.
+  assumption.
 (* letdia *)
 apply t_letdia with (A:=A).
 apply IHHT1; assumption.
@@ -313,48 +266,52 @@ apply IHHT2.
 (* letdia_get 1 *)
 destruct (eq_context_dec Gamma Delta).
 (* = *)
-subst.
-apply BackgroundSubsetImpl with (G:=(G & (Delta ++Delta') ++ G')).
-  exists nil. permut_simpl. 
-  replace (G'0 & Delta) with (G'0 & Delta ++ nil) in H by (rew_app; reflexivity).
-  apply PermutationElemInside in H. 
-  rew_app in H; assumption.
-apply t_letdia_get with (A:=A).
-apply IHHT1.
-assumption.
+subst;
+apply t_letdia_get with (A:=A)(Gamma:=Delta++Delta') (G:=G).
+apply IHHT1; assumption.
+apply BackgroundSubsetImpl with (G:=((A::nil) :: G) & (Delta ++ Delta')).
+  apply IHHT2; permut_simpl.
+  exists nil; permut_simpl.
+apply permut_app_l;
+apply PermutLastSame with (elem:=Delta); (* sad panda 8( *)
+apply permut_trans with (l2:=G0); assumption.
 (* <> *)
-assert (exists G0, exists G1, G'0 = G0 & Gamma ++ G1).
-  apply PermutationElementSplit_Neq with (G:=G) (G':=G') (elem':=Delta); assumption.
-destruct H0 as [G0]; destruct H0 as [G1].
-subst G'0.
-replace ((G0 & Gamma ++ G1) & (Delta ++Delta')) with (G0 & Gamma ++ (G1 & (Delta ++Delta'))) by (rew_app; reflexivity).
-apply t_letdia_get with (A:=A).
-replace (G0 & Gamma' ++ G1 & (Delta ++Delta')) with ((G0 & Gamma' ++ G1) & (Delta ++Delta')) by (rew_app; reflexivity).
-apply IHHT1.
+assert (exists G0, exists G1, G' = G0 & Gamma ++ G1).
+  apply PermutationElementSplit_Neq with (G:=G) (G':=nil) (elem':=Delta).
+    assumption.
+    rew_app; apply permut_trans with (l2:=G0); assumption.
+destruct H1 as [GH]; destruct H1 as [GT];
+subst G';
+apply t_letdia_get with (A:=A)(Gamma:=Gamma) (G:=GH ++ GT & (Delta ++ Delta')).
+(* <*> A*)
+apply BackgroundSubsetImpl with (G:= (GH ++ GT & Gamma') & (Delta ++ Delta')).
+  apply IHHT1;
+  permut_simpl;
+  apply PermutLastSame with (elem := Gamma);
+  apply permut_trans with (l2:=G0).
+    assumption.
+    apply permut_trans with (l2:=(GH & Gamma ++ GT) & Delta).
+      assumption.
+      permut_simpl.
+exists nil; permut_simpl.
+(* B *)
+apply BackgroundSubsetImpl with (G:=(((A :: nil) :: GH ++ GT & Gamma) & (Delta ++ Delta'))).
+  apply IHHT2;
+  permut_simpl;
+  apply PermutLastSame with (elem := Gamma);
+  apply permut_trans with (l2:=G0).
+    assumption. 
+    permut_simpl.
+    apply permut_trans with (l2:=(GH & Gamma ++ GT) & Delta).
+      assumption.
+      permut_simpl.
+  exists nil; permut_simpl.
 permut_simpl.
-replace ((G0 & Gamma ++ G1) & Delta) with (G0 & Gamma ++ (G1 & Delta)) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-assumption. 
-replace ( (A :: nil) :: G0 ++ G1 & (Delta ++Delta')) with (((A :: nil) :: G0 ++ G1) & (Delta ++Delta')) by (rew_app;reflexivity).
-apply IHHT2.
-permut_simpl.
-replace ((G0 & Gamma ++ G1) & Delta) with (G0 & Gamma ++ (G1 & Delta)) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-assumption. 
 (* letdia_get 2 *)
-apply t_letdia_get with (A:=A). 
-assert (exists GG, permut (G & (Gamma' ++Gamma'0) ++ G') (GG & (Gamma' ++Gamma'0))).
-exists (G++G'); permut_simpl.
-destruct H as [GG]. 
-apply BackgroundSubsetImpl with (G:=GG & (Gamma' ++ Gamma'0)).
-exists nil; apply permut_sym; permut_simpl. rew_app in *; assumption.
-apply IHHT1.
-permut_simpl.
-replace (GG & (Gamma' ++Gamma'0)) with (GG & (Gamma' ++ Gamma'0) ++ nil) in H by (rew_app; reflexivity).
-apply PermutationElemInside in H.
-rew_app in H.
+apply t_letdia_get with (A:=A)(G:=G) (Gamma:=Gamma).
+apply IHHT1; permut_simpl.
+apply IHHT2; permut_simpl.
 assumption.
-apply IHHT2.
 Qed.
 
 Lemma WeakeningBackgroundElem:
@@ -363,10 +320,10 @@ forall G G' Delta Delta' Gamma M A
   G & (Delta ++ Delta') ++ G' |= Gamma |- M ::: A.
 intros.
 apply BackgroundSubsetImpl with (G:=(G++G') & (Delta ++ Delta')).
-exists nil; permut_simpl.
 assert (permut (G & Delta ++ G') ((G++G') & Delta)).
   permut_simpl.
 eapply Weakening_general; eassumption.
+exists nil; permut_simpl.
 Qed.
 
 Lemma Weakening:
@@ -379,7 +336,9 @@ Qed.
 
 Lemma Progress:
 forall G M A
-  (EmptyCtx: forall Ctx, Mem Ctx G -> Ctx = nil)
+  (EmptyCtx: forall G', 
+    permut G G' -> 
+    forall Ctx, Mem Ctx G' -> Ctx = nil)
   (HT: G |= nil |- M ::: A),
   value M \/ exists N, M |-> N.
 induction M; intros; eauto using value.
@@ -399,10 +358,13 @@ destruct (IHM ([*]A) EmptyCtx HT0).
 right; inversion HT; subst.
 destruct (IHM ([*]A) EmptyCtx).
 assert (Gamma = nil).
-  apply EmptyCtx;
-  rewrite Mem_app_or_eq; left; rewrite Mem_app_or_eq; right;
-  rewrite Mem_cons_eq; left; reflexivity.
-subst; assumption.
+  apply EmptyCtx with (G':=G0 & Gamma).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq. right; rewrite Mem_cons_eq; left; reflexivity.
+subst. 
+apply BackgroundSubsetImpl with (G:=G0 & nil). 
+assumption.
+exists nil; rew_app; assumption.
 inversion H; subst; inversion HT0; subst; eexists; constructor.
 destruct H; eexists; constructor; eapply H.
 (* here *)
@@ -414,10 +376,14 @@ right; destruct H; exists (here x); eauto using step.
 inversion HT; subst.
 destruct (IHM A0 EmptyCtx).
 assert (Gamma = nil).
-  apply EmptyCtx;
-  rewrite Mem_app_or_eq; left; rewrite Mem_app_or_eq; right;
+  apply EmptyCtx with (G' := G0 & Gamma).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq; right;
   rewrite Mem_cons_eq; left; reflexivity.
-subst; assumption.
+subst. 
+apply BackgroundSubsetImpl with (G:=G0 & nil).
+assumption.
+exists nil; permut_simpl; assumption.
 left; econstructor; eassumption.
 right; destruct H; exists (get_here x); eauto using step.
 (* letdia *)
@@ -431,160 +397,70 @@ destruct H; exists (letdia x M2); eauto using step.
 right; inversion HT; subst.
 destruct (IHM1 (<*>A0) EmptyCtx).
 assert (Gamma = nil).
-  apply EmptyCtx;
-  rewrite Mem_app_or_eq; left; rewrite Mem_app_or_eq; right;
+  apply EmptyCtx with (G' := G0 & Gamma).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq; right;
   rewrite Mem_cons_eq; left; reflexivity.
-subst; assumption.
+subst.
+apply BackgroundSubsetImpl with (G:=G0 & nil).
+assumption.
+exists nil; permut_simpl; assumption.
 inversion H; subst; inversion HT1; subst.
   exists [M//0]M2; eauto using step.
   exists [M//0]M2; eauto using step.
 destruct H; exists (letdia_get x M2); eauto using step.
 Qed.
 
-Fixpoint subst_typing G L D : Prop :=
-match L, D with
-| nil, nil => True
-| M::L', A::D' => G |= nil |- M ::: A /\ (subst_typing G L' D')
-| _, _ => False
-end.
-
-Lemma subst_t_type_preserv:
-forall Delta G L Gamma N A
-  (HT1: subst_typing G L Delta)
-  (HT2: G |= Gamma ++ Delta |- N ::: A),
-  G |= Gamma |- subst_list L (length Gamma) N ::: A.
-Admitted.
-
-Lemma WorldsCollapse:
-forall G Delta G' Gamma M A,
-  G & Delta ++ G'|= Gamma |- M ::: A
-    <->
-  G ++ G' |= Gamma ++ Delta |- M ::: A.
-Admitted.
-
-Lemma Preservation:
-forall M A N G 
-  (EmptyCtx: forall X, Mem X G -> X = nil)
-  (HType: G |= nil |- M ::: A)
-  (HStep: M |-> N),
-  G |= nil |- N ::: A.
+(* Original formulations of modified typing rules can be reconstructed *)
+Lemma test_box:
+  forall G G' Gamma M A,
+    G & Gamma ++ G' |=  nil |- M ::: A ->
+      G ++ G' |= Gamma |- box M ::: [*]A.
 intros.
-remember (@nil ty) as Gamma.
-generalize dependent N.
-induction HType; intros;
-inversion HStep; subst;
-eauto using types.
-(* red_appl_lam *)
-inversion HType1; subst.
-replace ([N//0]M0) with (subst_list (N::nil) (length (@nil te)) M0) by auto.
-apply subst_t_type_preserv with (Delta:=A::nil).
-  simpl; split; auto.
-assumption.
-(* red_unbox_box *)
-inversion HType; subst.
-replace (@nil ty) with ((@nil ty)++(@nil ty)).
-apply WorldsCollapse; assumption.
-rew_app; reflexivity.
-(* red_unbox_fetch_box *)
-inversion HType; subst.
-apply BackgroundSubsetImpl with (G':=G & nil ++ G' & Gamma) in HT.
-apply WorldsCollapse in HT.
-rew_app in HT.
-apply BackgroundSubsetImpl with (G := G ++ G' & Gamma).
-exists nil; permut_simpl.
+constructor.
+apply BackgroundSubsetImpl with (G:=G & Gamma ++ G').
 assumption.
 exists nil; permut_simpl.
-apply permut_trans with (l2:= G & nil ++ G').
-rewrite H0; permut_simpl.
+Qed.
+
+Lemma test_unbox_fetch:
+  forall G G' Gamma Gamma' M A,
+    G & Gamma ++ G' |= Gamma' |- M ::: [*] A ->
+      G & Gamma' ++ G' |= Gamma |- unbox_fetch M ::: A.
+intros.
+apply t_unbox_fetch with (G:=G ++ G') (Gamma:=Gamma').
+apply BackgroundSubsetImpl with (G:=G & Gamma ++ G').
+assumption.
+exists nil; permut_simpl.
 permut_simpl.
-(* red_unbox_fetch *)
-constructor.
-assert (Gamma = nil).
-  apply EmptyCtx.
-  rew_app; rewrite Mem_app_or_eq.
-  right; rewrite Mem_cons_eq; 
-  left; reflexivity.
-subst.
-apply IHHType; auto.
-(* red_get_here *)
-constructor.
-assert (Gamma = nil).
-  apply EmptyCtx.
-  rew_app; rewrite Mem_app_or_eq.
-  right; rewrite Mem_cons_eq; 
-  left; reflexivity.
-subst.
-apply IHHType; auto.
-(* red_letdia_here *)
-inversion HType1; subst.
-replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
-apply subst_t_type_preserv with (Delta:=A::nil).
-  simpl; split; auto.
-rew_app.
-replace (A::nil) with (nil ++ (A::nil)) by (rew_app; reflexivity).
-replace G with (G ++ nil) by (rew_app; reflexivity).
-apply WorldsCollapse.
-rew_app.
-apply BackgroundSubsetImpl with (G:=(A::nil)::G).
+Qed.
+
+Lemma test_get_here:
+  forall G G' Gamma Gamma' M A,
+    G & Gamma' ++ G' |= Gamma |- M ::: A ->
+      G & Gamma ++ G' |= Gamma' |- get_here M ::: <*> A.
+intros.
+apply t_get_here with (G:=G ++ G') (Gamma:=Gamma).
+apply BackgroundSubsetImpl with (G:=G & Gamma' ++ G').
+assumption.
 exists nil; permut_simpl.
-assumption.
-(* red_letdia__get_here *)
-inversion HType1; subst.
-replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
-apply subst_t_type_preserv with (Delta:=A::nil).
-  simpl; split; auto.
-apply WorldsCollapse in HT.
-apply <- WorldsCollapse.
-rew_app in *.
-assumption.
-clear IHHType1 IHHType2 HType1 EmptyCtx.
-apply -> WorldsCollapse.
-apply BackgroundSubsetImpl with (G:=(A :: nil) :: G0 & Gamma ++ G').
-exists nil; permut_simpl.
-assumption.
-(* red_letdia_get__here *)
-inversion HType1; subst.
-replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
-apply subst_t_type_preserv with (Delta:=A::nil).
-  simpl; split; auto.
-apply WorldsCollapse in HT.
-apply <- WorldsCollapse.
-rew_app in *.
-assumption.
-apply GlobalWeakening.
-clear IHHType1 IHHType2 HType1 EmptyCtx.
-apply -> WorldsCollapse.
-apply BackgroundSubsetImpl with (G:=(A :: nil) :: G ++ G').
-exists nil; permut_simpl.
-assumption.
-(* red_letdia_get_get_here *)
-inversion HType1; subst.
-replace ([M0//0]N) with (subst_list (M0::nil) (length (@nil te)) N) by auto.
-apply subst_t_type_preserv with (Delta:=A::nil).
-  simpl; split; auto.
-replace Gamma0 with (nil++Gamma0) in HT by auto.
-apply WorldsCollapse in HT.
-apply BackgroundSubsetImpl with (G':= G & Gamma & nil ++ G') in HT.
-replace (@nil ty) with ((@nil ty) ++ (@nil ty)) by auto.
-apply -> WorldsCollapse.
-assumption.
-exists nil. permut_simpl. rew_app in *. rewrite H0. permut_simpl.
-clear IHHType1 IHHType2 HType1 EmptyCtx HT H0.
-apply GlobalWeakening.
-apply -> WorldsCollapse.
-apply BackgroundSubsetImpl with (G:=(A :: nil) :: G ++ G').
-exists nil; permut_simpl.
-assumption.
-(* red_letia_get *)
-assert (Gamma = nil).
-  apply EmptyCtx.
-  rew_app; rewrite Mem_app_or_eq.
-  right; rewrite Mem_cons_eq; 
-  left; reflexivity.
-subst.
-apply t_letdia_get with (A:=A).
-apply IHHType1; auto.
-assumption.
+permut_simpl.
+Qed.
+
+Lemma test_letdia_get:
+  forall G G' Gamma Gamma' M N A B,
+    G & Gamma' ++ G' |= Gamma |- M ::: <*>A ->
+    (A::nil) :: G & Gamma ++ G' |= Gamma' |- N ::: B ->
+      G & Gamma ++ G' |= Gamma' |-  letdia_get M N ::: B.
+intros.
+apply t_letdia_get with (A:=A) (Gamma:=Gamma) (G:=G ++ G').
+apply BackgroundSubsetImpl with (G:=G & Gamma' ++ G').
+  assumption.
+  exists nil; permut_simpl.
+apply BackgroundSubsetImpl with (G:=(A::nil) :: G & Gamma ++ G').
+  assumption.  
+  exists nil; permut_simpl.
+permut_simpl.
 Qed.
 
 End Lemmas.
