@@ -3,5 +3,6 @@
 .*
 *~
 *.glob
+Makefile.coq
 todo
 notes
