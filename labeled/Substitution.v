@@ -1,8 +1,8 @@
 Require Export Syntax.
-Require Export Arith.
-Require Export List.
+Require Import Arith.
+Require Import LibList.
 
-Open Scope is5_scope.
+Open Scope labeled_is5_scope.
 
 
 (* Term variable substitution *)
@@ -10,17 +10,17 @@ Reserved Notation " [ M // x ] N " (at level 5).
 
 Fixpoint subst_t M x N :=
 match N with
-| hyp v => if (eq_nat_dec x v) then M else N
-| lam t N' => lam t [M//S x]N'
-| appl N' N'' => appl [M//x]N' [M//x]N''
-| box N' => box [M//x]N'
-| unbox N' => unbox [M//x]N'
-| get w N' => get w [M//x]N'
-| letd N' N'' => letd [M//x]N' [M//S x]N''
-| here N' => here [M//x]N'
-| fetch w N' => fetch w [M//x]N'
+| hyp_L v => if (eq_nat_dec x v) then M else N
+| lam_L t N' => lam_L t [M//S x]N'
+| appl_L N' N'' => appl_L [M//x]N' [M//x]N''
+| box_L N' => box_L [M//x]N'
+| unbox_L N' => unbox_L [M//x]N'
+| get_L w N' => get_L w [M//x]N'
+| letd_L N' N'' => letd_L [M//x]N' [M//S x]N''
+| here_L N' => here_L [M//x]N'
+| fetch_L w N' => fetch_L w [M//x]N'
 end
-where " [ M // x ] N " := (subst_t M x N) : is5_scope.
+where " [ M // x ] N " := (subst_t M x N) : labeled_is5_scope.
 
 (* Substitute L[0] for n, L[1] for n+1,.. in M *)
 Fixpoint subst_list L n N :=
@@ -34,30 +34,30 @@ Reserved Notation " { w1 // w2 } N " (at level 5).
 
 Fixpoint subst_w w1 w2 N :=
 match N with
-| hyp v => hyp v
-| lam t N' => lam t {w1//w2}N'
-| appl N' N'' => appl {w1//w2}N' {w1//w2}N''
-| box N' => match w1, w2 with
-              | fwo w1', bwo w2' => box {w1 // bwo (S w2')}N'
-              | fwo w1', fwo w2' => box {w1 // w2} N'
-              | bwo w1', bwo w2' => box {bwo (S w1') // bwo (S w2')} N'
-              | bwo w1', fwo w2' => box {bwo (S w1')//w2} N'
+| hyp_L v => hyp_L v
+| lam_L t N' => lam_L t {w1//w2}N'
+| appl_L N' N'' => appl_L {w1//w2}N' {w1//w2}N''
+| box_L N' => match w1, w2 with
+              | fwo w1', bwo w2' => box_L {w1 // bwo (S w2')}N'
+              | fwo w1', fwo w2' => box_L {w1 // w2} N'
+              | bwo w1', bwo w2' => box_L {bwo (S w1') // bwo (S w2')} N'
+              | bwo w1', fwo w2' => box_L {bwo (S w1')//w2} N'
             end
-| unbox N' => unbox {w1//w2}N'
-| get w N' => get (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
-| letd N' N'' => match w1, w2 with
-                   | fwo w1', bwo w2' => letd {w1 // w2}N' {w1 // bwo (S w2')}N''
-                   | fwo w1', fwo w2' => letd {w1 // w2}N' {w1 // w2}N''
-                   | bwo w1', bwo w2' => letd {w1//w2}N' {bwo (S w1') // bwo (S w2')} N''
-                   | bwo w1', fwo w2' => letd {w1//w2}N' {bwo (S w1')//w2}N''
+| unbox_L N' => unbox_L {w1//w2}N'
+| get_L w N' => get_L (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
+| letd_L N' N'' => match w1, w2 with
+                   | fwo w1', bwo w2' => letd_L {w1 // w2}N' {w1 // bwo (S w2')}N''
+                   | fwo w1', fwo w2' => letd_L {w1 // w2}N' {w1 // w2}N''
+                   | bwo w1', bwo w2' => letd_L {w1//w2}N' {bwo (S w1') // bwo (S w2')} N''
+                   | bwo w1', fwo w2' => letd_L {w1//w2}N' {bwo (S w1')//w2}N''
                  end
-| here N' => here {w1//w2}N'
-| fetch w N' => fetch (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
+| here_L N' => here_L {w1//w2}N'
+| fetch_L w N' => fetch_L (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
 end
-where " { w1 // w2 } N " := (subst_w w1 w2 N) : is5_scope.
+where " { w1 // w2 } N " := (subst_w w1 w2 N) : labeled_is5_scope.
 
 Definition open_w M w := subst_w w (bwo 0) M.
-Notation " M ^ w " := (open_w M w) : is5_scope.
+Notation " M ^ w " := (open_w M w) : labeled_is5_scope.
 
 Section Substitution_lemmas.
 
@@ -77,14 +77,10 @@ rewrite IHM1; try rewrite IHM2; auto.
 (* box *)
 destruct w; try rewrite IHM; auto.
 (* get *)
-destruct (eq_wo_dec w (bwo n)).
-  (* w = bwo n *)
-  subst; discriminate.
-  (* w <> bwo n *)
-  reflexivity.
-  destruct w.
-    discriminate.
-    assumption.
+destruct (eq_wo_dec w (bwo n));
+[ subst; discriminate | reflexivity ];
+try (destruct w; [discriminate | assumption]).
+destruct w; [discriminate | assumption].
 (* letd *)
 destruct w;
 inversion H_unbound; auto;
@@ -92,14 +88,10 @@ apply app_eq_nil in H_unbound;
 destruct H_unbound;
 rewrite IHM1; try rewrite IHM2; auto.
 (* fetch *)
-destruct (eq_wo_dec w (bwo n)).
-  (* w = bwo n *)
-  subst; discriminate.
-  (* w <> bwo n *)
-  reflexivity.
-  destruct w.
-    discriminate.
-    assumption.
+destruct (eq_wo_dec w (bwo n));
+[ subst; discriminate | reflexivity ];
+try (destruct w; [discriminate | assumption]).
+destruct w; [discriminate | assumption].
 Qed.
 
 
@@ -122,7 +114,7 @@ induction N; intros; simpl; try (rewrite IHN; auto).
 (* hyp *)
 destruct (eq_nat_dec n0 n);
 simpl. 
-  apply closed_w_subst_id. 
+  apply closed_w_subst_id;
   replace m with (0+m) by auto;
   apply closed_w_addition; assumption.
   reflexivity.
@@ -195,7 +187,6 @@ destruct (eq_wo_dec w0 (fwo w)).
   subst; apply notin_union in HT; destruct HT;
   elim H; rewrite in_singleton; reflexivity.
   reflexivity.
-(* ? *)
 destruct w0.
   assumption.
   apply notin_union in HT; destruct HT; assumption.
@@ -212,7 +203,6 @@ destruct (eq_wo_dec w0 (fwo w)).
   subst; apply notin_union in HT; destruct HT;
   elim H; rewrite in_singleton; reflexivity.
   reflexivity.
-(* ? *)
 destruct w0.
   assumption.
   apply notin_union in HT; destruct HT; assumption.
@@ -223,32 +213,24 @@ Lemma subst_neutral:
 forall M w w' n
   (HT: lc_w_n M n),
   {fwo w//bwo n}({bwo n//fwo w'}M) = {fwo w//fwo w'}M.
-intros. generalize dependent n.
+intros; generalize dependent n;
 induction M; intros; simpl;
-inversion HT; subst.
-reflexivity.
-rewrite IHM; auto.
-rewrite IHM1; try rewrite IHM2; auto.
-rewrite IHM; auto.
-rewrite IHM; auto.
+inversion HT; subst;
+try rewrite IHM; 
+try (rewrite IHM1; try rewrite IHM2); 
+auto.
 (* get *)
 destruct (eq_wo_dec (fwo w1) (fwo w')).
-destruct (eq_wo_dec (bwo n) (bwo n)). 
-  rewrite IHM; auto.
-  elim n0; reflexivity.
-destruct (eq_wo_dec (fwo w1) (bwo n)).
-  discriminate.
-  rewrite IHM; auto.
-rewrite IHM1; try rewrite IHM2; auto.
-rewrite IHM; auto.
+  destruct (eq_wo_dec (bwo n) (bwo n));
+    [ | elim n0]; reflexivity.
+  destruct (eq_wo_dec (fwo w1) (bwo n));
+    [discriminate | reflexivity].
 (* fetch *)
 destruct (eq_wo_dec (fwo w1) (fwo w')).
-destruct (eq_wo_dec (bwo n) (bwo n)). 
-  rewrite IHM; auto.
-  elim n0; reflexivity.
-destruct (eq_wo_dec (fwo w1) (bwo n)).
-  discriminate.
-  rewrite IHM; auto.
+  destruct (eq_wo_dec (bwo n) (bwo n));
+    [ | elim n0]; reflexivity.
+  destruct (eq_wo_dec (fwo w1) (bwo n));
+    [discriminate | reflexivity].
 Qed.
 
 Lemma closed_step_opening:
@@ -266,4 +248,4 @@ Qed.
 
 End Substitution_lemmas.
 
-Close Scope is5_scope.
+Close Scope labeled_is5_scope.
