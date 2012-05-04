@@ -84,7 +84,7 @@ Inductive value_L: te_L -> Prop :=
    (fetch_L w M, w') |-> (fetch_L w M', w')
  | red_fetch_val_L: forall w M w' (HVal: value_L M),
    lc_w M ->
-   (fetch_L w M, w') |-> ({w'//w}M, w')
+   (fetch_L w M, w') |-> ({{w'//w}}M, w')
  | red_here_L: forall N N' w (HRed: (N, w) |-> (N',w)),
    lc_w N ->
    (here_L N, w) |-> (here_L N', w)
@@ -96,7 +96,7 @@ Inductive value_L: te_L -> Prop :=
    (get_L w M, w') |-> (get_L w M', w')
 | red_get_val_L: forall w M w' (HVal: value_L M),
    lc_w M ->
-   (get_L w (here_L M), w') |-> (here_L {w'//w}M, w')
+   (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
 where " M |-> N " := (step_LF M N ) : labeled_is5_scope.
 
 
@@ -259,7 +259,7 @@ forall Omega Gamma M A w w' w'' w'''
   (Old: w' \in Omega)
   (New: w''' = if eq_var_dec w'' w then w' else w'')
   (HT: \{w} \u Omega; Gamma |- M ::: A @ w''),
-  Omega; (rename_world_context (fwo w') (fwo w) Gamma) |- {fwo w'//fwo w}M ::: A @ w'''.
+  Omega; (rename_world_context (fwo w') (fwo w) Gamma) |- {{fwo w'//fwo w}}M ::: A @ w'''.
 intros; 
 remember (\{w} \u Omega) as Omega';
 generalize dependent Omega;
@@ -305,8 +305,8 @@ destruct (eq_var_dec w0 w); subst.
     assumption.
 intros; apply notin_union_r in H0;
 destruct H0; unfold open_w in *;
-replace ({fwo w'0//bwo 0}({fwo w'//fwo w}M)) 
-   with ({fwo w'//fwo w}({fwo w'0//bwo 0}M)).
+replace ({{fwo w'0//bwo 0}}({{fwo w'//fwo w}}M)) 
+   with ({{fwo w'//fwo w}}({{fwo w'0//bwo 0}}M)).
 apply H.
   assumption.
   assert (w'0 <> w).
@@ -372,7 +372,7 @@ apply IHHT.
   assumption.
   intros.
   apply notin_union in H0; destruct H0.
-  replace ({fwo w' // fwo w}N ^ fwo w'0) with ({fwo w' // fwo w}(N ^ fwo w'0)).
+  replace ({{fwo w' // fwo w}}N ^ fwo w'0) with ({{fwo w' // fwo w}}(N ^ fwo w'0)).
   replace ((A, fwo w'0) :: rename_world_context (fwo w') (fwo w) Gamma) with (rename_world_context (fwo w') (fwo w) ((A, fwo w'0) :: Gamma)). 
   subst.
   apply H.
@@ -532,7 +532,7 @@ apply Fresh.
 destruct H.
 apply notin_union in H; destruct H.
 unfold open_w in *.
-replace ({fwo w'//bwo 0}M0) with ({fwo w'//bwo 0}({bwo 0//fwo x}({fwo x//bwo 0}M0))).
+replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//bwo 0}}({{bwo 0//fwo x}}({{fwo x//bwo 0}}M0))).
 rewrite subst_neutral.
 replace (@nil (ty_L*wo)) with (rename_world_context (fwo w') (fwo x) (@nil (ty_L*wo))).
 apply rename_w_type_preserv with (w'':=x).
@@ -546,7 +546,7 @@ simpl; reflexivity.
 apply closed_step_opening; assumption.
 rewrite (subst_id M0 x 0 H1); reflexivity.
 (* red_get_here *)
-replace (here_L {fwo w'0//fwo w'}M0) with ({fwo w'0//fwo w'}(here_L M0)) by auto;
+replace (here_L {{fwo w'0//fwo w'}}M0) with ({{fwo w'0//fwo w'}}(here_L M0)) by auto;
 replace (@nil (ty_L*wo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
 apply rename_w_type_preserv with (w'':=w').
   assumption.
@@ -566,7 +566,7 @@ apply subst_t_type_preserv with (Delta:=(A, fwo w')::nil).
   simpl; auto.
   simpl.
   unfold open_w in *.
-  replace ({fwo w'//bwo 0}N) with ({fwo w'//bwo 0}({bwo 0//fwo x}({fwo x//bwo 0}N))).
+  replace ({{fwo w'//bwo 0}}N) with ({{fwo w'//bwo 0}}({{bwo 0//fwo x}}({{fwo x//bwo 0}}N))).
   rewrite subst_neutral.
   replace ((A, fwo w')::nil) with (rename_world_context (fwo w') (fwo x) ((A,fwo x)::nil)).
   apply rename_w_type_preserv with (w'':=w').

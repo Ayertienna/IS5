@@ -30,31 +30,31 @@ match L with
 end.
 
 (* World variable substitution *)
-Reserved Notation " { w1 // w2 } N " (at level 5).
+Reserved Notation " {{ w1 // w2 }} N " (at level 5).
 
 Fixpoint subst_w w1 w2 N :=
 match N with
 | hyp_L v => hyp_L v
-| lam_L t N' => lam_L t {w1//w2}N'
-| appl_L N' N'' => appl_L {w1//w2}N' {w1//w2}N''
+| lam_L t N' => lam_L t {{w1//w2}}N'
+| appl_L N' N'' => appl_L {{w1//w2}}N' {{w1//w2}}N''
 | box_L N' => match w1, w2 with
-              | fwo w1', bwo w2' => box_L {w1 // bwo (S w2')}N'
-              | fwo w1', fwo w2' => box_L {w1 // w2} N'
-              | bwo w1', bwo w2' => box_L {bwo (S w1') // bwo (S w2')} N'
-              | bwo w1', fwo w2' => box_L {bwo (S w1')//w2} N'
+              | fwo w1', bwo w2' => box_L {{w1 // bwo (S w2')}}N'
+              | fwo w1', fwo w2' => box_L {{w1 // w2}} N'
+              | bwo w1', bwo w2' => box_L {{bwo (S w1') // bwo (S w2')}} N'
+              | bwo w1', fwo w2' => box_L {{bwo (S w1')//w2}} N'
             end
-| unbox_L N' => unbox_L {w1//w2}N'
-| get_L w N' => get_L (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
+| unbox_L N' => unbox_L {{w1//w2}}N'
+| get_L w N' => get_L (if eq_wo_dec w w2 then w1 else w) {{w1//w2}}N'
 | letd_L N' N'' => match w1, w2 with
-                   | fwo w1', bwo w2' => letd_L {w1 // w2}N' {w1 // bwo (S w2')}N''
-                   | fwo w1', fwo w2' => letd_L {w1 // w2}N' {w1 // w2}N''
-                   | bwo w1', bwo w2' => letd_L {w1//w2}N' {bwo (S w1') // bwo (S w2')} N''
-                   | bwo w1', fwo w2' => letd_L {w1//w2}N' {bwo (S w1')//w2}N''
+                   | fwo w1', bwo w2' => letd_L {{w1 // w2}}N' {{w1 // bwo (S w2')}}N''
+                   | fwo w1', fwo w2' => letd_L {{w1 // w2}}N' {{w1 // w2}}N''
+                   | bwo w1', bwo w2' => letd_L {{w1//w2}}N' {{bwo (S w1') // bwo (S w2')}} N''
+                   | bwo w1', fwo w2' => letd_L {{w1//w2}}N' {{bwo (S w1')//w2}}N''
                  end
-| here_L N' => here_L {w1//w2}N'
-| fetch_L w N' => fetch_L (if eq_wo_dec w w2 then w1 else w) {w1//w2}N'
+| here_L N' => here_L {{w1//w2}}N'
+| fetch_L w N' => fetch_L (if eq_wo_dec w w2 then w1 else w) {{w1//w2}}N'
 end
-where " { w1 // w2 } N " := (subst_w w1 w2 N) : labeled_is5_scope.
+where " {{ w1 // w2 }} N " := (subst_w w1 w2 N) : labeled_is5_scope.
 
 Definition open_w M w := subst_w w (bwo 0) M.
 Notation " M ^ w " := (open_w M w) : labeled_is5_scope.
@@ -64,7 +64,7 @@ Section Substitution_lemmas.
 Lemma no_unbound_worlds_subst_w_id:
 forall M w n 
   (H_unbound: unbound_worlds n M = nil),
-  {w//bwo n}M = M.
+  {{w//bwo n}}M = M.
 intros;
 generalize dependent w;
 generalize dependent n;
@@ -98,7 +98,7 @@ Qed.
 Lemma closed_w_subst_id:
 forall M w n 
   (HT: lc_w_n M n),
-  {w//bwo n} M = M.
+  {{w//bwo n}} M = M.
 intros.
 apply no_unbound_worlds_subst_w_id.
 apply closed_no_unbound_worlds.
@@ -108,7 +108,7 @@ Qed.
 Lemma subst_order_irrelevant:
 forall N M n m w 
   (H_LC: lc_w M),
-  {w//bwo m}([M//n]N) = [M//n]({w//bwo m}N).
+  {{w//bwo m}}([M//n]N) = [M//n]({{w//bwo m}}N).
 unfold open_w; intro;
 induction N; intros; simpl; try (rewrite IHN; auto).
 (* hyp *)
@@ -131,7 +131,7 @@ Qed.
 Lemma subst_w_comm:
 forall M w w' w'' n
   (Neq: w'' <> w),
-  {fwo w'//fwo w''}({fwo w//bwo n}M) = {fwo w//bwo n}({fwo w'//fwo w''}M).
+  {{fwo w'//fwo w''}}({{fwo w//bwo n}}M) = {{fwo w//bwo n}}({{fwo w'//fwo w''}}M).
 induction M; intros; simpl; try (rewrite IHM; auto).
 reflexivity.
 rewrite IHM1; try rewrite IHM2; auto.
@@ -168,7 +168,7 @@ Qed.
 Lemma subst_id:
 forall M w n
   (HT: fresh_world w M),
-  {bwo n//fwo w}({fwo w//bwo n}M) = M.
+  {{bwo n//fwo w}}({{fwo w//bwo n}}M) = M.
 unfold fresh_world;
 intros; generalize dependent n;
 induction M; intros; simpl in *;
@@ -212,7 +212,7 @@ Qed.
 Lemma subst_neutral:
 forall M w w' n
   (HT: lc_w_n M n),
-  {fwo w//bwo n}({bwo n//fwo w'}M) = {fwo w//fwo w'}M.
+  {{fwo w//bwo n}}({{bwo n//fwo w'}}M) = {{fwo w//fwo w'}}M.
 intros; generalize dependent n;
 induction M; intros; simpl;
 inversion HT; subst;
@@ -236,7 +236,7 @@ Qed.
 Lemma closed_step_opening:
 forall M n w
   (HT: lc_w_n M (S n)),
-  lc_w_n ({fwo w//bwo n}M) n.
+  lc_w_n ({{fwo w//bwo n}}M) n.
 intros; generalize dependent n; induction M;
 intros; inversion HT; subst; simpl;
 eauto using lc_w_n.

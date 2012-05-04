@@ -25,6 +25,11 @@ Inductive wo :=
 (* vars = fset var *)
 Definition worlds_L := vars.
 
+Theorem eq_ty_L_dec:
+forall a b: ty_L, {a = b} + {a <> b}.
+decide equality. 
+Qed.
+
 Axiom eq_var_dec:
   forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
 
