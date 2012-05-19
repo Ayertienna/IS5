@@ -139,11 +139,60 @@ where " M |-> N " := (step_LF M N ) : label_free_is5_scope.
 
 Section Lemmas.
 
+Lemma BackgroundSubsetImpl:
+forall G G' Ctx M A
+  (HT: G |= Ctx |- M ::: A)
+  (HSubst: exists GT, permut (G++GT) G'),
+  G' |= Ctx |- M ::: A.
+intros.
+generalize dependent G'.
+induction HT; intros; eauto using types_LF.
+(* box *)
+destruct HSubst as [GT];
+apply t_box_LF with (L:=L); intros;
+apply H; [ | exists GT; permut_simpl]; assumption.
+(* unbox_fetch *)
+destruct HSubst as [GT];
+apply t_unbox_fetch_LF with (Gamma:=Gamma) (G:=G++GT).
+apply IHHT;
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G' ++ GT); 
+[ permut_simpl | ]; assumption.
+(* get_here *)
+destruct HSubst as [GT];
+apply t_get_here_LF with (Gamma:=Gamma) (G:=G++GT).
+apply IHHT;
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G0 ++ GT); 
+[ permut_simpl | ]; assumption.
+(* letdia *)
+apply t_letdia_LF with (A:=A) (L:=L). 
+apply IHHT; assumption.
+intros; apply H. 
+  assumption.
+  destruct HSubst as [GT];
+  exists GT; permut_simpl; assumption.
+(* letdia_get *)
+destruct HSubst as [GT];
+apply t_letdia_get_LF with (A:=A) (Gamma:=Gamma) (G:=G++GT) (L:=L).
+apply IHHT;
+  exists GT; permut_simpl.
+intros. apply H. 
+  assumption.
+  exists GT; permut_simpl.
+apply permut_trans with (l2:= G0 ++ GT); 
+[ permut_simpl | ]; assumption.
+Qed.
+
 Lemma GlobalWeakening:
 forall G G' Ctx Ctx' M A
   (HT: G ++ G' |= Ctx |- M ::: A),
   G & Ctx' ++ G' |= Ctx |- M ::: A.
-Admitted.
+intros; rew_app;
+apply BackgroundSubsetImpl with (G := G ++ G');
+[assumption | exists (Ctx'::nil)];
+permut_simpl.
+Qed.
 
 Lemma WeakeningBackgroundElem:
 forall G G' w Delta Delta' Ctx M A
