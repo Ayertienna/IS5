@@ -529,12 +529,121 @@ match G with
 | (w, a)::G => (w, nil) :: emptyEquiv G
 end.
 
+Lemma emptyEquiv_nil:
+forall G G' w Gamma,
+  permut (emptyEquiv G) G' ->
+  Mem (w, Gamma) G' -> Gamma = nil.
+Admitted.
+
+Lemma emptyEquiv_empty:
+forall G G',
+  permut (emptyEquiv G) G' ->
+  emptyEquiv G' = G'.
+Admitted.
+
+Lemma emptyEquiv_inv:
+forall G G' w,
+  emptyEquiv (G & (w,nil)) = (G' & (w, nil)) ->
+  emptyEquiv G = G'.
+Admitted.
+
+Lemma emptyEquiv_last:
+forall G G' w,
+  emptyEquiv G = G' ->
+  emptyEquiv (G & (w, nil)) = G' & (w, nil).
+Admitted.
+
 Lemma Progress:
 forall G w M A
   (HT: emptyEquiv G |= (w, nil) |- M ::: A),
   value_LF M \/ exists N, (M, fctx w) |-> (N, fctx w).
-
-Admitted.
+intros.
+remember (w, (@nil ty_LF)) as Ctx.
+generalize dependent Ctx.
+generalize dependent A.
+generalize dependent w.
+generalize dependent G. 
+induction M; intros; eauto using value_LF;
+inversion HeqCtx; subst.
+(* hyp *)
+inversion HT; destruct n;
+apply Nth_nil_inv in HT0; contradiction.
+(* appl *)
+right; inversion HT; subst.
+destruct IHM1 with (Ctx := (w, (@nil ty_LF))) (G := G) (A := A0 ---> A) (w := w);
+auto.
+  inversion H0; subst; inversion HT1; subst; eexists; constructor.
+  destruct H0; eexists; constructor; eapply H0.
+(* unbox *)
+right; inversion HT; subst;
+destruct IHM with (Ctx := (w, (@nil ty_LF))) (G := G) (A := [*]A) (w := w);
+auto.
+  inversion H0; subst; inversion HT0; subst; eexists; constructor.
+  destruct H0; eexists; constructor; eapply H0.
+(* unbox_fetch *)
+right; inversion HT; subst.
+assert (Gamma = nil).
+  apply emptyEquiv_nil with (G:=G) (G':=G0 & (w0, Gamma)) (w:=w0).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
+subst. 
+destruct IHM with (Ctx := (w0, (@nil ty_LF))) (G := G0 & (w, nil)) (A:=[*]A) (w:=w0).
+reflexivity.
+assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+apply emptyEquiv_last.
+apply emptyEquiv_inv with (w:=w0).
+apply emptyEquiv_empty with (G := G).
+  apply permut_sym; assumption.
+rewrite H0; assumption.
+inversion H0; subst; inversion HT0; subst. 
+eexists; constructor.
+destruct H0 as [M'].
+eexists; constructor; eassumption.
+(* here *)
+inversion HT; subst.
+destruct (IHM G w A0 (w,nil)); auto.
+left; apply val_here_LF; assumption.
+right; destruct H0; exists (here_LF x); eauto using step_LF.
+(* get_here *)
+inversion HT; subst.
+assert (Gamma = nil).
+  apply emptyEquiv_nil with (G:=G) (G':=G0 & (w0, Gamma)) (w:=w0).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
+subst; destruct (IHM (G0 & (w, nil)) w0 A0 (w0,nil)); auto.
+assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+apply emptyEquiv_last.
+apply emptyEquiv_inv with (w:=w0).
+apply emptyEquiv_empty with (G := G).
+  apply permut_sym; assumption.
+rewrite H0; assumption.
+left; econstructor; eassumption.
+right; destruct H0; eexists; constructor; eassumption. 
+(* letdia *)
+right; inversion HT; subst.
+destruct (IHM1 G w (<*>A0) (w, nil)); auto.
+inversion H0; subst; inversion HT1; subst.
+  eexists; econstructor; eassumption.
+  eexists; econstructor; eassumption.
+destruct H0; exists (letdia_LF x M2); eauto using step_LF.
+(* letdia_get *)
+right; inversion HT; subst.
+assert (Gamma = nil).
+  apply emptyEquiv_nil with (G:=G) (G':=G0 & (w0, Gamma)) (w:=w0).
+  apply permut_sym; assumption.
+  rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
+subst; destruct (IHM1 (G0 & (w, nil)) w0 (<*>A0) (w0,nil)); auto.
+assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+apply emptyEquiv_last.
+apply emptyEquiv_inv with (w:=w0).
+apply emptyEquiv_empty with (G := G).
+  apply permut_sym; assumption.
+rewrite H0; assumption.
+inversion H0; subst; inversion HT1; subst.
+  eexists; econstructor; eauto.
+  eexists; econstructor; eauto.
+destruct H0; eexists; econstructor; eassumption.
+Qed.
 
 Lemma Preservation:
 forall G w M N A
