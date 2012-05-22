@@ -1,3 +1,8 @@
+ Note
+------
+This is not really a label-free language, as we attach labels to contexts, but the logic used here is IS5 label-free logic.
+
+
 I. Statics
 ----------
 
@@ -5,62 +10,62 @@ I. Statics
 
   
        Gamma[n] == A
------------------------------ (Id)
- G |= Gamma |- hyp n : A
+------------------------------- (Id)
+ G |= (w, Gamma) |- hyp n : A
 
 
 2. Arrow
 
 
-     G |= A::Gamma |- M : B 
---------------------------------- (-> I)
- G |= Gamma |- lam A, M : A -> B
+     G |= (w, A::Gamma) |- M : B 
+-------------------------------------- (-> I)
+ G |= (w, Gamma) |- lam A, M : A -> B
 
 
- G |= Gamma |- M : A -> B   G |= Gamma |- N : A
-------------------------------------------------- (-> E)
-           G |= Gamma |- appl M N : B
+ G |= (w, Gamma) |- M : A -> B   G |= (w, Gamma) |- N : A
+----------------------------------------------------------- (-> E)
+              G |= (w, Gamma) |- appl M N : B
 
 
 3. Box
 
 
-  G & Gamma |= nil |- M : A
------------------------------ ([] I)
-  G |= Gamma |- box M : [] A
+  forall w0, w0 \notin L -> G & (w, Gamma) |= (w0, nil) |- M^w0 : A
+---------------------------------------------------------------------- ([] I)
+                G |= (w, Gamma) |- box M : [] A
 
 
-  G |= Gamma |- M : [] A
---------------------------- ([] E1)
- G |= Gamma |- unbox M : A
+  G |= (w, Gamma) |- M : [] A
+-------------------------------- ([] E1)
+ G |= (w, Gamma) |- unbox M : A
 
 
- G & Gamma' |= Gamma |- M : [] A   Permutation (G & Gamma) G'
--------------------------------------------------------------- ([] E2)
-            G' |= Gamma' |- unbox_fetch M : A
+ G & (w', Gamma') |= (w, Gamma) |- M : [] A   Permutation (G & (w, Gamma)) G'
+------------------------------------------------------------------------------ ([] E2)
+               G' |= (w', Gamma') |- unbox_fetch M : A
 
 
 4. Diamond
 
 
-     G |= Gamma |- M : A
------------------------------ (<> I1)
- G |= Gamma |- here M : <> A
+   G |= (w, Gamma) |- M : A
+---------------------------------- (<> I1)
+ G |= (w, Gamma) |- here M : <> A
 
 
- G & Gamma' |= Gamma |- M : A   Permutation (G & Gamma) G'
------------------------------------------------------------- (<> I2)
-            G' |= Gamma' |- get_here M : <> A
+ G & (w', Gamma') |= (w, Gamma) |- M : A   Permutation (G & (w, Gamma)) G'
+--------------------------------------------------------------------------- (<> I2)
+            G' |= (w', Gamma') |- get_here w M : <> A
 
 
- G |= Gamma |- M : <> A   \{A::nil} \u G |= Gamma |- N : C
------------------------------------------------------------ (<> E1)
-             G |= Gamma |- letdia M in N : C
+ G |= (w, Gamma) |- M : <> A     (w0, A::nil) :: G |= (w, Gamma) |- N ^ w0 : B
+------------------------------------------------------------------------------- (<> E1)
+             G |= (w, Gamma) |- letdia M in N : B
 
 
- G & Gamma' |= Gamma |- M : <> A   (A::nil) :: G & Gamma |= Gamma' |- N : C   Permutation (G & Gamma) G'
---------------------------------------------------------------------------------------------------------- (<> E2)
-                                G' |= Gamma' |- letdia_get M in N : C
+ G & (w', Gamma') |= (w, Gamma) |- M : <> A   forall w0, w0 \notin L -> (w0, (A::nil)) :: G & (w, Gamma) |= (w', Gamma') |- N ^ w0 : B   Permutation (G & (w, Gamma)) G'
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------- (<> E2)
+                                                         G' |= (w', Gamma') |- letdia_get w M in N : B
 
 
 II. Dynamics
@@ -79,30 +84,31 @@ value M ==> value (get_here M)
 
 B. Reductions
 
-appl (lam A, M) N |--> [N // 0] M
+appl (lam A, M) N, w  |--> [ N // 0 | w ] [ M | w ], w
 
-unbox (box M) |--> M
+unbox (box M), w |--> M ^ w, w
 
-unbox_fetch (box M) | --> M
+unbox_fetch w' (box M), w | --> M ^ w, w
 
-letd (here M) in N |--> [M // 0] N
+letd (here M) in N, w |--> [ M // 0 | w ] [ N ^ w | w ], w
 
-letd (get_here) in N |--> [M // 0] N
+letd (get_here w' M) in N, w |--> [ M // 0 | w' ] [ N ^ w' | w ], w
 
-letd_get (here M) in N |--> [M // 0] N 
+letd_get w' (here M) in N, w |--> [ M // 0 | w' ] [ N ^ w' | w ], w
 
-letd_get (get_here M) in N |--> [M // 0] N
+letd_get w' (get_here w'' M) in N, w |--> [ M // 0 | w'' ] [ N ^ w'' | w ], w
 
-(M |--> M') ==> (appl M N |--> appl M' N)
+(M, w |--> M', w) ==> (appl M N, w |--> appl M' N, w)
 
-(M |--> M') ==> (unbox M |--> unbox M')
+(M, w |--> M', w) ==> (unbox M, w |--> unbox M', w)
 
-(M |--> M') ==> (unbox_fetch M |--> unbox_fetch M')
+(M, w |--> M', w) ==> (unbox_fetch w M, w' |--> unbox_fetch w  M', w')
 
-(M |--> M') ==> (here M |--> here M')
+(M, w |--> M', w) ==> (here M, w |--> here M', w)
 
-(M |--> M') ==> (get_here M |--> get_here M')
+(M, w |--> M', w) ==> (get_here w M, w' |--> get_here w M', w')
 
-(M |--> M') ==> (letd M in N |--> letd M' in N)
+(M, w |--> M', w) ==> (letd M in N, w |--> letd M' in N, w)
 
-(M |--> M') ==> (letd_get M in N |--> letd_get M' in N)
+(M, w |--> M', w) ==> (letd_get w M in N, w' |--> letd_get w M' in N, w')
+
