@@ -2,9 +2,8 @@ Add LoadPath "./labeled" as Labeled.
 Add LoadPath "./label-free" as LabelFree.
 Require Import Labeled.
 Require Import LabelFree.
-Require Import List.
-Require Import FSets.
 Require Import Metatheory.
+Require Import LibList.
 Require Import LibListSorted.
 
 Open Scope labeled_is5_scope.
@@ -56,110 +55,121 @@ Section Contexts.
 
 (* Labeled from label-free *)
 
-Fixpoint give_names (G: list Context_LF) (Used: worlds_L) :=
-match G with
-| nil => nil
-| Gamma::G' => 
-  let w := var_gen Used in
-    (Gamma, w) :: give_names G' (\{w} \u Used)
-end.
-
-Fixpoint find_fst_eq (L:list (Context_LF * var)) (el: Context_LF) :=
-match L with
-| nil => error
-| (G, w) :: L' => If G = el then Some w else find_fst_eq L' el
-end.
-
-Definition annotate_worlds (p: (Context_LF * var)) :=
+Definition annotate_worlds (p: Context_LF) : Context_L :=
 match p with
-| (L, w) => map (fun (x: ty_LF) => (labeled_type x, fwo w)) L
+| (w, L) => map (fun (x: ty_LF) => (labeled_type x, fwo w)) L
 end.
 
-Definition labeled_context (G: Background_LF) (Gamma: Context_LF) : option (worlds_L * Context_L * var) :=
-  let CtxLst := give_names (Gamma::G) \{} in
-  let w := find_fst_eq CtxLst Gamma in
-  let Omega := from_list (map snd CtxLst) in
+Definition labeled_context (G: Background_LF) w Gamma : (worlds_L * Context_L * var) :=
+  let CtxLst := (w, Gamma) :: G in
+  let Omega := from_list (map fst CtxLst) in
   let Delta := flat_map annotate_worlds CtxLst in
-  match w with
-    | error => error (* this is never going to happen! *)
-    | Some w' => Some (Omega, Delta, w')
-  end.
-
+  (Omega, Delta, w).
 
 (* Label-free from labeled *)
 
-Fixpoint find_and_append (a: ty_L) (w:var) (res: list (list ty_LF * var)) :=
+Fixpoint find_and_append (a: ty_L) (w:var) (res: Background_LF) :=
 match res with
-| nil => (((label_free_type a)::nil), w) :: nil
-| (Gamma, w') :: res' => 
-  If w = w' then ((label_free_type a)::Gamma, w') :: res' else find_and_append a w res'
-end.
-  
-Fixpoint find_snd_eq (L:list (Context_LF * var)) (el: var) :=
-match L with
-| nil => error
-| (G, w) :: L' => If w = el then Some G else find_snd_eq L' el
+| nil => (w, (label_free_type a)::nil) :: nil
+| (w', Gamma) :: res' => 
+  if (eq_var_dec w w') then (w', (label_free_type a)::Gamma) :: res' else find_and_append a w res'
 end.
 
-Theorem eq_pair_ty_w_dec:
-forall a b: list ty_LF * var, {a = b} + {a <> b}.
-intros;
-decide equality.
-apply eq_var_dec.
-decide equality.
-decide equality.
-Qed.
-
-(* TODO: Result? really? *)
-Fixpoint group_contexts (Omega: worlds_L) (Forgotten: worlds_L) (Gamma: Context_L) (Result : list (Context_LF * var)) :=
+Fixpoint group_contexts (Omega: worlds_L) (Forgotten: worlds_L) (Gamma: Context_L) (Groups : Background_LF) :=
 match Gamma with
-| nil => (map (fun (x:Context_LF * var) => (rev (fst x), snd x)) Result) 
-   (* should be:
-      ++ generate_empty (cardinal Omega)  
-      for now we will ignore fresh, unused worlds *)
-| (a, fwo w)::Gamma' => let Result' := find_and_append a w Result in
-    group_contexts (Omega \- \{w}) (\{w} \u Forgotten) Gamma' Result'
-| _ :: Gamma' => (* we need to get rid of this case! *) group_contexts Omega Forgotten Gamma' Result
+| nil => (map (fun (x: Context_LF) => (fst x, rev (snd x))) Groups) 
+   (* TODO: should be with ++ generate_empty (cardinal Omega)  
+      for now we just ignore fresh, unused worlds - since there is no way
+      (that I could find) to determine the size of an fset from Metatheory package *)
+| (a, fwo w)::Gamma' => let Groups' := find_and_append a w Groups in
+    group_contexts (Omega \- \{w}) (\{w} \u Forgotten) Gamma' Groups'
+(* TODO: Why do we even allow Gamma to contain bound worlds? *) 
+| _ :: Gamma' => group_contexts Omega Forgotten Gamma' Groups
 end.
 
-Definition label_free_context (Omega: worlds_L) (Gamma: Context_L) (w: var) : option(Background_LF * Context_LF) :=
- let contexts := group_contexts Omega \{} Gamma nil in
- let Gamma' := find_snd_eq contexts w in
- match Gamma' with
- | error => error
- | Some Gamma'' => 
-    let G := map fst (remove eq_pair_ty_w_dec (Gamma'', w) contexts) in
-      Some (G, Gamma'')  
- end. 
+Definition label_free_context (Omega: worlds_L) (Gamma: Context_L) : Background_LF :=
+  group_contexts Omega \{} Gamma nil.
 
-Lemma labeled_context_no_error:
-forall G Gamma,
-  labeled_context G Gamma <> error.
-Admitted.
-
-Lemma label_free_context_no_error:
-forall Omega Gamma w,
-  label_free_context Omega Gamma w <> error.
-Admitted.
-
+(* TODO: These lemmas are not yet true, as we do not rewrite empty contexts correctly *) 
 Lemma contexts_equiv1:
-forall G Gamma Omega Delta w G' Gamma'
-  (HT1: labeled_context G Gamma = Some (Omega, Delta, w))
-  (HT2: label_free_context Omega Delta w = Some (G', Gamma')),
-    permut G G' /\
-    Gamma = Gamma'.
+forall G w Gamma Omega Delta w' G'
+  (HT1: labeled_context G w Gamma = (Omega, Delta, w'))
+  (HT2: label_free_context Omega Delta  = G'),
+    permut ((w, Gamma)::G) G'.
 Admitted.
 
 Lemma contexts_equiv2:
-forall Omega Gamma w G Delta Omega' Gamma' w'
-  (HT1: label_free_context Omega Gamma w = Some (G, Delta))
-  (HT2: labeled_context G Delta = Some (Omega', Gamma', w')),
+forall Omega Gamma G w Delta Omega' Gamma' w'
+  (HT1: label_free_context Omega Gamma = G)
+  (HT2: labeled_context G w Delta = (Omega', Gamma', w')),
     (forall X, X \in Omega  <-> X \in Omega') /\
-    Gamma = Gamma' /\
+    permut Gamma Gamma' /\ (* TODO: can we do better? should we? *)
     w = w'.
 Admitted.
 
 End Contexts.
+
+Section Terms.
+
+Fixpoint labeled_world (w: ctx_LF) : (wo) :=
+match w with
+| bctx n => bwo n
+| fctx w' => fwo w'
+end.
+
+Fixpoint label_free_world (w: wo) : (ctx_LF) :=
+match w with
+| bwo n => bctx n
+| fwo w' => fctx w'
+end.
+
+Fixpoint labeled_term (M0: te_LF) :=
+match M0 with
+| hyp_LF n => hyp_L n (* recalculate.... *)
+| lam_LF A M => lam_L (labeled_type A) (labeled_term M)
+| appl_LF M N => appl_L (labeled_term M) (labeled_term N)
+| box_LF M => box_L (labeled_term M)
+| unbox_LF M => unbox_L (labeled_term M)
+| unbox_fetch_LF w M => unbox_L (fetch_L (labeled_world w) (labeled_term M))
+| here_LF M => here_L (labeled_term M)
+| get_here_LF w M => get_L (labeled_world w) (here_L (labeled_term M))
+| letdia_LF M N => letd_L (labeled_term M) (labeled_term N)
+| letdia_get_LF w M N => letd_L (get_L (labeled_world w) (labeled_term M)) (labeled_term N)
+end.
+
+Fixpoint label_free_term (M0: te_L) :=
+match M0 with
+| hyp_L n => hyp_LF n (* recalculate .. *)
+| lam_L A M => lam_LF (label_free_type A) (label_free_term M)
+| appl_L M N => appl_LF (label_free_term M)  (label_free_term N)
+| box_L M => box_LF (label_free_term M)
+| unbox_L M => unbox_LF (label_free_term M)
+| here_L M => here_LF (label_free_term M)
+| letd_L M N => letdia_LF (label_free_term M) (label_free_term N)
+| get_L w M => letdia_get_LF (label_free_world w) (label_free_term M) 
+                             (get_here_LF (label_free_world w) (hyp_LF 0))
+| fetch_L w M => box_LF (unbox_fetch_LF (label_free_world w) (label_free_term M))
+end.
+
+End Terms.
+
+Lemma labeled_typing:
+forall G w Gamma M A Omega Delta M' A' w'
+  (HT: G |= (w, Gamma) |- M ::: A)
+  (H_Ctx: (Omega, Delta, w') = labeled_context G w Gamma) 
+  (H_M: M' = labeled_term M)
+  (H_A: A' = labeled_type A),
+  Omega; Delta |- M' ::: A' @ w'.
+Admitted.
+
+Lemma label_free_typing:
+forall Omega Gamma M A w G Delta M' A'
+  (HT: Omega; Gamma |- M ::: A @ w)
+  (H_G: permut (label_free_context Omega Gamma) (G & (w, Delta)))
+  (H_M: M' = label_free_term M)
+  (H_A: A' = label_free_type A),
+  G |= (w, Delta) |- M' ::: A'.
+Admitted.
 
 Close Scope labeled_is5_scope.
 Close Scope label_free_is5_scope.
