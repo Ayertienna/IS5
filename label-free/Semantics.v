@@ -1,7 +1,6 @@
 (* TODO: imports are messed up now that there's a module *) 
 Require Import Syntax.
 Require Import Substitution.
-Print LoadPath.
 Require Import Metatheory.
 Require Import LibList.
 Require Import LibListSorted.
@@ -10,7 +9,7 @@ Require Import Arith.
 Open Scope label_free_is5_scope.
 
 Global Reserved Notation " G '|=' Ctx '|-' M ':::' A " (at level 70).
-
+ 
 (* Statics *)
 
 Inductive types_LF: Background_LF -> Context_LF -> te_LF -> ty_LF -> Prop :=
@@ -30,7 +29,7 @@ Inductive types_LF: Background_LF -> Context_LF -> te_LF -> ty_LF -> Prop :=
 
 | t_box_LF: forall L A G Ctx M
   (HT: forall w', w' \notin L -> 
-    G & Ctx |= (w', nil) |- M ^^ (fctx w') ::: A),
+    G & Ctx |= (w', nil) |- M ^^ [fctx w' | fctx w'] ::: A),
   G |= Ctx |- box_LF M ::: [*] A
 
 | t_unbox_LF: forall A G Ctx M
@@ -51,16 +50,16 @@ Inductive types_LF: Background_LF -> Context_LF -> te_LF -> ty_LF -> Prop :=
   forall G0, permut (G & (w, Gamma)) G0 -> 
     G0 |= Ctx' |- get_here_LF (fctx w) M ::: <*> A
 
-| t_letdia_LF: forall L A B G Ctx M N
-  (HT1: G |= Ctx |- M ::: <*> A)
+| t_letdia_LF: forall L A B G w Gamma M N
+  (HT1: G |= (w, Gamma) |- M ::: <*> A)
   (HT2: forall w', w' \notin L ->
-    (w', A :: nil) :: G |= Ctx |- N ^^ (fctx w') ::: B),
-  G |= Ctx |- letdia_LF M N ::: B 
+    (w', A :: nil) :: G |= (w, Gamma) |- N ^^ [fctx w' | fctx w] ::: B),
+  G |= (w, Gamma) |- letdia_LF M N ::: B 
 
 | t_letdia_get_LF: forall L A B G w Gamma Ctx' M N
   (HT1: G & Ctx' |= (w, Gamma) |- M ::: <*> A)
   (HT2: forall w', w' \notin L ->
-    (w', (A :: nil)) :: G & (w, Gamma) |= Ctx' |- N ^^ (fctx w') ::: B),
+    (w', (A :: nil)) :: G & (w, Gamma) |= Ctx' |- N ^^ [fctx w' | fctx (fst Ctx')] ::: B),
   forall G0, permut (G & (w, Gamma)) G0 -> 
     G0 |= Ctx' |- letdia_get_LF (fctx w) M N ::: B
 
@@ -80,59 +79,80 @@ Global Reserved Notation " M |-> N " (at level 70).
 Inductive step_LF: (te_LF * ctx_LF) -> (te_LF * ctx_LF) -> Prop :=
 
 | red_appl_lam_LF: forall ctx M A N,
+  lc_w_LF M -> lc_w_LF N ->
   (appl_LF (lam_LF A M) N, ctx) |-> 
-    ([N // 0] M, ctx)
+    ([N // 0 | ctx ] [M | ctx], ctx)
 
 | red_unbox_box_LF: forall ctx M,
+  lc_w_n_LF M 1 -> 
   (unbox_LF (box_LF M), ctx) |-> 
-    (M ^^ ctx, ctx)
+    (M ^^ [ctx | ctx], ctx)
 
 | red_unbox_fetch_box_LF: forall ctx ctx' M,
+  lc_w_n_LF M 1 ->
   (unbox_fetch_LF ctx' (box_LF M), ctx) |-> 
-    (M ^^ ctx, ctx) 
+    (M ^^ [ctx | ctx], ctx) 
 
 | red_letdia_here_LF: forall ctx M N,
+  lc_w_LF M ->
+  lc_w_n_LF N 1 ->
   (letdia_LF (here_LF M) N, ctx) |-> 
-    ([M // 0] N ^^ ctx , ctx)
+    ([M // 0 | ctx ] [N ^^ [ctx | ctx] | ctx] , ctx)
 
 | red_letdia__get_here_LF: forall ctx ctx' M N,
+  lc_w_LF M ->
+  lc_w_n_LF N 1->
   (letdia_LF (get_here_LF ctx' M) N, ctx) |-> 
-    ([M // 0] N ^^ ctx, ctx)
+    ([M // 0 | ctx'] [N ^^ [ctx' | ctx] | ctx], ctx)
 
 | red_letdia_get__here_LF: forall ctx ctx' M N,
+  lc_w_LF M ->
+  lc_w_n_LF N 1 ->
   (letdia_get_LF ctx' (here_LF M) N, ctx) |-> 
-    ([M // 0] N ^^ ctx , ctx)
+    ([M // 0 | ctx'] [N ^^ [ ctx' | ctx ] | ctx], ctx)
 
 | red_letdia_get_get_here_LF: forall ctx ctx' ctx'' M N,
+  lc_w_LF M ->
+  lc_w_n_LF N 1 ->
   (letdia_get_LF ctx' (get_here_LF ctx'' M) N, ctx) |-> 
-    ([M // 0] N ^^ ctx , ctx)
+    ([M // 0 | ctx'' ] [N ^^ [ctx'' | ctx] | ctx] , ctx)
 
 | red_appl_LF: forall ctx M N M'
   (HT: (M, ctx) |-> (M', ctx)), 
+  lc_w_LF M ->
+  lc_w_LF N ->
   (appl_LF M N, ctx) |-> (appl_LF M' N, ctx)
 
 | red_unbox_LF: forall ctx M M'
   (HT: (M, ctx) |-> (M', ctx)), 
+  lc_w_n_LF M 1 ->
   (unbox_LF M, ctx) |-> (unbox_LF M', ctx)
 
 | red_unbox_fetch_LF: forall ctx' M M' ctx
   (HT: (M, ctx') |-> (M', ctx')), 
+  lc_w_n_LF M 1 ->
   (unbox_fetch_LF ctx' M, ctx) |-> (unbox_fetch_LF ctx' M', ctx)
 
 | red_here_LF: forall ctx M M' 
   (HT: (M, ctx) |-> (M', ctx)), 
+  lc_w_LF M ->
   (here_LF M, ctx) |-> (here_LF M', ctx)
 
 | red_get_here_LF: forall ctx ctx' M M' 
   (HT: (M, ctx) |-> (M', ctx)), 
+  lc_w_LF M ->
   (get_here_LF ctx M, ctx') |-> (get_here_LF ctx M', ctx')
 
 | red_letdia_LF: forall ctx M N M' 
   (HT: (M, ctx) |-> (M', ctx)),
+  lc_w_LF M ->
+  lc_w_n_LF N 1 ->
   (letdia_LF M N, ctx) |-> (letdia_LF M' N, ctx)
 
 | red_letdia_get_LF: forall ctx ctx' M N M'
   (HT: (M, ctx) |-> (M', ctx)), 
+  lc_w_LF M ->
+  lc_w_n_LF N 1->
   (letdia_get_LF ctx M N, ctx') |-> (letdia_get_LF ctx M' N, ctx')
 
 where " M |-> N " := (step_LF M N ) : label_free_is5_scope.
@@ -361,11 +381,11 @@ apply t_get_here_LF with (G:=G) (Gamma:=Gamma).
   assumption.
 (* letdia *)
 apply t_letdia_LF with (A:=A) (L:=L).
-specialize IHHT with w Gamma.
+specialize IHHT with w0 Gamma0.
 apply IHHT; auto.
 intros. 
 specialize H with (w':=w'0).
-destruct H with (w0:=w) (Gamma0:=Gamma).
+destruct H with (w:=w0) (Gamma:=Gamma0).
 assumption.
 reflexivity.
 apply H2 with (G':=(w'0, A::nil)::G');
@@ -477,7 +497,7 @@ Qed.
 Lemma test_box:
   forall L G G' Ctx M A,
     (forall w', w' \notin L -> 
-      G & Ctx ++ G' |=  (w', nil) |- M^^(fctx w') ::: A) ->
+      G & Ctx ++ G' |=  (w', nil) |- M^^[fctx w' | fctx w'] ::: A) ->
       G ++ G' |= Ctx |- box_LF M ::: [*]A.
 intros; apply t_box_LF with (L:=L); intros;
 try assumption;
@@ -510,7 +530,7 @@ Lemma test_letdia_get:
   forall L G G' w w' Gamma Gamma' M N A B,
     G & (w', Gamma') ++ G' |= (w, Gamma) |- M ::: <*>A ->
     (forall w'', w'' \notin L -> 
-      (w'', (A::nil)) :: G & (w, Gamma) ++ G' |= (w', Gamma') |- N ^^ (fctx w'') ::: B) ->
+      (w'', (A::nil)) :: G & (w, Gamma) ++ G' |= (w', Gamma') |- N ^^ [fctx w'' | fctx w'] ::: B) ->
     G & (w, Gamma) ++ G' |= (w', Gamma') |-  letdia_get_LF (fctx w) M N ::: B.
 intros.
 apply t_letdia_get_LF with (A:=A) (G:=G ++ G') (L:=L) (Gamma := Gamma); intros;
@@ -553,8 +573,81 @@ forall G G' w,
   emptyEquiv (G & (w, nil)) = G' & (w, nil).
 Admitted.
 
+Lemma emptyEquiv_stable:
+forall G,
+  emptyEquiv (emptyEquiv G) = emptyEquiv G.
+Admitted.
+
+Lemma emptyEquiv_permut:
+forall G G',
+  permut (emptyEquiv G) G' ->
+  emptyEquiv G' = G'.
+Admitted.
+
+Fixpoint subst_typing G L D w : Prop :=
+match L, D with
+| nil, nil => True
+| M::L', A :: D' => emptyEquiv G |= (w, nil) |- M ::: A /\ (subst_typing G L' D' w)
+| _, _ => False
+end.
+
+Lemma subst_t_preserv_types_inner:
+forall L G Gamma w Delta N B
+  (HT_L: subst_typing G L Delta w)
+  (HT_lc: forall M, Mem M L -> lc_w_LF M)
+  (HT_N: G |= (w, Gamma ++ Delta) |- N ::: B),
+  G |= (w, Gamma) |- subst_list L (length Gamma) N (fctx w) (fctx w) ::: B.
+Admitted.
+
+Lemma subst_t_preserv_types_outer:
+forall L G0 G G' G'' Gamma Gamma' w w' Delta N B
+  (HT_G0: permut G (G0 & (w', Gamma')))
+  (HT_G': permut G' (G0 & (w, Gamma))) 
+  (HT_G'': permut G'' (G0 & (w', Gamma' ++ Delta)))
+  (HT_L: subst_typing G' L Delta w')
+  (HT_lc: forall M, Mem M L -> lc_w_LF M)
+  (HT_N: G'' & (w', Gamma' ++ Delta) |= (w, Gamma) |- N ::: B),
+  G |= (w, Gamma) |- subst_list L (length Gamma) N (fctx w') (fctx w)  ::: B.
+Admitted.
+
+Lemma subst_ctx_preserv_types_outer:
+forall G G' w w' Gamma Gamma' M A n
+  (HT_G: permut G (G' & (w', Gamma')))
+  (HT: G |= (w, Gamma) |- M ::: A),
+  G |= (w, Gamma) |- {{fctx w' // bctx n}} [M | fctx w, 0] ::: A.
+Admitted.
+
+Lemma subst_ctx_preserv_types_new:
+forall G w Gamma M A n
+  (HT: G |= (w, Gamma) |- M ::: A),
+  G |= (w, Gamma) |- {{fctx w // bctx n}} [M | fctx w, 0] ::: A.
+Admitted.
+
+Lemma rename_ctx_preserv_types_outer:
+forall G G' G'' w w' w0 Gamma Gamma' Gamma0 M A
+  (HT_G': permut G' (G & (w, Gamma) & (w', Gamma')))
+  (HT_G'': permut G'' (G & (w, Gamma' ++ Gamma)))
+  (HT: G' |= (w0, Gamma0) |- M ::: A),
+  G'' |= (w0, Gamma0) |- {{fctx w // fctx w'}} [M | fctx w0, length (Gamma')] ::: A.
+Admitted.
+
+Lemma rename_ctx_preserv_types_old:
+forall G G' w0 w1 Gamma0 Gamma1 M A
+  (HT_G': permut G' (G & (w0, Gamma0)))
+  (HT: G' |= (w1, Gamma1) |- M ::: A),
+  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w1, length (Gamma1)] ::: A.
+Admitted.
+
+Lemma rename_ctx_preserv_types_new:
+forall G G' w0 w1 Gamma0 Gamma1 M A
+  (HT_G': permut G' (G & (w1, Gamma1)))
+  (HT: G' |= (w0, Gamma0) |- M ::: A),
+  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w0, length (Gamma1)] ::: A.
+Admitted.
+
 Lemma Progress:
 forall G w M A
+  (H_lc: lc_w_LF M)
   (HT: emptyEquiv G |= (w, nil) |- M ::: A),
   value_LF M \/ exists N, (M, fctx w) |-> (N, fctx w).
 intros.
@@ -570,16 +663,26 @@ inversion HT; destruct n;
 apply Nth_nil_inv in HT0; contradiction.
 (* appl *)
 right; inversion HT; subst.
+inversion H_lc; subst.
 destruct IHM1 with (Ctx := (w, (@nil ty_LF))) (G := G) (A := A0 ---> A) (w := w);
 auto.
   inversion H0; subst; inversion HT1; subst; eexists; constructor.
-  destruct H0; eexists; constructor; eapply H0.
+  inversion H2; subst; assumption.
+  assumption.
+  destruct H0; eexists; constructor. 
+  eapply H0.
+  assumption.
+  assumption.
 (* unbox *)
 right; inversion HT; subst;
+inversion H_lc; subst;
 destruct IHM with (Ctx := (w, (@nil ty_LF))) (G := G) (A := [*]A) (w := w);
 auto.
   inversion H0; subst; inversion HT0; subst; eexists; constructor.
-  destruct H0; eexists; constructor; eapply H0.
+  inversion H1; subst; assumption.
+  destruct H0; eexists; constructor.
+  eapply H0.
+  apply closed_w_succ; assumption.
 (* unbox_fetch *)
 right; inversion HT; subst.
 assert (Gamma = nil).
@@ -587,7 +690,9 @@ assert (Gamma = nil).
   apply permut_sym; assumption.
   rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
 subst. 
+inversion H_lc; subst;
 destruct IHM with (Ctx := (w0, (@nil ty_LF))) (G := G0 & (w, nil)) (A:=[*]A) (w:=w0).
+assumption.
 reflexivity.
 assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
 apply emptyEquiv_last.
@@ -597,20 +702,23 @@ apply emptyEquiv_empty with (G := G).
 rewrite H0; assumption.
 inversion H0; subst; inversion HT0; subst. 
 eexists; constructor.
+inversion H3; subst; assumption.
 destruct H0 as [M'].
-eexists; constructor; eassumption.
+eexists; constructor. eassumption. apply closed_w_succ; assumption.
 (* here *)
 inversion HT; subst.
-destruct (IHM G w A0 (w,nil)); auto.
+inversion H_lc; subst.
+destruct (IHM H1 G w A0 (w,nil)); auto.
 left; apply val_here_LF; assumption.
 right; destruct H0; exists (here_LF x); eauto using step_LF.
 (* get_here *)
+inversion H_lc; subst;
 inversion HT; subst.
 assert (Gamma = nil).
   apply emptyEquiv_nil with (G:=G) (G':=G0 & (w0, Gamma)) (w:=w0).
   apply permut_sym; assumption.
   rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
-subst; destruct (IHM (G0 & (w, nil)) w0 A0 (w0,nil)); auto.
+subst; destruct (IHM H3 (G0 & (w, nil)) w0 A0 (w0,nil)); auto.
 assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
 apply emptyEquiv_last.
 apply emptyEquiv_inv with (w:=w0).
@@ -620,19 +728,23 @@ rewrite H0; assumption.
 left; econstructor; eassumption.
 right; destruct H0; eexists; constructor; eassumption. 
 (* letdia *)
+inversion H_lc; subst;
 right; inversion HT; subst.
-destruct (IHM1 G w (<*>A0) (w, nil)); auto.
+destruct (IHM1 H4 G w (<*>A0) (w, nil)); auto.
 inversion H0; subst; inversion HT1; subst.
-  eexists; econstructor; eassumption.
-  eexists; econstructor; eassumption.
+  eexists; econstructor. 
+  inversion H4; subst; assumption.
+  eassumption.
+  eexists; econstructor. inversion H4; subst; assumption. eassumption.
 destruct H0; exists (letdia_LF x M2); eauto using step_LF.
 (* letdia_get *)
+inversion H_lc; subst;
 right; inversion HT; subst.
 assert (Gamma = nil).
   apply emptyEquiv_nil with (G:=G) (G':=G0 & (w0, Gamma)) (w:=w0).
   apply permut_sym; assumption.
   rewrite Mem_app_or_eq; right; rewrite Mem_cons_eq; left; reflexivity.
-subst; destruct (IHM1 (G0 & (w, nil)) w0 (<*>A0) (w0,nil)); auto.
+subst; destruct (IHM1 H5 (G0 & (w, nil)) w0 (<*>A0) (w0,nil)); auto.
 assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
 apply emptyEquiv_last.
 apply emptyEquiv_inv with (w:=w0).
@@ -641,16 +753,438 @@ apply emptyEquiv_empty with (G := G).
 rewrite H0; assumption.
 inversion H0; subst; inversion HT1; subst.
   eexists; econstructor; eauto.
+  inversion H5; subst; assumption.
   eexists; econstructor; eauto.
-destruct H0; eexists; econstructor; eassumption.
+  inversion H5; subst; eassumption.
+  destruct H0; eexists; econstructor; eassumption.
 Qed.
 
+Axiom Fresh: forall (L:fset var), exists w0, w0 \notin L.
+
 Lemma Preservation:
-forall G w M N A
+forall G M N A w
   (HT: emptyEquiv G |= (w, nil) |- M ::: A)
   (HS: (M, fctx w) |-> (N, fctx w)),
   emptyEquiv G |= (w, nil) |- N ::: A.
-Admitted.
+intros;
+remember (emptyEquiv G) as G';
+remember (w, (@nil ty_LF)) as Ctx;
+generalize dependent w;
+generalize dependent N;
+generalize dependent G;
+induction HT; intros;
+inversion HS; subst;
+eauto using types_LF.
+(* appl_lam *)
+inversion HT1; subst.
+replace ([N//0 | fctx w ] [M0 | fctx w]) with 
+        (subst_list (N::nil) (length (@nil te_LF)) M0 (fctx w) (fctx w)) by auto.
+apply subst_t_preserv_types_inner with (Delta := A::nil).
+  simpl; split; auto.
+  rewrite emptyEquiv_stable.
+  assumption.
+  intros; rewrite Mem_cons_eq in H; destruct H.
+    subst; assumption.
+    rewrite Mem_nil_eq in H; contradiction.
+  assumption.
+(* unbox_box *)
+inversion HT; subst.
+assert (exists w0, w0 \notin L \u free_worlds_LF M0).
+  apply Fresh.
+destruct H as [w0].
+rewrite notin_union in H; destruct H.
+unfold open_ctx in *.
+replace ({{fctx w // bctx 0}}[M0 | fctx w, 0]) with 
+  ({{fctx w // fctx w0}} [ {{fctx w0 // bctx 0}} [ M0 | fctx w0, length (@nil ty_LF)] | fctx w0, length (@nil ty_LF)]).
+replace (w, (@nil ty_LF)) with (w, (@nil ty_LF) ++ nil).
+apply rename_ctx_preserv_types_old with (G':=(emptyEquiv G0 & (w, nil))).
+permut_simpl.
+apply HT0; auto.
+rew_app; reflexivity.
+rewrite <- subst_neutral with (n:=0).
+rewrite subst_id.
+ reflexivity.
+ unfold fresh_world_LF; assumption.
+ apply closed_step_opening; assumption.
+(* unbox_fetch_box *)
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G0) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+inversion HT; subst.
+assert (exists w0, w0 \notin L \u free_worlds_LF M0).
+  apply Fresh.
+destruct H0 as [w1].
+rewrite notin_union in H0; destruct H0.
+unfold open_ctx in *.
+replace ({{fctx w0 // bctx 0}}[M0 | fctx w0, 0]) with 
+  ({{fctx w0 // fctx w1}} [ {{fctx w1 // bctx 0}} [ M0 | fctx w1, length (@nil ty_LF)] | fctx w1, length (@nil ty_LF)]).
+replace (w0, (@nil ty_LF)) with (w0, (@nil ty_LF) ++ nil).
+apply rename_ctx_preserv_types_old with (G':=(emptyEquiv G0 & (w0, nil))).
+permut_simpl.
+apply BackgroundSubsetImpl with (G:= G & (w0, nil) & (w, nil)).
+apply HT0; auto.
+exists (@nil Context_LF); permut_simpl; assumption.
+rew_app; reflexivity.
+rewrite <- subst_neutral with (n:=0).
+rewrite subst_id.
+ reflexivity.
+ unfold fresh_world_LF; assumption.
+ apply closed_step_opening; assumption.
+(* unbox_fetch *)
+apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma).
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G0) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+apply IHHT with (G0:=G & (w0, nil)) (w1 := w).
+rewrite emptyEquiv_last with (G':=G).
+reflexivity.
+apply emptyEquiv_inv with (w:=w).
+apply emptyEquiv_permut with (G:=G0).
+  apply permut_sym; assumption.
+reflexivity.
+assumption.
+assumption.
+(* get_here *)
+apply t_get_here_LF with (G:=G) (Gamma:=Gamma); auto.
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+apply IHHT with (G0:=G & (w0,nil)) (w1:=w); auto.
+rewrite emptyEquiv_last with (G':=G).
+reflexivity.
+apply emptyEquiv_inv with (w:=w).
+apply emptyEquiv_permut with (G:=G1).
+  apply permut_sym; assumption.
+(* letdia_here *)
+inversion HT; subst.
+inversion HeqCtx; subst.
+assert (exists w1, w1 \notin L \u free_worlds_LF N).
+  apply Fresh.
+destruct H0 as [w1].
+apply notin_union in H0;
+destruct H0.
+replace ([M0 // 0 | fctx w0] [N ^^ [fctx w0 | fctx w0] | fctx w0])
+   with (subst_list (M0::nil) (length (@nil te_LF)) (N ^^ [fctx w0 | fctx w0]) (fctx w0) (fctx w0)) by auto.
+apply subst_t_preserv_types_inner with (Delta:=A::nil).
+  simpl; split; auto.
+  rewrite emptyEquiv_stable. 
+  assumption.
+intros. rewrite Mem_cons_eq in H3; destruct H3.
+  subst; assumption.
+  rewrite Mem_nil_eq in H3; contradiction.
+  unfold open_ctx in *.
+  replace ({{fctx w0 // bctx 0}}[N | fctx w0, 0]) with 
+    ({{fctx w0 // fctx w1}} [ {{fctx w1 // bctx 0}} [ N | fctx w0, length (@nil te_LF)] | fctx w0, length (A::nil)]).
+  replace (w0, (nil & A)) with (w0, (A::nil) ++ (@nil ty_LF)).
+  apply rename_ctx_preserv_types_new with (G':=(emptyEquiv G0 & (w1, A::nil))).
+  permut_simpl.
+  apply BackgroundSubsetImpl with (G:= (w1, A :: nil) :: emptyEquiv G0).
+  apply HT2; auto.
+  exists (@nil Context_LF); permut_simpl; assumption.
+  rew_app; reflexivity.
+  rewrite <- subst_neutral' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* letdia__get_here *)
+inversion HT; subst.
+inversion HeqCtx; subst.
+assert (Gamma0 = nil).
+apply emptyEquiv_nil with (G:=G0) (G':=G & (w1, Gamma0)) (w:=w1).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+assert (exists w1, w1 \notin L \u free_worlds_LF N).
+  apply Fresh.
+destruct H0 as [w2].
+apply notin_union in H0;
+destruct H0.
+replace ([M0 // 0 | fctx w1] [N ^^ [fctx w1 | fctx w0] | fctx w0])
+   with (subst_list (M0::nil) (length (@nil te_LF)) (N ^^ [fctx w1 | fctx w0]) (fctx w1) (fctx w0)) by auto.
+apply subst_t_preserv_types_outer with (G0:=G) (Delta:=A::nil) (G':= G & (w0, nil)) (G'':= G & (w1, nil & A)) (Gamma':= nil) .
+  apply permut_sym; assumption.
+  permut_simpl.
+  permut_simpl.
+  simpl; split; auto.
+  rewrite emptyEquiv_last with (G':=G).
+    assumption.
+  apply emptyEquiv_inv with (w:=w1).
+  rewrite emptyEquiv_empty with (G:= emptyEquiv G0).
+    reflexivity.
+    rewrite emptyEquiv_stable.
+    apply permut_sym; assumption.
+intros. rewrite Mem_cons_eq in H3; destruct H3.
+  subst; assumption.
+  rewrite Mem_nil_eq in H3; contradiction.
+  apply GlobalWeakening. (* sth is wrong with the conclusion of subst_t_.._outer *) 
+  unfold open_ctx in *.
+  replace ({{fctx w1 // bctx 0}}[N | fctx w0, 0]) with 
+    ({{fctx w1 // fctx w2}} [ {{fctx w2 // bctx 0}} [ N | fctx w0, length (@nil te_LF)] | fctx w0, length (A::nil)]).
+  replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
+  apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G0 & (w2, A::nil)))
+    (G := G) (Gamma := nil).
+  permut_simpl; apply permut_sym; assumption.
+  permut_simpl.
+  apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: emptyEquiv G0).
+  apply HT2; auto.
+  exists (@nil Context_LF); permut_simpl; assumption.
+  rew_app; reflexivity.
+  rewrite <- subst_neutral'' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* letdia_get__here *)
+inversion HT; subst.
+assert (exists w1, w1 \notin L \u free_worlds_LF N).
+  apply Fresh.
+destruct H1 as [w2].
+apply notin_union in H1;
+destruct H1.
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+replace ([M0 // 0 | fctx w] [N ^^ [fctx w | fctx w0] | fctx w0])
+   with (subst_list (M0::nil) (length (@nil te_LF)) (N ^^ [fctx w | fctx w0]) (fctx w) (fctx w0)) by auto.
+apply subst_t_preserv_types_outer with (G0:=G) (Delta:=A::nil) (G':= G & (w0, nil)) (G'':= G & (w, nil & A)) (Gamma':= nil) .
+  apply permut_sym; assumption.
+  permut_simpl.
+  permut_simpl.
+  simpl; split; auto.
+  rewrite emptyEquiv_last with (G':=G).
+    assumption.
+  apply emptyEquiv_inv with (w:=w).
+  rewrite emptyEquiv_empty with (G:= emptyEquiv G1).
+    reflexivity.
+    rewrite emptyEquiv_stable.
+    apply permut_sym; assumption.
+intros. rewrite Mem_cons_eq in H4; destruct H4.
+  subst; assumption.
+  rewrite Mem_nil_eq in H4; contradiction.
+  apply GlobalWeakening. (* sth is wrong with the conclusion of subst_t_.._outer *) 
+  unfold open_ctx in *.
+  replace ({{fctx w // bctx 0}}[N | fctx w0, 0]) with 
+    ({{fctx w // fctx w2}} [ {{fctx w2 // bctx 0}} [ N | fctx w0, 0] | fctx w0, length (A::nil)]).
+  replace (w, (nil & A)) with (w, (A::nil) ++ (@nil ty_LF)).
+  apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G1 & (w2, A::nil)))
+    (G := G) (Gamma := nil).
+  permut_simpl; apply permut_sym; assumption.
+  permut_simpl.
+  apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: G & (w,nil)).
+  replace (fctx w0) with (fctx (fst (w0, (@nil ty_LF)))).
+  apply HT2; auto.
+  simpl; reflexivity.
+  exists (@nil Context_LF); permut_simpl; assumption.
+  rew_app; reflexivity.
+  rewrite <- subst_neutral'' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* letdia_get_get_here *)
+inversion HT; subst.
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+assert (Gamma0 = nil).
+apply emptyEquiv_nil with (G:=G & (w0, nil)) (G':=G0 & (w1, Gamma0)) (w:=w1).
+  rewrite emptyEquiv_last with (G':=G).
+  apply permut_sym; assumption.
+  apply emptyEquiv_inv with (w:=w).
+  apply emptyEquiv_permut with (G:=G1).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+assert (exists w1, w1 \notin L \u free_worlds_LF N).
+  apply Fresh.
+destruct H1 as [w2].
+apply notin_union in H1;
+destruct H1.
+replace ([M0 // 0 | fctx w1] [N ^^ [fctx w1 | fctx w0] | fctx w0])
+   with (subst_list (M0::nil) (length (@nil te_LF)) (N ^^ [fctx w1 | fctx w0]) (fctx w1) (fctx w0)) by auto.
+(* ! *)
+destruct (eq_var_LF_dec w0 w1).
+(* = *)
+subst.
+assert (permut (G0 & (w1, nil) ++ nil) (G & (w1, nil) ++ nil)).
+rew_app; assumption.
+apply permut_inv in H4; rew_app in H4.
+apply subst_t_preserv_types_inner with (Delta:=A::nil).
+simpl; split; auto.
+rewrite emptyEquiv_stable.
+apply BackgroundSubsetImpl with (G:=G0 & (w,nil)).
+assumption.
+exists (@nil Context_LF).
+rew_app.
+apply permut_trans with (l2:=G&(w,nil));
+permut_simpl; assumption.
+intros. rewrite Mem_cons_eq in H6; destruct H6.
+  subst; assumption.
+  rewrite Mem_nil_eq in H6; contradiction.
+unfold open_ctx in *.
+replace ({{fctx w1 // bctx 0}}[N | fctx w1, 0]) with 
+    ({{fctx w1 // fctx w2}} [ {{fctx w2 // bctx 0}} [ N | fctx w1, 0] | fctx w1, length (A::nil)]).
+replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
+apply rename_ctx_preserv_types_new with (G':=(emptyEquiv G1 & (w2, A::nil))).
+permut_simpl.
+  apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: G & (w, nil)).
+  apply HT2.
+  assumption.
+  exists (@nil Context_LF); permut_simpl; assumption.
+  auto.
+  rewrite <- subst_neutral'' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* <> *)
+assert (exists GH, exists GT, G = GH & (w1, nil) ++ GT). 
+apply permut_split_neq with (G := G0) (G' := nil) (elem' := (w0, nil)).
+intro; inversion H4; subst; elim n; reflexivity.
+rew_app; assumption.
+destruct H4 as (GH).
+destruct H4 as (GT).
+subst G.
+assert (permut (G0++nil) (GH ++ GT & (w0,nil)++nil )).
+  apply permut_inv with (elem:=(w1,nil)); rew_app.
+  apply permut_trans with (l2:=(GH & (w1, nil) ++ GT) & (w0, nil)).
+    assumption.
+    permut_simpl.
+rew_app in H4.
+destruct (eq_var_LF_dec w w0).
+(* = *)
+apply subst_t_preserv_types_outer with (G0 := GH++GT & (w,nil)) 
+  (Delta:=A::nil) (G':= G0 & (w, nil)) (G'':= G0 & (w1, nil & A)) (Gamma':= nil).
+  apply permut_trans with (l2:=(GH & (w1, nil) ++ GT) & (w, nil)).
+    apply permut_sym; assumption.
+    permut_simpl. 
+  permut_simpl; assumption.
+  permut_simpl; subst; assumption.
+  simpl; split; auto.
+  rewrite emptyEquiv_last with (G':=G0).
+    assumption.
+  apply emptyEquiv_inv with (w:=w1).
+  rewrite emptyEquiv_empty with (G:= G1).
+    reflexivity.
+    apply permut_trans with (l2:= (GH & (w1, nil) ++ GT) & (w, nil)).
+    apply permut_sym; assumption.
+    permut_simpl; apply permut_sym; subst; assumption.
+intros. rewrite Mem_cons_eq in H6; destruct H6.
+  subst; assumption.
+  rewrite Mem_nil_eq in H6; contradiction.
+apply GlobalWeakening. (* sth is wrong with the conclusion of subst_t_.._outer *) 
+unfold open_ctx in *.
+subst.
+  replace ({{fctx w1 // bctx 0}}[N | fctx w0, 0]) with 
+    ({{fctx w1 // fctx w2}} [ {{fctx w2 // bctx 0}} [ N | fctx w0, 0] | fctx w0, length (A::nil)]).
+  replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
+  apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G1 & (w2, A::nil)))
+    (G := G0) (Gamma := nil).
+  permut_simpl. 
+  apply permut_trans with (l2:=(GH & (w1, nil) ++ GT) & (w0, nil)).
+    apply permut_sym; assumption.
+    permut_simpl; apply permut_sym; assumption.
+  permut_simpl.
+  apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: (GH & (w1, nil) ++ GT) & (w0,nil)).
+  replace (fctx w0) with (fctx (fst (w0, (@nil ty_LF)))).
+  apply HT2; auto.
+  simpl; reflexivity.
+  exists (@nil Context_LF). permut_simpl. rew_app in *; assumption.
+  rew_app; reflexivity.
+  rewrite <- subst_neutral'' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* <> *)
+clear H5.
+assert (permut (emptyEquiv G1 & (w0, nil)) (G0 & (w1,nil) &(w,nil))).
+  apply permut_trans with (l2:=GH & (w1, nil) ++ GT & (w,nil)  & (w0, nil) ).
+  permut_simpl. rew_app in H0. rew_app. apply permut_sym; assumption.
+  permut_simpl; apply permut_sym; assumption.
+assert (exists GH', exists GT', G0 & (w1,nil) = GH' & (w0,nil) ++ GT').
+apply permut_split_neq with (G := emptyEquiv G1) (G' := nil) (elem' := (w, nil)).
+intro; inversion H6; subst; elim n0; reflexivity.
+rew_app in *; assumption.
+destruct H6 as (GH').
+destruct H6 as (GT').
+assert (exists GH'', exists GT'', G0 = GH'' & (w0, nil) ++ GT'').
+apply permut_split_neq with (G := GH') (G' := GT') (elem' := (w1, nil)).
+intro; inversion H8; subst; elim n; reflexivity.
+rewrite <- H6; permut_simpl.
+destruct H8 as (GH'').
+destruct H8 as (GT'').
+subst G0.
+assert (permut (emptyEquiv G1 ++ nil) ((GH'' ++ GT'') & (w, nil) & (w1, nil))).
+apply permut_inv with (elem := (w0,nil)).
+rew_app in *.
+apply permut_trans with (l2:=(GH'' ++ (w0, nil) :: GT'' ++ (w1, nil) :: (w, nil) :: nil)).
+assumption. permut_simpl.
+apply subst_t_preserv_types_outer with (G0 := GH''++GT'' & (w, nil)) 
+  (Delta:=A::nil) (G':= GH'' ++ GT'' & (w, nil) & (w0, nil)) (G'':= (GH'' ++ GT'' & (w, nil)) & (w1, nil & A)) (Gamma':= nil).
+  permut_simpl; rew_app in *; assumption.
+  permut_simpl.
+  permut_simpl. 
+  simpl; split; auto.
+  rewrite emptyEquiv_inv with (w:=w1) (G':=(GH'' ++ GT'' & (w, nil) & (w0, nil))).
+  apply BackgroundSubsetImpl with (G:=(GH'' & (w0, nil) ++ GT'') & (w, nil)).
+  apply HT0.
+  exists (@nil Context_LF); permut_simpl.
+  apply emptyEquiv_last.
+  replace ( GH'' ++ GT'' & (w, nil) & (w0, nil) ) with (( GH'' ++ GT'' & (w, nil)) & (w0, nil)).
+  apply emptyEquiv_last.
+  apply emptyEquiv_inv with (w:=w1).
+  apply emptyEquiv_permut with (G:=G1). 
+  rew_app in *. assumption.
+  rew_app; reflexivity.
+intros. rewrite Mem_cons_eq in H9; destruct H9.
+  subst; assumption.
+  rewrite Mem_nil_eq in H9; contradiction.
+apply GlobalWeakening. (* sth is wrong with the conclusion of subst_t_.._outer *) 
+unfold open_ctx in *.
+  replace ({{fctx w1 // bctx 0}}[N | fctx w0, 0]) with 
+    ({{fctx w1 // fctx w2}} [ {{fctx w2 // bctx 0}} [ N | fctx w0, 0] | fctx w0, length (A::nil)]).
+  replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
+  apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G1 & (w2, A::nil)))
+    (G := GH''++GT'' & (w,nil)) (Gamma := nil).
+  permut_simpl; rew_app in *; assumption.
+  permut_simpl.
+  apply BackgroundSubsetImpl with (G:=(w2, A :: nil) :: (GH & (w1, nil) ++ GT) & (w, nil)).
+  replace (fctx w0) with (fctx (fst (w0, (@nil ty_LF)))).
+  apply HT2; auto.
+  simpl; reflexivity.
+  exists (@nil Context_LF). permut_simpl. rew_app in *; assumption.
+  rew_app; reflexivity.
+  rewrite <- subst_neutral'' with (n:=0).
+  rewrite subst_id.
+  reflexivity.
+  unfold fresh_world_LF. assumption.
+  apply closed_step_opening; assumption.
+(* letdia_get *)
+apply t_letdia_get_LF with (L:=L)(A:=A) (G:=G) (Gamma:=Gamma); auto.
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+apply IHHT with (G0:=G & (w0,nil)) (w1:=w); auto.
+rewrite emptyEquiv_last with (G':=G).
+reflexivity.
+apply emptyEquiv_inv with (w:=w).
+apply emptyEquiv_permut with (G:=G1).
+  apply permut_sym; assumption.
+Qed.
 
 End Lemmas.
 

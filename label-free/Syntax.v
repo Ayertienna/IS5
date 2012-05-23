@@ -128,6 +128,23 @@ end.
 Definition lc_w_LF (t:te_LF) : Prop := lc_w_n_LF t 0.
 
 Section Lemmas.
+
+Lemma unbound_nil:
+forall M n
+  (HT: unbound_worlds (S n) M = nil),
+  unbound_worlds n M = nil.
+induction M; intros; simpl in *; auto.
+apply app_eq_nil in HT; destruct HT;
+rewrite IHM1; try rewrite IHM2; auto.
+destruct c; auto; discriminate.
+destruct c; auto; discriminate.
+apply app_eq_nil in HT; destruct HT;
+rewrite IHM1; try rewrite IHM2; auto.
+destruct c; try discriminate.
+apply app_eq_nil in HT; destruct HT;
+rewrite IHM1; try rewrite IHM2; auto.
+Qed.
+
 Lemma closed_w_succ:
 forall M n,
   lc_w_n_LF M n -> lc_w_n_LF M (S n).
