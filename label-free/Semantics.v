@@ -78,6 +78,19 @@ Global Reserved Notation " M |-> N " (at level 70).
 
 Inductive step_LF: (te_LF * ctx_LF) -> (te_LF * ctx_LF) -> Prop :=
 
+| red_unbox_fetch_unbox_LF: forall ctx M,
+  lc_w_LF M ->
+  (unbox_fetch_LF ctx M, ctx) |-> (unbox_LF M, ctx)
+
+| red_get_here_here_LF: forall ctx M,
+  lc_w_LF M ->
+  (get_here_LF ctx M, ctx) |-> (here_LF M, ctx)
+
+| red_letdia_get_letdia_LF: forall ctx M N,
+  lc_w_LF M -> 
+  lc_w_n_LF N 1 ->
+  (letdia_get_LF ctx M N, ctx) |-> (letdia_LF M N, ctx)
+
 | red_appl_lam_LF: forall ctx M A N,
   lc_w_LF M -> lc_w_LF N ->
   (appl_LF (lam_LF A M) N, ctx) |-> 
@@ -610,6 +623,7 @@ forall L G0 G G' G'' Gamma Gamma' w w' Delta N B
   G |= (w, Gamma) |- subst_list L (length Gamma) N (fctx w') (fctx w)  ::: B.
 Admitted.
 
+(*
 Lemma subst_ctx_preserv_types_outer:
 forall G G' w w' Gamma Gamma' M A n
   (HT_G: permut G (G' & (w', Gamma')))
@@ -622,6 +636,7 @@ forall G w Gamma M A n
   (HT: G |= (w, Gamma) |- M ::: A),
   G |= (w, Gamma) |- {{fctx w // bctx n}} [M | fctx w, 0] ::: A.
 Admitted.
+*)
 
 Lemma rename_ctx_preserv_types_outer:
 forall G G' G'' w w' w0 Gamma Gamma' Gamma0 M A
@@ -644,6 +659,7 @@ forall G G' w0 w1 Gamma0 Gamma1 M A
   (HT: G' |= (w0, Gamma0) |- M ::: A),
   G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w0, length (Gamma1)] ::: A.
 Admitted.
+
 
 Lemma Progress:
 forall G w M A
@@ -804,8 +820,19 @@ rew_app; reflexivity.
 rewrite <- subst_neutral with (n:=0).
 rewrite subst_id.
  reflexivity.
- unfold fresh_world_LF; assumption.
+ unfold fresh_world_LF. assumption.
  apply closed_step_opening; assumption.
+(* unbox_fetch_unbox *)
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G0) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+inversion H3; subst.
+constructor.
+apply BackgroundSubsetImpl with (G:=(G & (w0,nil))).
+assumption.
+exists (@nil Context_LF); permut_simpl; assumption.
 (* unbox_fetch_box *)
 assert (Gamma = nil).
 apply emptyEquiv_nil with (G:=G0) (G':=G & (w, Gamma)) (w:=w).
@@ -848,6 +875,17 @@ apply emptyEquiv_permut with (G:=G0).
 reflexivity.
 assumption.
 assumption.
+(* get_here_here *)
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+inversion H3; subst.
+constructor.
+apply BackgroundSubsetImpl with (G:=(G & (w0,nil))).
+assumption.
+exists (@nil Context_LF); permut_simpl; assumption.
 (* get_here *)
 apply t_get_here_LF with (G:=G) (Gamma:=Gamma); auto.
 assert (Gamma = nil).
@@ -889,6 +927,7 @@ intros. rewrite Mem_cons_eq in H3; destruct H3.
   exists (@nil Context_LF); permut_simpl; assumption.
   rew_app; reflexivity.
   rewrite <- subst_neutral' with (n:=0).
+  rewrite length_nil.
   rewrite subst_id.
   reflexivity.
   unfold fresh_world_LF. assumption.
@@ -941,6 +980,22 @@ intros. rewrite Mem_cons_eq in H3; destruct H3.
   reflexivity.
   unfold fresh_world_LF. assumption.
   apply closed_step_opening; assumption.
+(* letdia_get_letdia *)
+assert (Gamma = nil).
+apply emptyEquiv_nil with (G:=G1) (G':=G & (w, Gamma)) (w:=w).
+  apply permut_sym; assumption.
+  apply Mem_last.
+subst.
+inversion H5; subst.
+apply t_letdia_LF with (L:=L)(A:=A).
+apply BackgroundSubsetImpl with (G:=(G & (w0,nil))).
+assumption.
+exists (@nil Context_LF); permut_simpl; assumption.
+intros.
+apply BackgroundSubsetImpl with (G:=(w', A::nil) :: G & (w0,nil)).
+apply HT2.
+assumption.
+exists (@nil Context_LF); permut_simpl; assumption.
 (* letdia_get__here *)
 inversion HT; subst.
 assert (exists w1, w1 \notin L \u free_worlds_LF N).

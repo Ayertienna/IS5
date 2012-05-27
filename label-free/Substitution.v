@@ -5,6 +5,12 @@ Require Import List.
 
 Open Scope label_free_is5_scope.
 
+Definition var_from (w: ctx_LF):=
+match w with
+| fctx w0 => \{w0}
+| bctx _ => \{}
+end.
+
 (* Term substitution *)
 
 (* We want to substitute M for nth hyp. in term N0, provided that the current context
@@ -100,7 +106,7 @@ match M0 with
 | appl_LF M N => appl_LF (subst_ctx_outer M curr ctx1 ctx2 len_old) 
                          (subst_ctx_outer N curr ctx1 ctx2 len_old)
 | box_LF M => 
-  let w0 := var_gen (free_worlds_LF M) in
+  let w0 := var_gen ((free_worlds_LF M) \u (var_from curr) \u (var_from ctx1) \u (var_from ctx2)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 | unbox_LF M => unbox_LF (subst_ctx_outer M curr ctx1 ctx2 len_old)
@@ -149,24 +155,19 @@ match M0 with
 | appl_LF M N => appl_LF (subst_ctx_old M ctx1 ctx2 len_old) 
                          (subst_ctx_old N ctx1 ctx2 len_old)
 | box_LF M =>
-  let w0 := var_gen (free_worlds_LF M) in
+  let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u (var_from ctx2)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in     
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 | unbox_LF M => unbox_LF (subst_ctx_old M ctx1 ctx2 len_old)
 | unbox_fetch_LF w M =>
   match (eq_ctx_LF_dec w ctx1) with
-  | left _ => unbox_LF (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-      (* w = ctx2 will never really happen, since ctx2 is current context *) 
-      | left _ => unbox_fetch_LF w (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
+  | left _ => unbox_fetch_LF ctx1 (subst_ctx_new M ctx1 ctx2 len_old)
+  | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
    end
 | here_LF M => here_LF (subst_ctx_old M ctx1 ctx2 len_old)
 | get_here_LF w M =>
   match (eq_ctx_LF_dec w ctx1) with
-  | left _ => here_LF (subst_ctx_new M ctx1 ctx2 len_old)
+  | left _ => get_here_LF ctx1 (subst_ctx_new M ctx1 ctx2 len_old)
   | right _ => 
     match (eq_ctx_LF_dec w ctx2) with
       | left _ => get_here_LF w (subst_ctx_old M ctx1 ctx2 len_old)
@@ -180,7 +181,7 @@ match M0 with
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
   match (eq_ctx_LF_dec w ctx1) with
-  | left _ => letdia_LF (subst_ctx_new M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old)
+  | left _ => letdia_get_LF ctx1 (subst_ctx_new M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old)
   | right _ => 
     match (eq_ctx_LF_dec w ctx2) with
       | left _ => letdia_get_LF w (subst_ctx_old M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old) 
@@ -191,32 +192,31 @@ end
 (* In subst_ctx_new we assume that current context is ctx1 *)
 with subst_ctx_new (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
 match M0 with 
-| hyp_LF n => hyp_LF (len_old+n)
+| hyp_LF n => 
+  match ctx2 with
+    | bctx _ => hyp_LF n
+    | fctx _ => hyp_LF (len_old+n)
+  end
 | lam_LF A M => lam_LF A (subst_ctx_new M ctx1 ctx2 len_old)
 | appl_LF M N => appl_LF (subst_ctx_new M ctx1 ctx2 len_old) 
                          (subst_ctx_new N ctx1 ctx2 len_old)
 | box_LF M =>
-  let w0 := var_gen (free_worlds_LF M) in
+  let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u (var_from ctx2)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 | unbox_LF M => unbox_LF (subst_ctx_new M ctx1 ctx2 len_old)
 | unbox_fetch_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-  (* w = ctx1 will never really happen, since ctx1 is current context *) 
-  | left _ => unbox_fetch_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-      | left _ => unbox_LF (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-   end
+  match (eq_ctx_LF_dec w ctx2) with
+    | left _ => unbox_fetch_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old)
+    | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
+  end
 | here_LF M => here_LF (subst_ctx_new M ctx1 ctx2 len_old)
 | get_here_LF w M =>
   match (eq_ctx_LF_dec w ctx1) with
   | left _ => get_here_LF w (subst_ctx_new M ctx1 ctx2 len_old)
   | right _ => 
     match (eq_ctx_LF_dec w ctx2) with
-      | left _ => here_LF (subst_ctx_old M ctx1 ctx2 len_old)
+      | left _ => get_here_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old)
       | right _ => get_here_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
     end
    end
@@ -230,7 +230,7 @@ match M0 with
   | left _ => letdia_get_LF w (subst_ctx_new M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old)
   | right _ => 
     match (eq_ctx_LF_dec w ctx2) with
-      | left _ => letdia_LF (subst_ctx_old M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old) 
+      | left _ => letdia_get_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old) 
       | right _ => letdia_get_LF w (subst_ctx_outer M w ctx1 ctx2 len_old) (subst_ctx_old M ctx1' ctx2' len_old) 
     end
   end
@@ -252,12 +252,68 @@ Definition open_ctx M ctx curr := subst_ctx M ctx (bctx 0) curr 0.
 
 Notation " M ^^ [ w | w' ] " := (open_ctx M w w') (at level 10) : label_free_is5_scope.
 
+
 Section Lemmas.
 
+Lemma subst_ctx__old:
+forall M c1 c2 len_old
+  (Neq: c1 <> c2),
+  subst_ctx_old M c1 c2 len_old = {{ c1 // c2 }} [M | c2, len_old].
+intros;
+unfold subst_ctx;
+repeat case_if;
+reflexivity.
+Qed.
+
+Lemma subst_ctx__new:
+forall M c1 c2 len_old
+  (Neq: c1 <> c2),
+  subst_ctx_new M c1 c2 len_old = {{ c1 // c2 }} [M | c1, len_old].
+intros;
+unfold subst_ctx;
+repeat case_if;
+reflexivity.
+Qed.
+
+Lemma subst_ctx__outer:
+forall M c1 c2 curr len_old
+  (Neq: c1 <> c2)
+  (Neq': c1 <> curr)
+  (Neq'': c2 <> curr),
+  subst_ctx_outer M curr c1 c2 len_old = {{ c1 // c2 }} [M | curr, len_old].
+intros;
+unfold subst_ctx;
+repeat case_if;
+reflexivity.
+Qed.
+
+
+(*
 Lemma no_unbound_worlds_subst_w_id:
 forall M w k w'
   (H_unbound: unbound_worlds k M = nil),
   {{w//bctx k}}[M | w', 0] = M.
+intros;
+generalize dependent w;
+generalize dependent k;
+induction M; unfold subst_ctx in *;
+intros.
+(* hyp *)
+repeat case_if; reflexivity.
+(* lam *)
+apply IHM with (w:=w) in H_unbound;
+repeat case_if; simpl;
+try rewrite H_unbound; reflexivity.
+(* appl *)
+simpl in H_unbound;
+apply app_eq_nil in H_unbound;
+destruct H_unbound as (H_Un1, H_Un2);
+apply IHM1 with (w:=w) in H_Un1;
+apply IHM2 with (w:=w) in H_Un2;
+repeat case_if; simpl;
+try (rewrite H_Un1; rewrite H_Un2); reflexivity.
+(* box *)
+
 Admitted.
 
 Lemma closed_w_subst_id:
@@ -282,16 +338,162 @@ forall M w w' w'' n w0 w1 k
   (Neq: w'' <> w),
   {{fctx w'//fctx w''}}[({{fctx w//bctx n}}[M | w0, 0]) | w1, k] = {{fctx w//bctx n}}[({{fctx w'//fctx w''}}[M | w1, k]) | w0, 0].
 Admitted.
+*)
+
+Lemma var_gen_neq:
+  forall w S
+  (HT: w \in S),
+  fctx w <> fctx (var_gen S).
+intros; intro; inversion H; subst;
+assert (var_gen S \notin S) by apply var_gen_spec;
+contradiction.
+Qed.
+
+Ltac in_singleton_union :=
+match goal with
+| |- ?w \in \{?w} => rewrite in_singleton; reflexivity
+| |- ?w \in \{?w} \/ _ => left; in_singleton_union
+| |- _ \/ ?w \in \{?w} => right; in_singleton_union
+| |- _ \/ ?w \in \{?w} \/ _ => right; in_singleton_union
+| |- _ \/ _ \/ ?w \in \{?w}  => right; in_singleton_union
+| _ => fail
+end.
+
+Ltac autorewrite_ctx :=
+match goal with 
+| [H : (bctx ?n = bctx ?n') |- _ ] => rewrite H
+| [H : (fctx ?n = fctx ?n') |- _ ] => rewrite H
+| _ => skip
+end.
 
 Lemma subst_id:
-forall M w n w0 k w0'
-  (HT: fresh_world_LF w M),
-  {{bctx n//fctx w}}[({{fctx w//bctx n}}[M | w0, 0]) | w0', k] = M.
-Admitted.
+forall M w n w0 w0' k
+  (HT: w \notin (free_worlds_LF M)),
+  {{bctx n // fctx w}}[ {{fctx w // bctx n}} [M | fctx w0', 0] | fctx w0, k] = M.
+intros;
+generalize dependent n;
+generalize dependent w0';
+generalize dependent w0;
+induction M; intros.
+(* hyp *)
+unfold subst_ctx;
+simpl in *;
+repeat case_if;
+reflexivity.
+(* lam *)
+simpl in HT;
+unfold subst_ctx;
+repeat case_if; 
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+auto;
+rewrite IHM; auto.
+(* appl *)
+simpl in HT; rewrite notin_union in HT; destruct HT;
+unfold subst_ctx;
+repeat case_if;
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+auto;
+try rewrite IHM1; try rewrite IHM2; auto.
+(* box *)
+simpl in HT;
+unfold subst_ctx;
+repeat case_if;
+subst; simpl in *;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM; 
+try discriminate;
+try (apply var_gen_neq;
+  repeat rewrite in_union; right; 
+  in_singleton_union);
+auto.
+(* unbox *)
+simpl in HT;
+unfold subst_ctx;
+repeat case_if;
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM; 
+try discriminate;
+auto.
+(* unbox_fetch *)
+simpl in HT; destruct c; simpl in HT;
+try (rewrite notin_union in HT; destruct HT);
+unfold subst_ctx;
+repeat (case_if; simpl);
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM; 
+autorewrite_ctx;
+try discriminate;
+auto;
+autorewrite_ctx.
+(* here *)
+simpl in HT;
+unfold subst_ctx;
+repeat case_if;
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM; 
+try discriminate;
+auto.
+(* get_here *)
+simpl in HT; destruct c; simpl in HT;
+try (rewrite notin_union in HT; destruct HT);
+unfold subst_ctx;
+repeat (case_if; simpl);
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM; 
+autorewrite_ctx;
+try discriminate;
+auto;
+autorewrite_ctx.
+(* letdia *)
+simpl in HT;
+unfold subst_ctx;
+repeat case_if;
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM1;
+try rewrite IHM2; 
+try discriminate;
+auto.
+(* letdia_get *)
+simpl in HT; destruct c; simpl in HT;
+try (rewrite notin_union in HT; destruct HT);
+unfold subst_ctx;
+repeat (case_if; simpl);
+subst; simpl in *;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer;
+try rewrite IHM1;
+try rewrite IHM2; 
+autorewrite_ctx;
+try discriminate;
+auto;
+autorewrite_ctx.
+Qed.
 
 (* This is just one option of neutral substitution! *)
 Lemma subst_neutral:
-forall M w w' n  k
+forall M w w' n k
   (HT: lc_w_n_LF M n),
   {{fctx w//bctx n}}[({{bctx n//fctx w'}}[M | fctx w', k]) | fctx w, 0] = {{fctx w//fctx w'}}[ M | fctx w', k].
 Admitted.

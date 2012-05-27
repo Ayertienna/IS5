@@ -55,6 +55,7 @@ decide equality.
 apply eq_var_LF_dec. 
 Qed.
 
+(*
 Theorem eq_ty_LF_dec:
 forall t1 t2: ty_LF, {t1 = t2} + {t1 <> t2}.
 intros; decide equality.
@@ -69,6 +70,7 @@ apply eq_ctx_LF_dec.
 apply eq_ctx_LF_dec.
 apply eq_ctx_LF_dec.
 Qed.
+*)
 
 (* Calculate list of free worlds used in term M *)
 Fixpoint free_worlds_LF (M: te_LF) : fset var :=
@@ -129,6 +131,7 @@ Definition lc_w_LF (t:te_LF) : Prop := lc_w_n_LF t 0.
 
 Section Lemmas.
 
+(*
 Lemma unbound_nil:
 forall M n
   (HT: unbound_worlds (S n) M = nil),
@@ -144,6 +147,7 @@ destruct c; try discriminate.
 apply app_eq_nil in HT; destruct HT;
 rewrite IHM1; try rewrite IHM2; auto.
 Qed.
+*)
 
 Lemma closed_w_succ:
 forall M n,
@@ -153,6 +157,7 @@ induction M; intros; inversion H; subst;
 eauto using lc_w_n_LF.
 Qed.
 
+(*
 Lemma closed_w_addition:
 forall M n m,
   lc_w_n_LF M n -> lc_w_n_LF M (n + m).
@@ -182,6 +187,7 @@ destruct c; inversion H; subst; auto.
   [rewrite IHM2 | auto];
   auto.  
 Qed.
+*)
 
 End Lemmas.
 
