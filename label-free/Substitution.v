@@ -309,20 +309,6 @@ repeat case_if;
 reflexivity.
 Qed.
 
-
-Lemma subst_ctx_rewrite_new:
-forall w0 w1 k M, 
-  {{ w0 // w1}}[ {{w1 // k}} [M | w1, 0] | w1, 0] = {{ w0 // k }} [M | w0, 0]. 
-Admitted.
-
-Lemma subst_ctx_rewrite_old:
-forall w0 w1 k M, 
-  {{ w0 // w1}}[ {{w1 // k}} [M | w1, 0] | w1, 0] = {{ w0 // k }} [M | w0, 0]. 
-Admitted.
-
-Lemma subst_ctx_rewrite_outer:
-forall w0 w1 w k l M, 
-  {{ w0 // w1}}[ {{w1 // k}} [M | w, 0] | w, l] = {{ w0 // k }} [M | w, 0]. 
 Admitted.
 
 End Lemmas.
