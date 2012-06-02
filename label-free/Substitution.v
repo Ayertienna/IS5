@@ -309,8 +309,6 @@ repeat case_if;
 reflexivity.
 Qed.
 
-Admitted.
-
 End Lemmas.
 
 Close Scope label_free_is5_scope.
