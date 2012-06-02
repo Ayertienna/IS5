@@ -529,8 +529,8 @@ Admitted.
 
 Lemma emptyEquiv_permut:
 forall G G',
-  permut (emptyEquiv G) G' ->
-  emptyEquiv G' = G'.
+  permut G G' ->
+  permut (emptyEquiv G) (emptyEquiv G').
 Admitted.
 
 Lemma unique_worlds:
@@ -547,18 +547,119 @@ match L, D with
 | _, _ => False
 end.
 
+Lemma subst_t_preserv_types_end:
+forall G0 w_subst Gamma_subst w G_M G_HT G_TS Gamma_HT Gamma_TS M A N B
+  (H_inner: w_subst = w -> 
+    G_TS = G_HT /\ Gamma_HT = Gamma_TS & A /\ G_M = G_TS /\ G0 = G_M)
+  (H_outer: w_subst <> w ->
+    permut G_TS (G0 & (w_subst, Gamma_subst)) /\
+    permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
+    Gamma_HT = Gamma_TS /\ permut G_M (G0 & (w, Gamma_TS)))
+  (HM: emptyEquiv G_M |= (w_subst, nil) |- M ::: A)
+  (H_lc: lc_w_LF M)
+  (HT: G_HT |= (w, Gamma_HT) |- N ::: B),
+  G_TS |= (w, Gamma_TS) |- [ M // length Gamma_subst | fctx w_subst ] [ N | fctx w] ::: B.
+Admitted.
+
+Lemma subst_t_preserv_types_end_inner:
+forall G Gamma w M N A B
+  (HM: emptyEquiv G |= (w, nil) |- M ::: A)
+  (H_lc: lc_w_LF M)
+  (HT: G |= (w, Gamma & A) |- N ::: B),
+  G |= (w, Gamma) |- [ M // length Gamma | fctx w] [N | fctx w] ::: B.
+intros;
+eapply subst_t_preserv_types_end; eauto;
+intro n; elim n; reflexivity.
+Qed.
+
+Lemma subst_t_preserv_types_end_outer:
+forall G0 w w_subst Gamma_subst A G' G_HT G_TS Gamma M N B
+  (H_G': permut G' (G0 & (w, Gamma)))
+  (H_G'': permut G_HT (G0 & (w_subst, Gamma_subst & A)))
+  (H_G''': permut G_TS (G0 & (w_subst, Gamma_subst)))
+  (HM: emptyEquiv G' |= (w_subst, nil) |- M ::: A)
+  (H_lc: lc_w_LF M)
+  (HT: G_HT |= (w, Gamma) |- N ::: B),
+  G_TS |= (w, Gamma) |- [ M // length Gamma_subst | fctx w_subst ] [N | fctx w] ::: B.
+intros.
+eapply subst_t_preserv_types_end.
+assert (w <> w_subst).
+eapply unique_worlds with (G':=G_HT); eauto. 
+intro nn; subst; elim H; reflexivity.
+intro; repeat split; eauto.
+assumption.
+assumption.
+assumption.
+Qed.
+
 Lemma subst_t_preserv_types:
 forall L Delta G0 G_min G_HT G_TS Gamma_HT Gamma_TS w_subst Gamma_subst w N A
   (H_L: subst_typing G_min L Delta w_subst)
   (H_lc: forall M, Mem M L -> lc_w_LF M)
   (H_inner: w_subst = w -> G_HT = G_min /\ G_HT = G_TS /\ Gamma_HT = Gamma_TS ++ Delta /\
-            permut G0 G_HT /\ Gamma_subst = Gamma_HT)
+            permut G0 G_HT /\ Gamma_subst = Gamma_TS)
   (H_outer: w_subst <> w -> Gamma_HT = Gamma_TS /\ permut G_min (G0 & (w, Gamma_HT)) /\
             permut G_HT (G0 & (w_subst, Gamma_subst ++ Delta)) /\ 
             permut G_TS (G0 & (w_subst, Gamma_subst)))
   (HT: G_HT |= (w, Gamma_HT) |- N ::: A),
-  G_TS |= (w, Gamma_TS) |- subst_list L (length Gamma_TS) N (fctx w_subst) (fctx w) ::: A.
-Admitted.
+  G_TS |= (w, Gamma_TS) |- subst_list L (length Gamma_subst) N (fctx w_subst) (fctx w) ::: A.
+induction L; destruct Delta; simpl in *; intros; try contradiction;
+unfold subst_t;
+destruct (eq_var_LF_dec w_subst w).
+(* = - inner substitution, nil *)
+apply H_inner in e; destruct e; destruct H0; destruct H1; destruct H2.
+subst G_TS; subst Gamma_HT.
+replace Gamma_TS with (Gamma_TS ++ nil) by (rew_app; reflexivity).
+  assumption.
+(* <> - outer substitution, nil *)
+apply H_outer in n; destruct n; destruct H0; destruct H1.
+rew_app in H1; apply BackgroundSubsetImpl with (G:=G_HT).
+subst Gamma_TS; assumption.
+exists (@nil Context_LF); permut_simpl;
+apply permut_trans with (l2:=(G0 & (w_subst, Gamma_subst))).
+  assumption.
+  apply permut_sym; assumption.
+(* = - inner substitution, step *)
+case_if; try (inversion H; discriminate); clear H.
+assert (w_subst = w) by assumption.
+apply H_inner in H; destruct H. destruct H0. destruct H1. destruct H2.
+clear H_inner H_outer.
+destruct H_L.
+rewrite subst_t__inner.
+subst Gamma_subst.
+apply subst_t_preserv_types_end_inner with (A:=t).
+subst G_min; subst G_TS; subst w_subst;
+assumption.
+apply H_lc; apply Mem_here.
+replace (S(length Gamma_TS)) with (length (Gamma_TS & t) ).
+eapply IHL; eauto. 
+intros; apply H_lc; apply Mem_next; assumption.
+intro n; elim n; subst w; reflexivity.
+subst Gamma_HT; rew_app in *; assumption.
+rew_length; omega.
+(* <> - outer substitution, step *)
+case_if; clear H.
+assert (w_subst <> w) by assumption.
+apply H_outer in H. destruct H. destruct H0; destruct H1.
+clear H_inner H_outer.
+destruct H_L.
+rewrite subst_t__outer.
+eapply subst_t_preserv_types_end_outer with (A:=t); eauto.
+apply BackgroundSubsetImpl with (G:=emptyEquiv G_min).
+assumption.
+exists (@nil Context_LF); permut_simpl.
+apply emptyEquiv_permut. subst Gamma_TS. assumption.
+apply H_lc; apply Mem_here.
+replace (S(length Gamma_subst)) with (length (Gamma_subst & t) ).
+eapply IHL; eauto.
+intros; apply H_lc; apply Mem_next; assumption.
+intro nn; elim n; subst w; reflexivity.
+apply BackgroundSubsetImpl with (G:=G_HT).
+assumption.
+exists (@nil Context_LF); permut_simpl; rew_app in *; assumption.
+rew_length; omega.
+intro nn; inversion nn; subst; elim n; reflexivity.
+Qed.
 
 Lemma subst_t_preserv_types_inner:
 forall L G Gamma w Delta N B
@@ -579,7 +680,7 @@ forall L G0 G G' G'' Gamma Gamma' w w' Delta N B
   (HT_L: subst_typing G' L Delta w')
   (HT_lc: forall M, Mem M L -> lc_w_LF M)
   (HT_N: G'' |= (w, Gamma) |- N ::: B),
-  G |= (w, Gamma) |- subst_list L (length Gamma) N (fctx w') (fctx w)  ::: B.
+  G |= (w, Gamma) |- subst_list L (length Gamma') N (fctx w') (fctx w)  ::: B.
 intros;
 eapply subst_t_preserv_types; eauto.
 intro n; absurd (w = w'); try symmetry; auto.
@@ -684,10 +785,11 @@ forall G G' w0 w1 Gamma0 Gamma1 M A
   (HT: G' |= (w1, Gamma1) |- M ::: A),
   G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w1, length (Gamma1)] ::: A.
 intros;
-eapply rename_ctx_preserv_types; eauto.
-
-
-Admitted.
+eapply rename_ctx_preserv_types with (w_HT:=w1); eauto.
+intros a b; elim b; reflexivity.
+assert (w1 <> w0) by (eapply unique_worlds; eauto).
+intro; subst; elim H; reflexivity.
+Qed.
 
 Lemma rename_ctx_preserv_types_new:
 forall G G' w0 w1 Gamma0 Gamma1 M A
@@ -837,14 +939,12 @@ eauto using types_LF.
 inversion HT1; subst.
 replace ([N//0 | fctx w ] [M0 | fctx w]) with 
         (subst_list (N::nil) (length (@nil te_LF)) M0 (fctx w) (fctx w)) by auto.
-eapply subst_t_preserv_types with (Delta := A::nil) (G_min := emptyEquiv G0).
+apply subst_t_preserv_types_inner with (Delta := A::nil).
   simpl; split. rewrite emptyEquiv_stable. eauto. auto.
   intros; rewrite Mem_cons_eq in H; destruct H.
     subst; assumption.
     rewrite Mem_nil_eq in H; contradiction.
   intros; repeat split; eauto.
-  intro neq; elim neq; reflexivity.
-  rew_app in *; assumption.
 (* unbox_box *)
 inversion HT; subst.
 assert (exists w0, w0 \notin L \u free_worlds_LF M0).
@@ -889,7 +989,7 @@ apply IHHT with (G0:=G & (w0, nil)) (w1 := w).
 rewrite emptyEquiv_last with (G':=G).
 reflexivity.
 apply emptyEquiv_inv with (w:=w).
-apply emptyEquiv_permut with (G:=G0).
+apply emptyEquiv_empty with (G:=G0).
   apply permut_sym; assumption.
 reflexivity.
 assumption.
@@ -905,7 +1005,7 @@ apply IHHT with (G0:=G & (w0,nil)) (w1:=w); auto.
 rewrite emptyEquiv_last with (G':=G).
 reflexivity.
 apply emptyEquiv_inv with (w:=w).
-apply emptyEquiv_permut with (G:=G1).
+apply emptyEquiv_empty with (G:=G1).
   apply permut_sym; assumption.
 (* letdia + (here | get_here ) *)
 inversion HT; subst.
@@ -916,15 +1016,13 @@ apply notin_union in H0;
 destruct H0.
 replace ([M0 // 0 | fctx w0] [N ^^ [fctx w0 | fctx w0] | fctx w0])
    with (subst_list (M0::nil) (length (@nil te_LF)) (N ^^ [fctx w0 | fctx w0]) (fctx w0) (fctx w0)) by auto.
-eapply subst_t_preserv_types with (Delta:=A::nil) (G_min := emptyEquiv G0) (G0 := emptyEquiv G0).
+eapply subst_t_preserv_types_inner with (Delta:=A::nil). 
   simpl; split; auto;
   rewrite emptyEquiv_stable;
   assumption.
 intros. rewrite Mem_cons_eq in H3; destruct H3.
   subst; assumption.
   rewrite Mem_nil_eq in H3; contradiction.
-intros; repeat split; eauto.
-intro neq; elim neq; reflexivity.
 unfold open_ctx in *.
   replace (w0, (nil & A)) with (w0, (A::nil) ++ (@nil ty_LF)).
   eapply inv_subst_ctx_preserv_types_new; eauto.
@@ -1027,7 +1125,7 @@ apply emptyEquiv_nil with (G:=G & (w0, nil)) (G':=G0 & (w1, Gamma0)) (w:=w1).
   rewrite emptyEquiv_last with (G':=G).
   apply permut_sym; assumption.
   apply emptyEquiv_inv with (w:=w).
-  apply emptyEquiv_permut with (G:=G1).
+  apply emptyEquiv_empty with (G:=G1).
   apply permut_sym; assumption.
   apply Mem_last.
 subst.
@@ -1044,7 +1142,7 @@ subst.
 assert (permut (G0 & (w1, nil) ++ nil) (G & (w1, nil) ++ nil)).
 rew_app; assumption.
 apply permut_inv in H4; rew_app in H4.
-eapply subst_t_preserv_types with (Delta:=A::nil) (G_min:=emptyEquiv G1) (G0:=emptyEquiv G1).
+eapply subst_t_preserv_types_inner with (Delta:=A::nil). 
 simpl; split; auto.
 rewrite emptyEquiv_stable; 
 apply BackgroundSubsetImpl with (G:=G0 & (w,nil)).
@@ -1056,8 +1154,6 @@ permut_simpl; assumption.
 intros. rewrite Mem_cons_eq in H6; destruct H6.
   subst; assumption.
   rewrite Mem_nil_eq in H6; contradiction.
-intro; repeat split; eauto.
-intro neq; elim neq; reflexivity.
 unfold open_ctx in *.
 replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
   apply inv_subst_ctx_preserv_types_new with (w':=w2) (k:=0). 
@@ -1119,7 +1215,7 @@ apply subst_t_preserv_types with (G0 := GH''++GT'' & (w, nil))
   replace ( GH'' ++ GT'' & (w, nil) & (w0, nil) ) with (( GH'' ++ GT'' & (w, nil)) & (w0, nil)).
   apply emptyEquiv_last.
   apply emptyEquiv_inv with (w:=w1).
-  apply emptyEquiv_permut with (G:=G1). 
+  apply emptyEquiv_empty with (G:=G1). 
   rew_app in *. assumption.
   rew_app; reflexivity.
 intros. rewrite Mem_cons_eq in H11; destruct H11.
@@ -1154,7 +1250,7 @@ apply IHHT with (G0:=G & (w0,nil)) (w1:=w); auto.
 rewrite emptyEquiv_last with (G':=G).
 reflexivity.
 apply emptyEquiv_inv with (w:=w).
-apply emptyEquiv_permut with (G:=G1).
+apply emptyEquiv_empty with (G:=G1).
   apply permut_sym; assumption.
 Qed.
 
