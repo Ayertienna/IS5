@@ -5,6 +5,10 @@ Require Import Metatheory.
 Require Import LibList.
 Require Import LibListSorted.
 Require Import Arith.
+Require Import Setoid.
+Require Import Relations.
+Require Import Equivalence.
+
 
 Open Scope label_free_is5_scope.
 
@@ -120,7 +124,35 @@ where " M |-> N " := (step_LF M N ) : label_free_is5_scope.
 
 Section PermutationAdd.
 Variable A: Type.
-Implicit Types l : list A.
+Implicit Type l : list A.
+(*
+Notation " L1 ~=~ L2 " := (@permut A L1 L2) (at level 70).
+*)
+Lemma permut_eq_refl:
+  reflexive (list A) (@permut A).
+unfold reflexive; intros; permut_simpl.
+Qed.
+
+Lemma permut_eq_sym:
+  symmetric (list A) (@permut A).
+unfold symmetric; intros; 
+apply permut_sym; assumption. 
+Qed.
+
+Lemma permut_eq_trans:
+  transitive (list A) (@permut A).
+unfold transitive; intros;
+eapply permut_trans; eauto.
+Qed.
+
+Theorem permut_setoid : Setoid_Theory _ (@permut A).
+split;
+[ apply permut_eq_refl |
+  apply permut_eq_sym | 
+  apply permut_eq_trans].
+Qed.
+
+Add Setoid (list A) (@permut A) permut_setoid as permut_s.
 
 Lemma permut_inv:
 forall G0 G0' G1 G1' (elem: A),
@@ -517,9 +549,9 @@ forall G G' w,
 Admitted.
 
 Lemma emptyEquiv_last:
-forall G G' w,
+forall G G' Gamma w,
   emptyEquiv G = G' ->
-  emptyEquiv (G & (w, nil)) = G' & (w, nil).
+  emptyEquiv (G & (w, Gamma)) = G' & (w, nil).
 Admitted.
 
 Lemma emptyEquiv_stable:
@@ -533,11 +565,29 @@ forall G G',
   permut (emptyEquiv G) (emptyEquiv G').
 Admitted.
 
+Lemma emptyEquiv_typing:
+forall G w Gamma M A
+  (HT: emptyEquiv G |= (w, Gamma) |- M ::: A),
+  G |= (w, Gamma) |- M ::: A.
+Admitted.
+
 Lemma unique_worlds:
 forall G G' w w' Gamma Gamma' M A
   (HPermut: permut G' (G & (w', Gamma')))
   (HT: G' |= (w, Gamma) |- M ::: A),
   w <> w'.
+Admitted.
+
+Lemma Nth_last:
+forall Gamma (A: ty_LF) A',
+  Nth (length Gamma) (Gamma & A) A' -> A = A'.
+Admitted.
+
+Lemma Nth_not_last:
+forall Gamma (A: ty_LF) A' n,
+  Nth n (Gamma & A) A' ->
+  n <> length Gamma ->
+  Nth n Gamma A'.
 Admitted.
 
 Fixpoint subst_typing G L D w : Prop :=
@@ -548,28 +598,67 @@ match L, D with
 end.
 
 Lemma subst_t_preserv_types_end:
-forall G0 w_subst Gamma_subst w G_M G_HT G_TS Gamma_HT Gamma_TS M A N B
-  (H_inner: w_subst = w -> 
-    G_TS = G_HT /\ Gamma_HT = Gamma_TS & A /\ G_M = G_TS /\ G0 = G_M)
-  (H_outer: w_subst <> w ->
-    permut G_TS (G0 & (w_subst, Gamma_subst)) /\
-    permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
-    Gamma_HT = Gamma_TS /\ permut G_M (G0 & (w, Gamma_TS)))
-  (HM: emptyEquiv G_M |= (w_subst, nil) |- M ::: A)
+forall G w Gamma M N B
   (H_lc: lc_w_LF M)
-  (HT: G_HT |= (w, Gamma_HT) |- N ::: B),
-  G_TS |= (w, Gamma_TS) |- [ M // length Gamma_subst | fctx w_subst ] [ N | fctx w] ::: B.
+  (HT: G |= (w, Gamma) |- N ::: B),
+  (forall Gamma' A,
+    emptyEquiv G |= (w, nil) |- M ::: A -> 
+    Gamma' & A = Gamma ->
+    G |= (w, Gamma') |- [ M // length Gamma' | fctx w] [ N | fctx w] ::: B )
+  /\
+  (forall Gamma' A G0 G1 G' w',
+    permut G (G0 & (w', Gamma' & A)) ->
+    permut G' (G0 & (w', Gamma')) ->
+    permut G1 (G0 & (w, Gamma)) ->
+    emptyEquiv G1 |= (w', nil) |- M ::: A ->
+    G' |= (w, Gamma) |- [M // length Gamma' | fctx w'] [ N | fctx w] ::: B).
+intros.
+induction HT;
+split; intros; 
+unfold subst_t.
+(* hyp inner *)
+assert (Gamma0 = Gamma) by skip; (* TODO - why does it say Gamma0 instead of Gamma? *)
+subst;
+unfold subst_t; case_if; simpl; case_if; subst.
+(* v_n = length Gamma *)
+apply Nth_last in HT;
+subst;
+replace Gamma' with (nil ++ Gamma') by auto;
+apply Weakening;
+apply emptyEquiv_typing in H; assumption.
+(* <> *)  
+constructor. generalize dependent v_n.
+induction Gamma'; simpl in *; intros.
+rew_length in H1.
+induction v_n; simpl; try (elim H1; reflexivity).
+inversion HT; subst.
+apply Nth_nil_inv in H6; contradiction.
+apply Nth_not_last with (A:=A0); assumption.
+(* hyp outer *)
+assert (w = w0) by skip. (* TODO - why does it use w0 in assumptions instead of w? *)
+subst.
+assert (w' <> w0).
+apply emptyEquiv_permut in H1.
+rewrite emptyEquiv_last with (G':= emptyEquiv G0) in H1; eauto.
+eapply unique_worlds; eauto.
+case_if; simpl;
+eauto using types_LF.
+(* lam inner *)
+case_if; simpl;
+rewrite subst_t__inner;
+constructor.
+eapply IHHT; eauto.
+(* stuck - A::Gamma' & A0 <> Gamma *)
 Admitted.
 
 Lemma subst_t_preserv_types_end_inner:
-forall G Gamma w M N A B
+forall G Gamma M N A B w
   (HM: emptyEquiv G |= (w, nil) |- M ::: A)
   (H_lc: lc_w_LF M)
   (HT: G |= (w, Gamma & A) |- N ::: B),
   G |= (w, Gamma) |- [ M // length Gamma | fctx w] [N | fctx w] ::: B.
 intros;
-eapply subst_t_preserv_types_end; eauto;
-intro n; elim n; reflexivity.
+eapply subst_t_preserv_types_end with (Gamma := Gamma & A); eauto.
 Qed.
 
 Lemma subst_t_preserv_types_end_outer:
@@ -582,14 +671,7 @@ forall G0 w w_subst Gamma_subst A G' G_HT G_TS Gamma M N B
   (HT: G_HT |= (w, Gamma) |- N ::: B),
   G_TS |= (w, Gamma) |- [ M // length Gamma_subst | fctx w_subst ] [N | fctx w] ::: B.
 intros.
-eapply subst_t_preserv_types_end.
-assert (w <> w_subst).
-eapply unique_worlds with (G':=G_HT); eauto. 
-intro nn; subst; elim H; reflexivity.
-intro; repeat split; eauto.
-assumption.
-assumption.
-assumption.
+eapply subst_t_preserv_types_end; eauto.
 Qed.
 
 Lemma subst_t_preserv_types:
