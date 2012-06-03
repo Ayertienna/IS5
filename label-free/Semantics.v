@@ -238,7 +238,7 @@ generalize dependent Gamma;
 generalize dependent w;
 induction HT; split;
 intros; subst; simpl;
-try (inversion HeqCtx; subst);
+try (inversion HeqCtx; subst).
 (* hyp *)
 eauto using types_LF.
 constructor; generalize dependent v_n;
@@ -590,6 +590,15 @@ forall Gamma (A: ty_LF) A' n,
   Nth n Gamma A'.
 Admitted.
 
+Ltac smart_destruct :=
+match goal with
+| [H: ?w = ?w -> _ |- _] => destruct H; [reflexivity | try smart_destruct]
+| [H: ?w = ?w -> ?w' = ?w' -> _ |- _] => 
+  destruct H; [reflexivity | reflexivity | try smart_destruct]
+| [H: ?w <> ?w |- _ ] => elim H; reflexivity 
+| [H: ?t1 = ?t2 /\ _ |- _] => destruct H; try smart_destruct 
+end.
+
 Fixpoint subst_typing G L D w : Prop :=
 match L, D with
 | nil, nil => True
@@ -598,24 +607,38 @@ match L, D with
 end.
 
 Lemma subst_t_preserv_types_end:
-forall G w Gamma M N B
+forall M w_subst w G_HT G_TS G_min G0 A Gamma_HT Gamma_TS Gamma_subst N B
   (H_lc: lc_w_LF M)
-  (HT: G |= (w, Gamma) |- N ::: B),
-  (forall Gamma' A,
-    emptyEquiv G |= (w, nil) |- M ::: A -> 
-    Gamma' & A = Gamma ->
-    G |= (w, Gamma') |- [ M // length Gamma' | fctx w] [ N | fctx w] ::: B )
-  /\
-  (forall Gamma' A G0 G1 G' w',
-    permut G (G0 & (w', Gamma' & A)) ->
-    permut G' (G0 & (w', Gamma')) ->
-    permut G1 (G0 & (w, Gamma)) ->
-    emptyEquiv G1 |= (w', nil) |- M ::: A ->
-    G' |= (w, Gamma) |- [M // length Gamma' | fctx w'] [ N | fctx w] ::: B).
+(*
+  (H_inner: w_subst = w -> 
+    G_HT = G_TS /\ G_HT = G_min /\
+    Gamma_HT = Gamma_TS & A /\ Gamma_subst = Gamma_TS)
+  (H_outer: w_subst <> w ->
+    forall G0,
+      permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
+      permut G_TS (G0 & (w_subst, Gamma_subst)) /\
+      permut G_min (G0 & (w, Gamma_HT)) /\
+      Gamma_HT = Gamma_TS)
+*)
+  (HOption: 
+    (* G0 arbitrary *)
+    (w_subst = w /\ G_HT = G_TS /\ G_HT = G_min /\
+      Gamma_HT = Gamma_TS & A /\ Gamma_subst = Gamma_TS)
+    \/
+    (w_subst <> w /\ permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
+      permut G_TS (G0 & (w_subst, Gamma_subst)) /\
+      permut G_min (G0 & (w, Gamma_HT)) /\ Gamma_HT = Gamma_TS))
+  (HM: emptyEquiv G_min |= (w_subst, nil) |- M ::: A)
+  (HT: G_HT |= (w, Gamma_HT) |- N ::: B),
+  G_TS |= (w, Gamma_TS) |- [ M // length Gamma_subst | fctx w_subst] [ N | fctx w ] ::: B.
 intros.
-induction HT;
-split; intros; 
-unfold subst_t.
+destruct HOption;
+try smart_destruct; subst.
+(* inner *)
+subst G_TS;
+remember (Gamma_TS & A) as Gamma_HT; generalize dependent Gamma_TS.
+induction HT; intros; simpl in *; unfold subst_t; case_if.
+(*
 (* hyp inner *)
 assert (Gamma0 = Gamma) by skip; (* TODO - why does it say Gamma0 instead of Gamma? *)
 subst;
@@ -649,14 +672,38 @@ rewrite subst_t__inner;
 constructor.
 eapply IHHT; eauto.
 (* stuck - A::Gamma' & A0 <> Gamma *)
+*)
 Admitted.
 
 Lemma subst_t_preserv_types_end_inner:
-forall G Gamma M N A B w
+forall Gamma G M N A B w
   (HM: emptyEquiv G |= (w, nil) |- M ::: A)
-  (H_lc: lc_w_LF M)
-  (HT: G |= (w, Gamma & A) |- N ::: B),
+  (HT: G |= (w, Gamma & A) |- N ::: B)
+  (H_lc: lc_w_LF M),
   G |= (w, Gamma) |- [ M // length Gamma | fctx w] [N | fctx w] ::: B.
+intros. unfold subst_t. case_if.
+remember (Gamma & A) as Gamma'.
+generalize dependent Gamma.
+induction HT; intros.
+
+Focus 2.
+unfold subst_t. case_if.
+simpl. 
+constructor. rewrite subst_t__inner.
+apply IHHT.
+assumption.
+
+
+subst.
+
+induction HT.
+intros; simpl in *;
+subst; simpl.
+
+
+
+
+
 intros;
 eapply subst_t_preserv_types_end with (Gamma := Gamma & A); eauto.
 Qed.
@@ -781,11 +828,44 @@ forall G_HT G_TS G0 Gamma_HT Gamma_TS Gamma_fresh Gamma_subst w_TS w_HT
             G0 = G_HT /\ Gamma_HT = Gamma_fresh ++ Gamma_subst)
   (H_new: w_subst = w_fresh -> w_subst = w_HT ->
             w_TS = w_HT /\ w_HT = w_step /\
+            w_TS = w_HT /\ w_HT = w_step /\
             Gamma_TS = Gamma_HT /\ Gamma_HT = Gamma_fresh ++ Gamma_subst)
   (HT: G_HT |= (w_HT, Gamma_HT) |- {{ fctx w_subst // fctx w_fresh }} 
                                    [ {{fctx w_fresh // bctx k }}  [ M | fctx w_step, 0] |
                                      fctx w_step, length Gamma_fresh] ::: A),
   G_TS |= (w_TS, Gamma_TS) |- {{ fctx w_subst // bctx k }} [ M | fctx w_TS, 0] ::: A.
+intros; induction M; unfold subst_ctx in *; simpl in *.
+(* hyp *)
+repeat case_if; subst.
+inversion H1; subst; inversion H0; subst. smart_destruct.
+try (inversion H1; subst);
+try smart_destruct; 
+subst; 
+try discriminate;
+auto.
+subst w_fresh; smart_destruct.
+inversion H2; subst.
+destruct H_outer.
+intro nn; subst; elim H0; reflexivity.
+intro nn; subst; elim H0; reflexivity.
+smart_destruct; subst; auto.
+inversion H2; subst.
+destruct H_outer.
+intro nn; subst; elim H0; reflexivity.
+intro nn; subst; elim H0; reflexivity.
+smart_destruct; subst; auto.
+inversion H3; subst.
+destruct H_outer.
+intro nn; subst; elim H0; reflexivity.
+intro nn; subst; elim H0; reflexivity.
+smart_destruct; subst; auto.
+
+(* lam *)
+(* appl *)
+(* box *)
+(* unbox_fetch *)
+(* get_here *)
+(* letdia_get *)
 Admitted.
 
 Lemma inv_subst_ctx_preserv_types_outer:
