@@ -22,7 +22,7 @@ match N0 with
 | lam_LF A M => 
     lam_LF A (subst_t_outer M0 n ctx M curr)
 | appl_LF M N => 
-    appl_LF (subst_t_outer M0 n ctx M curr) (subst_t_outer M0 n ctx M curr)
+    appl_LF (subst_t_outer M0 n ctx M curr) (subst_t_outer M0 n ctx N curr)
 | box_LF M => 
   let w0 := var_gen (free_worlds_LF N0) in (* shouldn't we add sth? *)
     box_LF (subst_t_outer M0 n ctx M (fctx w0))
@@ -48,7 +48,7 @@ match N0 with
 | hyp_LF n => 
     if (eq_nat_dec n m) then M0 else hyp_LF n
 | lam_LF A M => 
-    lam_LF A (subst_t_inner M0 m M curr)
+    lam_LF A (subst_t_inner M0 (S m) M curr)
 | appl_LF M N => 
     appl_LF (subst_t_inner M0 m M curr) (subst_t_inner M0 m N curr)
 | box_LF M =>
@@ -276,6 +276,23 @@ Notation " M ^^ [ w | w' ] " := (open_ctx M w w') (at level 10) : label_free_is5
 
 
 Section Lemmas.
+
+Lemma subst_t__inner:
+forall M k N w,
+  subst_t_inner M k N w = [M//k | w] [N | w].
+intros;
+unfold subst_t;
+case_if;
+reflexivity.
+Qed.
+
+Lemma subst_t__outer:
+forall M k N w w'
+  (Neq: w <> w'),
+  subst_t_outer M k w N w' = [M//k | w] [N | w'].
+intros; unfold subst_t;
+case_if; reflexivity.
+Qed.
 
 Lemma subst_ctx__old:
 forall M c1 c2 len_old

@@ -595,7 +595,6 @@ match goal with
 | [H: ?w = ?w -> _ |- _] => destruct H; [reflexivity | try smart_destruct]
 | [H: ?w = ?w -> ?w' = ?w' -> _ |- _] => 
   destruct H; [reflexivity | reflexivity | try smart_destruct]
-| [H: ?w <> ?w |- _ ] => elim H; reflexivity 
 | [H: ?t1 = ?t2 /\ _ |- _] => destruct H; try smart_destruct 
 end.
 
@@ -607,73 +606,279 @@ match L, D with
 end.
 
 Lemma subst_t_preserv_types_end:
-forall M w_subst w G_HT G_TS G_min G0 A Gamma_HT Gamma_TS Gamma_subst N B
+forall M w_subst w Gamma_HT G_HT G_TS G_min A Gamma_TS Gamma_subst N B
   (H_lc: lc_w_LF M)
-(*
   (H_inner: w_subst = w -> 
     G_HT = G_TS /\ G_HT = G_min /\
     Gamma_HT = Gamma_TS & A /\ Gamma_subst = Gamma_TS)
   (H_outer: w_subst <> w ->
-    forall G0,
-      permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
-      permut G_TS (G0 & (w_subst, Gamma_subst)) /\
-      permut G_min (G0 & (w, Gamma_HT)) /\
+      permut (G_HT & (w, Gamma_HT)) (G_min & (w_subst, Gamma_subst & A)) /\
+      permut (G_min & (w_subst, Gamma_subst)) (G_TS & (w, Gamma_HT)) /\
       Gamma_HT = Gamma_TS)
-*)
-  (HOption: 
-    (* G0 arbitrary *)
-    (w_subst = w /\ G_HT = G_TS /\ G_HT = G_min /\
-      Gamma_HT = Gamma_TS & A /\ Gamma_subst = Gamma_TS)
-    \/
-    (w_subst <> w /\ permut G_HT (G0 & (w_subst, Gamma_subst & A)) /\
-      permut G_TS (G0 & (w_subst, Gamma_subst)) /\
-      permut G_min (G0 & (w, Gamma_HT)) /\ Gamma_HT = Gamma_TS))
   (HM: emptyEquiv G_min |= (w_subst, nil) |- M ::: A)
   (HT: G_HT |= (w, Gamma_HT) |- N ::: B),
   G_TS |= (w, Gamma_TS) |- [ M // length Gamma_subst | fctx w_subst] [ N | fctx w ] ::: B.
 intros.
-destruct HOption;
-try smart_destruct; subst.
-(* inner *)
-subst G_TS;
-remember (Gamma_TS & A) as Gamma_HT; generalize dependent Gamma_TS.
-induction HT; intros; simpl in *; unfold subst_t; case_if.
-(*
+generalize dependent Gamma_TS.
+generalize dependent Gamma_subst.
+generalize dependent G_TS.
+induction HT; intros;
+simpl in *; unfold subst_t; case_if.
 (* hyp inner *)
-assert (Gamma0 = Gamma) by skip; (* TODO - why does it say Gamma0 instead of Gamma? *)
-subst;
-unfold subst_t; case_if; simpl; case_if; subst.
+inversion H; subst.
+smart_destruct; subst.
+clear H_outer.
+simpl. case_if; subst.
 (* v_n = length Gamma *)
+assert (Gamma = Gamma_TS & A) by skip; subst. (* !!! *)
 apply Nth_last in HT;
-subst;
-replace Gamma' with (nil ++ Gamma') by auto;
-apply Weakening;
-apply emptyEquiv_typing in H; assumption.
-(* <> *)  
-constructor. generalize dependent v_n.
-induction Gamma'; simpl in *; intros.
-rew_length in H1.
-induction v_n; simpl; try (elim H1; reflexivity).
-inversion HT; subst.
-apply Nth_nil_inv in H6; contradiction.
-apply Nth_not_last with (A:=A0); assumption.
-(* hyp outer *)
-assert (w = w0) by skip. (* TODO - why does it use w0 in assumptions instead of w? *)
 subst.
-assert (w' <> w0).
-apply emptyEquiv_permut in H1.
-rewrite emptyEquiv_last with (G':= emptyEquiv G0) in H1; eauto.
-eapply unique_worlds; eauto.
-case_if; simpl;
-eauto using types_LF.
+replace Gamma_TS with (nil ++ Gamma_TS) by auto;
+apply Weakening.
+apply emptyEquiv_typing in HM; assumption.
+(* <> *)
+assert (Gamma = Gamma_TS & A) by skip; subst. (* !!! *)  
+constructor. generalize dependent v_n.
+induction Gamma_TS; simpl in *; intros.
+rew_length in H0.
+induction v_n; simpl; try (elim H0; reflexivity).
+inversion HT; subst.
+apply Nth_nil_inv in H5; contradiction.
+apply Nth_not_last with (A:=A); assumption.
+(* hyp outer *)
+assert (w = w0) by skip; subst. (* !!! *)
+assert (Gamma = Gamma_HT) by skip; subst. (* !!! *) 
+assert (w_subst <> w0) by (intro; subst; elim H; reflexivity).
+destruct H_outer; auto; destruct H2; subst.
+simpl; constructor; assumption.
 (* lam inner *)
-case_if; simpl;
-rewrite subst_t__inner;
-constructor.
+inversion H; subst;
+smart_destruct; subst.
+simpl; constructor.
+rewrite subst_t__inner.
+replace (S(length Gamma_TS)) with (length (A0::Gamma_TS)).
 eapply IHHT; eauto.
-(* stuck - A::Gamma' & A0 <> Gamma *)
-*)
-Admitted.
+intro; repeat split; auto.
+skip. (* stuck - Gamma_TS & A <> A0 :: Gamma_TS & A *)
+intro nn; elim nn; reflexivity.
+rew_length; omega.
+(* lam outer *)
+destruct H_outer.
+intro; subst; elim H; reflexivity.
+destruct H1.
+subst.
+simpl; constructor.
+rewrite subst_t__outer; auto.
+apply IHHT.
+intro nn; subst; elim H; reflexivity.
+intro; repeat split; auto.
+skip. (* stuck - (G & (w0, A0 :: Gamma)) is not a permut of (G_min & (w_subst, Gamma_subst & A)) *)
+skip. (* stuck - ~ permut (G_min & (w_subst, Gamma_subst)) (G_TS & (w0, A0 :: Gamma)) (A0 too many *)
+skip. (* Gamma_TS <> A0 :: Gamma_TS *)
+(* appl inner *)
+inversion H; subst;
+smart_destruct; subst.
+simpl. apply t_appl_LF with (A:=A0);
+rewrite subst_t__inner.
+apply IHHT1.
+intro; repeat split; auto.
+intro nn; elim nn; reflexivity.
+apply IHHT2.
+intro; repeat split; auto.
+intro nn; elim nn; reflexivity.
+(* appl outer *)
+destruct H_outer.
+intro; subst; elim H; reflexivity.
+destruct H1.
+subst;
+simpl; apply t_appl_LF with (A := A0);
+rewrite subst_t__outer; auto. 
+(* box *)
+inversion H0; subst;
+smart_destruct; subst.
+simpl; apply t_box_LF with (L := L); intros.
+rewrite subst_t__outer.
+skip. (* stuck - the definition for box subst must be wrong, the goal doesn't make sense *)
+skip. (* add used worlds outside M0 to var_gen *)
+(* box outer *)
+destruct H_outer.
+intro; subst; elim H0; reflexivity.
+destruct H2.
+subst; simpl.
+apply t_box_LF with (L:=L); intros.
+rewrite subst_t__outer.
+skip. (* requires subst_order_irrelevance and maybe sth more *)
+skip. (* add used worlds outside M0 to var_gen *)
+(* unbox inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H; subst;
+smart_destruct; subst.
+simpl; case_if.
+inversion H0; subst.
+apply t_unbox_LF.
+rewrite subst_t__inner.
+apply IHHT.
+intro; repeat split; auto.
+intro nn; elim nn; reflexivity.
+(* unbox outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H; reflexivity.
+destruct H1.
+subst.
+simpl. case_if.
+eapply t_unbox_LF. 
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H2; reflexivity.
+intro; repeat split; eauto.
+assumption.
+(* unbox_fetch inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H0; subst;
+smart_destruct; subst.
+simpl; case_if.
+eapply t_unbox_fetch_LF.
+rewrite subst_t__inner.
+eapply IHHT.
+intro; repeat split; eauto.
+skip. (* ! *)
+skip. (* ! *)
+intro nn; elim nn; reflexivity.
+skip. (* ! *)
+(* unbox_fetch outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H0; reflexivity.
+destruct H2.
+subst.
+simpl. case_if.
+eapply t_unbox_fetch_LF. 
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H3; reflexivity.
+intro; repeat split; eauto.
+skip. (* (w, Gamma) is too much *)
+skip. (* ! *)
+assumption.
+skip. (* ! *)
+(* here inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H; subst;
+smart_destruct; subst.
+simpl; case_if.
+inversion H0; subst.
+constructor.
+rewrite subst_t__inner.
+apply IHHT.
+intro; repeat split; auto.
+intro nn; elim nn; reflexivity.
+(* here outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H; reflexivity.
+destruct H1.
+subst.
+simpl. case_if.
+constructor. 
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H2; reflexivity.
+intro; repeat split; eauto.
+assumption.
+(* get_here inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H0; subst;
+smart_destruct; subst.
+simpl; case_if.
+eapply t_get_here_LF.
+rewrite subst_t__inner.
+eapply IHHT.
+intro; repeat split; eauto.
+skip. (* ! *)
+skip. (* ! *)
+intro nn; elim nn; reflexivity.
+skip. (* ! *)
+(* get_here outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H0; reflexivity.
+destruct H2.
+subst.
+simpl. case_if.
+eapply t_get_here_LF. 
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H3; reflexivity.
+intro; repeat split; eauto.
+skip. (* (w, Gamma) is too much *)
+skip. (* ! *)
+assumption.
+skip. (* ! *)
+(* letdia inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H0; subst;
+smart_destruct; subst.
+simpl; case_if.
+eapply t_letdia_LF.
+rewrite subst_t__inner.
+eapply IHHT.
+intro; repeat split; eauto.
+intro nn; elim nn; reflexivity.
+intros.
+skip. (* order subst irrelevant + this isn't outer substitution *)
+(* letdia outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H0; reflexivity.
+destruct H2.
+subst.
+simpl. case_if.
+eapply t_letdia_LF.
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H3; reflexivity.
+intro; repeat split; eauto.
+assumption.
+intros.
+rewrite subst_t__outer.
+skip. (* order subst irrelevant *)
+assumption.
+(* letdia_get inner *)
+assert (w0 = w) by skip; subst. (* ! *)
+inversion H1; subst;
+smart_destruct; subst.
+simpl; case_if.
+eapply t_letdia_get_LF.
+rewrite subst_t__inner.
+eapply IHHT.
+intro; repeat split; eauto.
+skip. (* ! *)
+skip. (* ! *)
+intro nn; elim nn; reflexivity.
+intros.
+skip. (* order subst irrelevant *)
+skip. (* ! *)
+(* letdia_get outer *)
+assert (w0 = w) by skip; subst. (* ! *)
+destruct H_outer.
+intro; subst; elim H1; reflexivity.
+destruct H3.
+subst.
+simpl. case_if.
+eapply t_letdia_get_LF. 
+rewrite subst_t__outer.
+eapply IHHT.
+intro n; subst; elim H4; reflexivity.
+intro; repeat split; eauto.
+skip. (* ! *)
+skip. (* ! *)
+assumption.
+intros. rewrite subst_t__outer.
+skip. (* order subst irrelevant *)
+assumption.
+skip. (* ! *)
+Admitted. (* non-instantiated exist. variables *)
 
 Lemma subst_t_preserv_types_end_inner:
 forall Gamma G M N A B w
@@ -681,31 +886,9 @@ forall Gamma G M N A B w
   (HT: G |= (w, Gamma & A) |- N ::: B)
   (H_lc: lc_w_LF M),
   G |= (w, Gamma) |- [ M // length Gamma | fctx w] [N | fctx w] ::: B.
-intros. unfold subst_t. case_if.
-remember (Gamma & A) as Gamma'.
-generalize dependent Gamma.
-induction HT; intros.
-
-Focus 2.
-unfold subst_t. case_if.
-simpl. 
-constructor. rewrite subst_t__inner.
-apply IHHT.
-assumption.
-
-
-subst.
-
-induction HT.
-intros; simpl in *;
-subst; simpl.
-
-
-
-
-
 intros;
-eapply subst_t_preserv_types_end with (Gamma := Gamma & A); eauto.
+eapply subst_t_preserv_types_end; eauto. 
+intro n; elim n; reflexivity.
 Qed.
 
 Lemma subst_t_preserv_types_end_outer:
@@ -719,6 +902,18 @@ forall G0 w w_subst Gamma_subst A G' G_HT G_TS Gamma M N B
   G_TS |= (w, Gamma) |- [ M // length Gamma_subst | fctx w_subst ] [N | fctx w] ::: B.
 intros.
 eapply subst_t_preserv_types_end; eauto.
+intro.
+absurd (w_subst = w); auto.
+apply emptyEquiv_permut in H_G'.
+eapply unique_worlds with (G:=emptyEquiv G0); eauto.
+eapply BackgroundSubsetImpl with (G:=emptyEquiv G'); eauto.
+exists (@nil Context_LF); rew_app. 
+rewrite emptyEquiv_last with (G':=emptyEquiv G0) in H_G'.
+eassumption.
+auto.
+intro; repeat split; auto.
+skip. (* Not sure if this version will be used, so no need to generate additional permut lemmas *)
+skip. (* Same here *)
 Qed.
 
 Lemma subst_t_preserv_types:
@@ -759,13 +954,13 @@ subst Gamma_subst.
 apply subst_t_preserv_types_end_inner with (A:=t).
 subst G_min; subst G_TS; subst w_subst;
 assumption.
-apply H_lc; apply Mem_here.
 replace (S(length Gamma_TS)) with (length (Gamma_TS & t) ).
 eapply IHL; eauto. 
 intros; apply H_lc; apply Mem_next; assumption.
 intro n; elim n; subst w; reflexivity.
 subst Gamma_HT; rew_app in *; assumption.
 rew_length; omega.
+apply H_lc; apply Mem_here.
 (* <> - outer substitution, step *)
 case_if; clear H.
 assert (w_subst <> w) by assumption.
@@ -834,38 +1029,6 @@ forall G_HT G_TS G0 Gamma_HT Gamma_TS Gamma_fresh Gamma_subst w_TS w_HT
                                    [ {{fctx w_fresh // bctx k }}  [ M | fctx w_step, 0] |
                                      fctx w_step, length Gamma_fresh] ::: A),
   G_TS |= (w_TS, Gamma_TS) |- {{ fctx w_subst // bctx k }} [ M | fctx w_TS, 0] ::: A.
-intros; induction M; unfold subst_ctx in *; simpl in *.
-(* hyp *)
-repeat case_if; subst.
-inversion H1; subst; inversion H0; subst. smart_destruct.
-try (inversion H1; subst);
-try smart_destruct; 
-subst; 
-try discriminate;
-auto.
-subst w_fresh; smart_destruct.
-inversion H2; subst.
-destruct H_outer.
-intro nn; subst; elim H0; reflexivity.
-intro nn; subst; elim H0; reflexivity.
-smart_destruct; subst; auto.
-inversion H2; subst.
-destruct H_outer.
-intro nn; subst; elim H0; reflexivity.
-intro nn; subst; elim H0; reflexivity.
-smart_destruct; subst; auto.
-inversion H3; subst.
-destruct H_outer.
-intro nn; subst; elim H0; reflexivity.
-intro nn; subst; elim H0; reflexivity.
-smart_destruct; subst; auto.
-
-(* lam *)
-(* appl *)
-(* box *)
-(* unbox_fetch *)
-(* get_here *)
-(* letdia_get *)
 Admitted.
 
 Lemma inv_subst_ctx_preserv_types_outer:
@@ -895,6 +1058,7 @@ intros;
 eapply inv_subst_ctx_preserv_types with (w_HT:=w);
 eauto.
 intro n; elim n; reflexivity.
+intros; repeat split; auto.
 Qed.
 
 Lemma inv_subst_ctx_preserv_types_old:
@@ -907,6 +1071,7 @@ intros;
 eapply inv_subst_ctx_preserv_types with (w_step:=w');
 eauto.
 intro n; elim n; reflexivity.
+intros; repeat split; auto.
 Qed.
 
 Lemma rename_ctx_preserv_types:
