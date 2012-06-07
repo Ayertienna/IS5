@@ -15,12 +15,14 @@ Notation " '<*>' A " := (tdia_LF A) (at level 30) : label_free_is5_scope.
 Open Scope label_free_is5_scope.
 
 Definition Context_LF := prod var (list ty_LF).
+
+(* TODO: consider using env (list ty_LF) instead *)
 Definition Background_LF := list Context_LF.
 
 Inductive ctx_LF :=
 | bctx: nat -> ctx_LF
-| fctx: var -> ctx_LF.
-
+| fctx: var -> ctx_LF
+.
 
 Inductive te_LF :=
 | hyp_LF: nat -> te_LF
@@ -92,6 +94,21 @@ match M with
 | letdia_get_LF _ M N => free_worlds_LF M \u free_worlds_LF N
 end.
 
+(* Calculate list of unbound worlds of level above n *)
+Fixpoint unbound_worlds (n:nat) (M:te_LF):=
+match M with
+| hyp_LF n => nil
+| lam_LF t M => unbound_worlds n M
+| appl_LF M N => unbound_worlds n M ++ unbound_worlds n N
+| box_LF M => unbound_worlds (S n) M
+| unbox_fetch_LF (bctx w) M => w :: unbound_worlds n M
+| unbox_fetch_LF (fctx w) M => unbound_worlds n M
+| get_here_LF (bctx w) M => w :: unbound_worlds n M
+| get_here_LF (fctx w) M => unbound_worlds n M
+| letdia_get_LF (bctx w) M N => w :: unbound_worlds n M ++ unbound_worlds (S n) N
+| letdia_get_LF (fctx w) M N => unbound_worlds n M ++ unbound_worlds (S n) N
+end.
+
 Section Lemmas.
 
 Lemma closed_w_succ:
@@ -100,6 +117,33 @@ forall M n,
 intros; generalize dependent n;
 induction M; intros; inversion H; subst;
 eauto using lc_w_n_LF.
+Qed.
+
+Lemma closed_w_addition:
+forall M n m,
+  lc_w_n_LF M n -> lc_w_n_LF M (n + m).
+intros; induction m.
+replace (n+0) with n by auto; assumption.
+replace (n+ S m) with (S (n+m)) by auto;
+apply closed_w_succ; assumption.
+Qed.
+
+Lemma closed_no_unbound_worlds:
+forall M n,
+  lc_w_n_LF M n -> unbound_worlds n M = nil.
+intros;
+generalize dependent n;
+induction M; intros; simpl in *;
+eauto.
+apply IHM; inversion H; subst; assumption.
+inversion H; subst; rewrite IHM1; try rewrite IHM2; auto.
+apply IHM; inversion H; subst; assumption.
+destruct c; [ | apply IHM]; inversion H; subst; auto.
+destruct c; [ | apply IHM]; inversion H; subst; auto.
+destruct c; inversion H; subst; auto.
+  rewrite IHM1; 
+  [rewrite IHM2 | auto];
+  auto.  
 Qed.
 
 End Lemmas.
