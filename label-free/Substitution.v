@@ -13,8 +13,8 @@ end.
 
 (* Term substitution *)
 
-(* We want to substitute M for nth hyp. in term N0, provided that the current
-   context is ctx. *)
+(* We want to substitute M for nth hyp. in term N0 when the context is ctx.
+   We also know, that current context isn't ctx. *)
 Fixpoint subst_t_outer (M0: te_LF) (n: nat) (ctx: ctx_LF) (N0: te_LF) :=
 match N0 with
 | hyp_LF n => 
@@ -66,7 +66,7 @@ match N0 with
 end.
 
 Definition subst_t M n ctx N curr :=
-  If ctx = curr then (subst_t_inner M n N curr) 
+  If ctx = curr then (subst_t_inner M n N ctx) 
   else (subst_t_outer M n ctx N). 
 
 Notation " [ M // n | ctx ] [ N | curr ] " := 
@@ -92,46 +92,41 @@ Definition recalculate_ctx (ctx1: ctx_LF) (ctx2: ctx_LF) : prod ctx_LF ctx_LF :=
 
 (* We want to substitute ctx1 for every occ. of ctx2; our current context is
    curr. *)
-(* In subst_ctx_outer it is assumed that curr is neither ctx1 nor ctx2 *)
-Fixpoint subst_ctx_outer (M0 : te_LF) (curr:ctx_LF) 
-                         (ctx1: ctx_LF) (ctx2: ctx_LF) 
+(* In subst_ctx_outer it is assumed that current context is neither ctx1
+   nor ctx2 *)
+Fixpoint subst_ctx_outer (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF)
                          (len_old: nat) :=
 match M0 with 
 | hyp_LF n => hyp_LF n
 
-| lam_LF A M => lam_LF A (subst_ctx_outer M curr ctx1 ctx2 len_old)
+| lam_LF A M => lam_LF A (subst_ctx_outer M ctx1 ctx2 len_old)
 
-| appl_LF M N => appl_LF (subst_ctx_outer M curr ctx1 ctx2 len_old) 
-                         (subst_ctx_outer N curr ctx1 ctx2 len_old)
+| appl_LF M N => appl_LF (subst_ctx_outer M ctx1 ctx2 len_old) 
+                         (subst_ctx_outer N ctx1 ctx2 len_old)
 
 | box_LF M => 
-  (* generate variable which is as fresh as possible *)
-  let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u 
-                     (var_from ctx2) \u (var_from curr)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
-    box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M => 
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
-  let curr' := recalc_simpl_ctx curr in
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
-  let N' := subst_ctx_outer N curr' ctx1' ctx2' len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let N' := subst_ctx_outer N ctx1' ctx2' len_old in
   letdia_get_LF w M' N'
-
 end
 
 (* In subst_ctx_old we assume that current context was ctx2 *)
@@ -145,27 +140,26 @@ match M0 with
                          (subst_ctx_old N ctx1 ctx2 len_old)
 
 | box_LF M =>
-  let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u (var_from ctx2)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in     
-    box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M =>
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   let N' := subst_ctx_old N ctx1' ctx2' len_old in
   letdia_get_LF w M' N'
 end
@@ -183,27 +177,26 @@ match M0 with
                          (subst_ctx_new N ctx1 ctx2 len_old)
 
 | box_LF M =>
-  let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u (var_from ctx2)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
-    box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M =>
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
   let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
             else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M w ctx1 ctx2 len_old in
+            else subst_ctx_outer M ctx1 ctx2 len_old in
   let N' := subst_ctx_old N ctx1' ctx2' len_old in
   letdia_get_LF w M' N'
 end.
@@ -217,7 +210,7 @@ else
     If curr = c2 then
       subst_ctx_old M c1 c2 len_old
     else
-      subst_ctx_outer M curr c1 c2 len_old.
+      subst_ctx_outer M c1 c2 len_old.
 
 Notation " {{ c1 // c2 }} [ M | curr , m ] " := 
   (subst_ctx M c1 c2 curr m) (at level 5) : label_free_is5_scope.
@@ -271,21 +264,11 @@ forall M c1 c2 curr len_old
   (Neq: c1 <> c2)
   (Neq': c1 <> curr)
   (Neq'': c2 <> curr),
-  subst_ctx_outer M curr c1 c2 len_old = {{ c1 // c2 }} [M | curr, len_old].
+  subst_ctx_outer M c1 c2 len_old = {{ c1 // c2 }} [M | curr, len_old].
 intros;
 unfold subst_ctx;
 repeat case_if;
 reflexivity.
-Qed.
-
-Lemma generate_fresh:
-forall M w
-  (HIn: w \in M),
-  var_gen M <> w.
-intros;
-intro; subst;
-absurd (var_gen M \in M);
-[apply var_gen_spec | assumption].
 Qed.
 
 Lemma no_unbound_worlds_LF_subst_w_id:
@@ -313,86 +296,102 @@ apply IHM2 with (w:=w) (w0:=w0) in H_Un2;
 repeat case_if; simpl;
 try (rewrite H_Un1; rewrite H_Un2); reflexivity.
 (* box *)
-inversion H_unbound; subst.
-apply IHM with (w:=w) (w0:=w0) in H0. 
-repeat case_if; simpl; try subst; auto.
-destruct w.
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate;
-assert ({{bctx (S n0) // bctx (S n)}}[M
-     | fctx (var_gen (free_worlds_LF M \u var_from (bctx n0) \u \{})), 0] = M) by
-  (eapply IHM with (n:=S n); simpl in H_unbound; assumption).
-rewrite H2; reflexivity.
-intro nn; inversion nn; subst n0; elim H; reflexivity.
-subst w0;
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate.
-rewrite IHM; eauto.
-assert (v \in free_worlds_LF M \u var_from (fctx v) \u \{}).
-repeat rewrite in_union; right; left; simpl; rewrite in_singleton; reflexivity.
-intro. inversion H2. symmetry in H4.
-eapply generate_fresh; eauto. 
-subst w0; destruct w.
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate.
-assert ({{bctx (S n0) // bctx (S n)}}[M
-     | fctx (var_gen (free_worlds_LF M \u var_from (bctx n0) \u \{})), 0] = M) by
-  (eapply IHM with (n:=S n); simpl in H_unbound; assumption).
-rewrite H2; reflexivity.
-intro nn; inversion nn; subst n0; elim H; reflexivity.
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate.
-rewrite IHM; eauto.
-assert (v \in free_worlds_LF M \u var_from (fctx v) \u \{}).
-repeat rewrite in_union; right; left; simpl; rewrite in_singleton; reflexivity.
-intro. inversion H3. symmetry in H5.
-eapply generate_fresh; eauto. 
-destruct w.
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate.
-rewrite IHM; eauto.
-intro nn; inversion nn; subst n0; elim H; reflexivity.
-rewrite subst_ctx__outer;
-unfold recalc_simpl_ctx; try discriminate.
-rewrite IHM; eauto.
-assert (v \in free_worlds_LF M \u var_from (fctx v) \u \{} \u var_from w0).
-repeat rewrite in_union; right; left; simpl; rewrite in_singleton; reflexivity.
-intro. inversion H4. symmetry in H6.
-eapply generate_fresh; eauto. 
+inversion H_unbound; subst;
+apply IHM with (w:=w) (w0:=w0) in H0;
+repeat case_if; simpl; try subst; auto;
+unfold recalc_simpl_ctx;
+assert (exists w0, w0 \notin free_worlds_LF M \u var_from w) by
+  (exists (var_gen (free_worlds_LF M \u var_from w)); apply var_gen_spec).
+destruct H2 as (w_fresh);
+rewrite notin_union in H2; destruct H2;
+rewrite subst_ctx__outer with (curr := fctx w_fresh);
+try rewrite IHM; eauto; try discriminate;
+destruct w; simpl in H3;
+try (intro nn; inversion nn; subst n0; elim H; reflexivity);
+try discriminate;
+rewrite notin_singleton in H3;
+intro nn; inversion nn; subst v; elim H3; reflexivity.
+
+destruct H3 as (w_fresh);
+rewrite notin_union in H3; destruct H3;
+rewrite subst_ctx__outer with (curr := fctx w_fresh);
+try rewrite IHM; eauto; try discriminate;
+destruct w; simpl in H4;
+try (intro nn; inversion nn; subst n0; elim H; reflexivity);
+try discriminate;
+rewrite notin_singleton in H4;
+intro nn; inversion nn; subst v; elim H4; reflexivity.
+
+destruct H3 as (w_fresh);
+rewrite notin_union in H3; destruct H3;
+rewrite subst_ctx__outer with (curr := fctx w_fresh);
+try rewrite IHM; eauto; try discriminate;
+destruct w; simpl in H4;
+try (intro nn; inversion nn; subst n0; elim H; reflexivity);
+try discriminate;
+rewrite notin_singleton in H4;
+intro nn; inversion nn; subst v; elim H4; reflexivity.
 (* unbox_fetch *)
 inversion H_unbound; destruct c; simpl; try discriminate;
+assert (exists w0, w0 \notin free_worlds_LF M \u var_from w) by
+  (exists (var_gen (free_worlds_LF M \u var_from w)); apply var_gen_spec);
+destruct H as (w_fresh);
 repeat case_if; simpl;
 try rewrite subst_ctx__old;
 try rewrite subst_ctx__new;
-try rewrite subst_ctx__outer;
+try rewrite subst_ctx__outer with (curr:=fctx w_fresh);
 try discriminate;
 try rewrite IHM; 
-eauto.
+eauto;
+rewrite notin_union in H; unfold var_from in *;
+destruct w;
+try rewrite notin_singleton in H;
+destruct H; try discriminate;
+intro nn; inversion nn; subst w_fresh. 
+elim H5; reflexivity.
+elim H6; reflexivity.
+elim H6; reflexivity.
 (* get_here *)
 inversion H_unbound; destruct c; simpl; try discriminate;
+assert (exists w0, w0 \notin free_worlds_LF M \u var_from w) by
+  (exists (var_gen (free_worlds_LF M \u var_from w)); apply var_gen_spec);
+destruct H as (w_fresh);
+rewrite notin_union in H; unfold var_from in *;
+destruct w;
+try rewrite notin_singleton in H; destruct H;
 repeat case_if; simpl;
 try rewrite subst_ctx__old;
 try rewrite subst_ctx__new;
-try rewrite subst_ctx__outer;
+try rewrite subst_ctx__outer with (curr := fctx w_fresh);
 try discriminate;
 try rewrite IHM; 
-eauto.
+eauto;
+intro nn; inversion nn; subst w_fresh;
+elim H1; reflexivity.
+
 (* letdia_get *)
 inversion H_unbound; destruct c; simpl; try discriminate;
 apply app_eq_nil in H0; destruct H0;
+assert (exists w0, w0 \notin free_worlds_LF M1 \u free_worlds_LF M2 \u var_from w) by
+  (exists (var_gen (free_worlds_LF M1 \u free_worlds_LF M2 \u var_from w)); apply var_gen_spec);
+destruct H1 as (w_fresh);
+repeat rewrite notin_union in H1; unfold var_from in *;
+destruct H1; destruct H2; destruct w;
+repeat rewrite notin_singleton in H3; 
 repeat case_if; simpl;
-unfold recalc_simpl_ctx in *; 
-destruct w; destruct w0;
+eauto;
+unfold recalc_simpl_ctx in *;
+try destruct w0;
 try repeat rewrite subst_ctx__old;
 try repeat rewrite subst_ctx__new;
-try repeat rewrite subst_ctx__outer;
+try repeat rewrite subst_ctx__outer with (curr := fctx w_fresh);
 try discriminate;
 try rewrite IHM1;
 try rewrite IHM2; 
 eauto;
-try (intro nn; inversion nn; subst; elim H1; reflexivity);
+try inversion H5;
+try (intro nn; inversion nn; subst; elim H4; reflexivity);
 try (intro nn; inversion nn; subst; elim H3; reflexivity).
-intro nn; inversion nn; subst; elim H2; reflexivity.
 Qed.
 
 Lemma closed_ctx_subst_id:
