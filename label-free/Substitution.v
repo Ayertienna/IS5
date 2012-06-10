@@ -13,8 +13,9 @@ end.
 
 (* Term substitution *)
 
-(* We want to substitute M for nth hyp. in term N0, provided that the current context is ctx. *)
-Fixpoint subst_t_outer (M0: te_LF) (n: nat) (ctx: ctx_LF) (N0: te_LF) {struct N0} :=
+(* We want to substitute M for nth hyp. in term N0, provided that the current
+   context is ctx. *)
+Fixpoint subst_t_outer (M0: te_LF) (n: nat) (ctx: ctx_LF) (N0: te_LF) :=
 match N0 with
 | hyp_LF n => 
     hyp_LF n
@@ -89,12 +90,12 @@ end.
 Definition recalculate_ctx (ctx1: ctx_LF) (ctx2: ctx_LF) : prod ctx_LF ctx_LF :=
   (recalc_simpl_ctx ctx1, recalc_simpl_ctx ctx2).
 
-(* We want to substitute ctx1 for every occ. of ctx2; our current context is curr.
-   We assume in subst_ctx_outer that curr <> ctx2 *)
-
-(* len_old is used to calculate shift in new hypotheses, when we substitute for some bctx
-   this should be set to 0 *)
-Fixpoint subst_ctx_outer (M0 : te_LF) (curr:ctx_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
+(* We want to substitute ctx1 for every occ. of ctx2; our current context is
+   curr. *)
+(* In subst_ctx_outer it is assumed that curr is neither ctx1 nor ctx2 *)
+Fixpoint subst_ctx_outer (M0 : te_LF) (curr:ctx_LF) 
+                         (ctx1: ctx_LF) (ctx2: ctx_LF) 
+                         (len_old: nat) :=
 match M0 with 
 | hyp_LF n => hyp_LF n
 
@@ -102,49 +103,38 @@ match M0 with
 
 | appl_LF M N => appl_LF (subst_ctx_outer M curr ctx1 ctx2 len_old) 
                          (subst_ctx_outer N curr ctx1 ctx2 len_old)
+
 | box_LF M => 
+  (* generate variable which is as fresh as possible *)
   let w0 := var_gen (free_worlds_LF M \u (var_from ctx1) \u 
                      (var_from ctx2) \u (var_from curr)) in
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M => 
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => unbox_fetch_LF ctx1 (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ =>
-    match (eq_ctx_LF_dec w ctx2) with
-    | left _ => unbox_fetch_LF ctx2 (subst_ctx_old M ctx1 ctx2 len_old)
-    | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-  end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => get_here_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-      | left _ => get_here_LF w (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => get_here_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-  end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
   let curr' := recalc_simpl_ctx curr in
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => letdia_get_LF w (subst_ctx_new M ctx1 ctx2 len_old) 
-                              (subst_ctx_outer N curr' ctx1' ctx2' len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-    | left _ => letdia_get_LF w (subst_ctx_old M ctx1 ctx2 len_old) 
-                                (subst_ctx_outer N curr' ctx1' ctx2' len_old)
-    | right _ => 
-          letdia_get_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)  
-                          (subst_ctx_outer N curr' ctx1' ctx2' len_old)
-    end
-  end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  let N' := subst_ctx_outer N curr' ctx1' ctx2' len_old in
+  letdia_get_LF w M' N'
+
 end
-(* In subst_ctx_old we assume that current context was ctx2, now changed to ctx1 *)
+
+(* In subst_ctx_old we assume that current context was ctx2 *)
 with subst_ctx_old (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
 match M0 with 
 | hyp_LF n => hyp_LF n
@@ -160,46 +150,32 @@ match M0 with
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => unbox_fetch_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with 
-      | left _ => unbox_fetch_LF w (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-  end 
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => get_here_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-      | left _ => get_here_LF w (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => get_here_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-   end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
   let N' := subst_ctx_old N ctx1' ctx2' len_old in
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => letdia_get_LF w (subst_ctx_new M ctx1 ctx2 len_old) N'
-  | right _ =>
-    match (eq_ctx_LF_dec w ctx2) with
-    | left _ => letdia_get_LF w (subst_ctx_old M ctx1 ctx2 len_old) N'
-    | right _ => letdia_get_LF w (subst_ctx_outer M w ctx1 ctx2 len_old) N'
-    end
-  end
+  letdia_get_LF w M' N'
 end
+
 (* In subst_ctx_new we assume that current context is ctx1 *)
 with subst_ctx_new (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
 match M0 with 
 
-| hyp_LF n => 
-  match ctx2 with
-    | bctx _ => hyp_LF n
-    | fctx _ => hyp_LF (len_old+n)
-  end
+(* It is assumed that when ctx2 = bctx _, then len_old is 0 *)
+| hyp_LF n => hyp_LF (len_old + n)
 
 | lam_LF A M => lam_LF A (subst_ctx_new M ctx1 ctx2 len_old)
 
@@ -212,38 +188,24 @@ match M0 with
     box_LF (subst_ctx_outer M (fctx w0) ctx1' ctx2' len_old)
 
 | unbox_fetch_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-    | left _ => unbox_fetch_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-    | right _ => 
-      match (eq_ctx_LF_dec w ctx2) with 
-        | left _ => unbox_fetch_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old)
-        | right _ => unbox_fetch_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-      end
-  end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => get_here_LF w (subst_ctx_new M ctx1 ctx2 len_old)
-  | right _ => 
-    match (eq_ctx_LF_dec w ctx2) with
-      | left _ => get_here_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old)
-      | right _ => get_here_LF w (subst_ctx_outer M w ctx1 ctx2 len_old)
-    end
-   end
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
-  match (eq_ctx_LF_dec w ctx1) with
-  | left _ => letdia_get_LF w (subst_ctx_new M ctx1 ctx2 len_old) 
-                              (subst_ctx_old N ctx1' ctx2' len_old)
-  | right _ =>
-    match (eq_ctx_LF_dec w ctx2) with
-      | left _ => letdia_get_LF ctx1 (subst_ctx_old M ctx1 ctx2 len_old) 
-                                     (subst_ctx_old N ctx1' ctx2' len_old) 
-      | right _ => letdia_get_LF w (subst_ctx_outer M w ctx1 ctx2 len_old) 
-                                   (subst_ctx_old N ctx1' ctx2' len_old) 
-    end
-  end 
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
+            else subst_ctx_outer M w ctx1 ctx2 len_old in
+  let N' := subst_ctx_old N ctx1' ctx2' len_old in
+  letdia_get_LF w M' N'
 end.
 
 Definition subst_ctx M c1 c2 curr len_old :=
@@ -320,7 +282,11 @@ Lemma generate_fresh:
 forall M w
   (HIn: w \in M),
   var_gen M <> w.
-Admitted.
+intros;
+intro; subst;
+absurd (var_gen M \in M);
+[apply var_gen_spec | assumption].
+Qed.
 
 Lemma no_unbound_worlds_LF_subst_w_id:
 forall M n
@@ -331,9 +297,9 @@ induction M; intros; unfold subst_ctx.
 repeat case_if; reflexivity.
 (* lam *)
 unfold subst_ctx in *;
-simpl in H_unbound.
-specialize IHM with n w w0.
-apply IHM with (w:=w) (w0:=w0) in H_unbound.
+simpl in H_unbound;
+specialize IHM with n w w0;
+apply IHM with (w:=w) (w0:=w0) in H_unbound;
 repeat case_if; simpl; 
 try rewrite H_unbound; 
 auto.
@@ -394,7 +360,7 @@ repeat rewrite in_union; right; left; simpl; rewrite in_singleton; reflexivity.
 intro. inversion H4. symmetry in H6.
 eapply generate_fresh; eauto. 
 (* unbox_fetch *)
-inversion H_unbound; destruct c; simpl; try discriminate.
+inversion H_unbound; destruct c; simpl; try discriminate;
 repeat case_if; simpl;
 try rewrite subst_ctx__old;
 try rewrite subst_ctx__new;
@@ -402,9 +368,8 @@ try rewrite subst_ctx__outer;
 try discriminate;
 try rewrite IHM; 
 eauto.
-subst w; reflexivity.
 (* get_here *)
-inversion H_unbound; destruct c; simpl; try discriminate.
+inversion H_unbound; destruct c; simpl; try discriminate;
 repeat case_if; simpl;
 try rewrite subst_ctx__old;
 try rewrite subst_ctx__new;
@@ -413,8 +378,8 @@ try discriminate;
 try rewrite IHM; 
 eauto.
 (* letdia_get *)
-inversion H_unbound; destruct c; simpl; try discriminate.
-apply app_eq_nil in H0; destruct H0.
+inversion H_unbound; destruct c; simpl; try discriminate;
+apply app_eq_nil in H0; destruct H0;
 repeat case_if; simpl;
 unfold recalc_simpl_ctx in *; 
 destruct w; destruct w0;

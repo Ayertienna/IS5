@@ -135,10 +135,10 @@ forall Omega Delta  M N A B w w'
   (HT2: Omega; Delta ++ (A, fwo w')::nil |- N ::: B @ w)
   (HT_lc: lc_w M),
   Omega; Delta|- [M // length Delta]N ::: B @ w.
-intros;
-remember (Delta ++ (A, fwo w')::nil) as Delta';
-generalize dependent Delta;
-induction HT2;
+intros.
+remember (Delta ++ (A, fwo w')::nil) as Delta'.
+generalize dependent Delta.
+induction HT2. intros.
 intros; simpl in *; subst; simpl;
 eauto using types_L.
 (* hyp *)

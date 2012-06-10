@@ -504,6 +504,7 @@ Qed.
 
 (* / *)
 
+(* emptyEquiv = map (fun x => (x, nil)) (map fst G) *)
 Fixpoint emptyEquiv (G: Background_LF) : Background_LF :=
 match G with
 | nil => nil
@@ -576,6 +577,10 @@ forall Gamma (A: ty_LF) A' n,
   Nth n Gamma A'.
 Admitted.
 
+(* TODO: It's not really smart yet.. *)
+(* Goal of smart destruct is to destruct chains of assumptions without loosing
+   any of them; it should also work when the chain is conditional, but the
+   condition is easily checked to be true (e.g. provable by reflexivity) *)
 Ltac smart_destruct :=
 match goal with
 | [H: ?w = ?w -> _ |- _] => destruct H; [reflexivity | try smart_destruct]
@@ -601,6 +606,8 @@ forall G L,
   ok_Bg G L = ok_Bg (emptyEquiv G) L.
 Admitted.
 
+(* TODO: add_fresh and add_new are too specialized and should be 
+         removed (or changed) *)
 Lemma ok_Bg_add_fresh:
 forall G w Gamma w' Gamma' L,
   w' \notin (\{w} \u from_list (map fst G) \u from_list L) ->
@@ -638,7 +645,8 @@ Admitted.
 Lemma emptyEquiv_mem:
 forall G G' w,
   permut (emptyEquiv G) (emptyEquiv G') ->
-  w \notin from_list (map fst G) -> w \notin from_list (map fst G').
+  w \notin from_list (map fst G) -> 
+  w \notin from_list (map fst G').
 Admitted.
 
 Fixpoint subst_typing G L D w : Prop :=
@@ -648,15 +656,49 @@ match L, D with
 | _, _ => False
 end.
 
-(* TODO: ! *)
+Ltac try_rewrite_subst :=
+try repeat rewrite subst_t__inner;
+try repeat rewrite subst_t__outer;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old;
+try repeat rewrite subst_ctx__outer; eauto.
+
 Lemma subst_order_irrelevant:
+forall N w w' M n m w0 w1
+  (HT_M: lc_w_LF M),
+    [M // n | w0] [{{w1 // bctx m}}[N | fctx w, 0] | fctx w'] = 
+    {{w1 // bctx m}}[ [M // n | w0] [N | fctx w'] | fctx w, 0].
+induction N; unfold subst_t; unfold subst_ctx; intros.
+(* hyp *)
+repeat (case_if; simpl in *); subst; simpl in *; try reflexivity;
+try_rewrite_subst; 
+rewrite closed_ctx_subst_id; auto;
+unfold lc_w_LF in HT_M; replace m with (0+m) by omega;
+apply closed_w_addition; assumption.
+(* lam *)
+repeat (case_if; simpl in *); subst; simpl in *;
+try_rewrite_subst; simpl;
+try erewrite IHN; eauto;
+repeat erewrite subst_t__outer; eauto;
+erewrite IHN; eauto.
+(* appl *)
+repeat (case_if; simpl in *); subst; simpl in *;
+try_rewrite_subst; simpl;
+try rewrite IHN1; try rewrite IHN2; auto;
+repeat erewrite subst_t__outer; eauto;
+erewrite IHN1; try erewrite IHN2; eauto.
+(* box *)
+repeat (case_if; simpl in *); subst; simpl in *;
+try_rewrite_subst; simpl.
+repeat erewrite subst_t__outer; eauto;
+simpl in *; try discriminate.
+Admitted.
+(* ALT:
 forall G Gamma A M N w m n w0 w1
   (H_lc: lc_w_LF M)
   (HT: G |= (w, Gamma) |-  [M // n | w0] [{{w1 // bctx m}}[N | fctx w, 0] | fctx w] ::: A),
-  G |= (w, Gamma) |- {{w1 // bctx m}}[ [M // n | w0] [N | fctx w] | fctx w, 0] ::: A. 
-Admitted.
-(* Alt:  [M // n | w0] [{{w1 // bctx m}}[N | fctx w, 0] | fctx w] = 
-         {{w1 // bctx m}}[ [M // n | w0] [N | fctx w] | fctx w, 0] *)
+  G |= (w, Gamma) |- {{w1 // bctx m}}[ [M // n | w0] [N | fctx w] | fctx w, 0] ::: A.
+*)
 
 Lemma subst_t_preserv_types_end:
 forall G_HT w Gamma_HT M N B
