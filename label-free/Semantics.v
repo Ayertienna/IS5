@@ -658,47 +658,11 @@ end.
 
 Ltac try_rewrite_subst :=
 try repeat rewrite subst_t__inner;
-try repeat rewrite subst_t__outer;
+try repeat erewrite subst_t__outer;
 try repeat rewrite subst_ctx__new;
 try repeat rewrite subst_ctx__old;
-try repeat rewrite subst_ctx__outer; eauto.
-
-Lemma subst_order_irrelevant:
-forall N w w' M n m w0 w1
-  (HT_M: lc_w_LF M),
-    [M // n | w0] [{{w1 // bctx m}}[N | fctx w, 0] | fctx w'] = 
-    {{w1 // bctx m}}[ [M // n | w0] [N | fctx w'] | fctx w, 0].
-induction N; unfold subst_t; unfold subst_ctx; intros.
-(* hyp *)
-repeat (case_if; simpl in *); subst; simpl in *; try reflexivity;
-try_rewrite_subst; 
-rewrite closed_ctx_subst_id; auto;
-unfold lc_w_LF in HT_M; replace m with (0+m) by omega;
-apply closed_w_addition; assumption.
-(* lam *)
-repeat (case_if; simpl in *); subst; simpl in *;
-try_rewrite_subst; simpl;
-try erewrite IHN; eauto;
-repeat erewrite subst_t__outer; eauto;
-erewrite IHN; eauto.
-(* appl *)
-repeat (case_if; simpl in *); subst; simpl in *;
-try_rewrite_subst; simpl;
-try rewrite IHN1; try rewrite IHN2; auto;
-repeat erewrite subst_t__outer; eauto;
-erewrite IHN1; try erewrite IHN2; eauto.
-(* box *)
-repeat (case_if; simpl in *); subst; simpl in *;
-try_rewrite_subst; simpl.
-repeat erewrite subst_t__outer; eauto;
-simpl in *; try discriminate.
-Admitted.
-(* ALT:
-forall G Gamma A M N w m n w0 w1
-  (H_lc: lc_w_LF M)
-  (HT: G |= (w, Gamma) |-  [M // n | w0] [{{w1 // bctx m}}[N | fctx w, 0] | fctx w] ::: A),
-  G |= (w, Gamma) |- {{w1 // bctx m}}[ [M // n | w0] [N | fctx w] | fctx w, 0] ::: A.
-*)
+try repeat rewrite subst_ctx__outer; 
+eauto.
 
 Lemma subst_t_preserv_types_end:
 forall G_HT w Gamma_HT M N B
@@ -798,7 +762,7 @@ assert (w' <> w) by
 rewrite subst_t__outer with (w':=fctx w'); 
 try (intro nn; inversion nn; subst; elim H2; reflexivity);
 unfold open_ctx in *;
-eapply subst_order_irrelevant; eauto;
+rewrite <- subst_order_irrelevant; eauto;
 eapply H; eauto.
 
 apply ok_Bg_permut with (G:=(w',nil)::(w, Gamma_TS & A0)::G); try permut_simpl.
@@ -837,7 +801,7 @@ apply notin_union in H11; destruct H11;
 rewrite subst_t__outer with (w':=fctx w');
 try (intro nn; inversion nn; subst; elim H8; reflexivity);
 unfold open_ctx in *.
-eapply subst_order_irrelevant; auto;
+rewrite <- subst_order_irrelevant; auto;
 assert (permut (G & (w, Gamma_HT)) (G0 & (w, Gamma_HT) & (w_subst, Gamma_subst & A0)))by
   (permut_simpl; assumption);
 eapply H; eauto.
@@ -1238,7 +1202,7 @@ rewrite subst_t__inner.
 eapply IHHT; eauto.
 intros.
 unfold open_ctx.
-eapply subst_order_irrelevant; eauto.
+rewrite <- subst_order_irrelevant; eauto.
 eapply H; eauto.
 apply ok_Bg_permut with (G:= (w', A::nil) :: ((w0, Gamma_TS & A0)::G)).
 permut_simpl.
@@ -1260,7 +1224,8 @@ eapply IHHT; eauto.
 
 intros;
 rewrite subst_t__outer with (w':=fctx w0); auto.
-apply subst_order_irrelevant; eauto.
+unfold open_ctx;
+rewrite <- subst_order_irrelevant; eauto.
 eapply H with (G_TS := (w', A::nil) :: G_TS) (G0:=(w', A::nil) :: G0) ; eauto.
 
 apply ok_Bg_permut with (G:=(w', A::nil) :: ((w0,Gamma_HT) :: G)).
@@ -1376,7 +1341,7 @@ assumption.
 
 intros.
 rewrite subst_t__inner.
-apply subst_order_irrelevant; auto.
+unfold open_ctx; rewrite <- subst_order_irrelevant; auto.
 eapply H; eauto.
 
 apply ok_Bg_permut with (G:=(w', A::nil)::(w0, Gamma_TS & A0) :: (w, Gamma) :: G).
@@ -1443,7 +1408,8 @@ apply emptyEquiv_permut; apply permut_sym; apply permut_app_l; assumption.
 
 intros.
 rewrite subst_t__outer with (w':=fctx w0).
-apply subst_order_irrelevant; eauto.
+unfold open_ctx;
+rewrite <- subst_order_irrelevant; eauto.
 eapply H with (G0:=(w',A::nil)::G1) (A1:=A0); eauto.
 
 skip. (* ok_Bg *)
@@ -1515,7 +1481,8 @@ assumption.
 
 intros.
 rewrite subst_t__outer with (w':=fctx w0).
-apply subst_order_irrelevant; eauto.
+unfold open_ctx;
+rewrite <- subst_order_irrelevant; eauto.
 eapply H with (G0:=(w',A::nil)::G1) (A0:=A0); eauto.
 
 skip. (* ok_Bg *)
@@ -1620,19 +1587,20 @@ apply permut_trans with (l2:=(G0 & (w_subst, Gamma_subst))).
 (* = - inner substitution, step *)
 case_if; try (inversion H; discriminate); clear H.
 assert (w_subst = w) by assumption.
-apply H_inner in H; destruct H. destruct H0. destruct H1. destruct H2.
-clear H_inner H_outer.
-destruct H_L.
+apply H_inner in H; destruct H; destruct H0; destruct H1; destruct H2;
+clear H_inner H_outer;
+destruct H_L;
 rewrite subst_t__inner.
-subst Gamma_subst.
+subst Gamma_subst. subst w_subst;
 apply subst_t_preserv_types_end_inner with (A:=t);
-subst G_min; subst G_TS; subst w_subst.
+subst G_min; subst G_TS;
 case_if. simpl. case_if. assumption.
 assumption.
 replace (S(length Gamma_TS)) with (length (Gamma_TS & t) ).
 eapply IHL; eauto. 
 intros; apply H_lc; apply Mem_next; assumption.
 intro n; elim n. reflexivity.
+case_if; assumption.
 subst Gamma_HT; rew_app in *; assumption.
 rew_length; omega.
 apply H_lc; apply Mem_here.
