@@ -271,6 +271,11 @@ repeat case_if;
 reflexivity.
 Qed.
 
+Ltac try_rewrite_subst :=
+try repeat rewrite subst_t__inner;
+try repeat rewrite subst_ctx__new;
+try repeat rewrite subst_ctx__old.
+
 Lemma no_unbound_worlds_LF_subst_w_id:
 forall M n
   (H_unbound: unbound_worlds n M = nil),
@@ -402,6 +407,141 @@ intros;
 apply no_unbound_worlds_LF_subst_w_id;
 apply closed_no_unbound_worlds;
 assumption.
+Qed.
+
+Lemma subst_order_irrelevant:
+forall N w w' M n m w0 w1
+  (HT_M: lc_w_LF M),
+    [M // n | w0] [{{w1 // bctx m}}[N | w, 0] | w'] = 
+    {{w1 // bctx m}}[ [M // n | w0] [N | w'] | w, 0].
+induction N; unfold subst_t; unfold subst_ctx; intros;
+remember (var_from w \u var_from w' \u var_from w0 \u var_from w1) as known_worlds;
+assert (exists w', w' \notin known_worlds) by
+  (exists (var_gen known_worlds); eapply var_gen_spec);
+destruct H as (w_fresh); subst; repeat rewrite notin_union in *;
+repeat rewrite notin_singleton in *;
+destruct H; destruct H0; destruct H1.
+(* hyp *)
+repeat (case_if; simpl in * ); subst; simpl in *; try reflexivity;
+try_rewrite_subst; auto;
+try rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try rewrite closed_ctx_subst_id; auto;
+try discriminate;
+try (intro nn; inversion nn; subst;
+     simpl in H2; rewrite notin_singleton in H2;
+     elim H2; reflexivity);
+unfold lc_w_LF in HT_M; replace m with (0+m) by omega;
+apply closed_w_addition; assumption.
+(* lam *)
+repeat case_if; subst; simpl in *; eauto;
+try_rewrite_subst; auto;
+repeat erewrite subst_t__outer; eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); simpl;
+eauto;
+try rewrite IHN; eauto;
+try destruct w1;
+try discriminate;
+try (simpl in *; rewrite notin_singleton in H2; intro nn;
+     inversion nn; subst; elim H2; reflexivity).
+(* appl *)
+repeat (case_if; simpl in * ); subst; simpl in *;
+try_rewrite_subst; simpl;
+try rewrite IHN1; try rewrite IHN2; auto;
+repeat erewrite subst_t__outer; eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try (erewrite IHN1; try erewrite IHN2; eauto);
+try destruct w1;
+try discriminate;
+try (simpl in *; rewrite notin_singleton in *; intro nn;
+  inversion nn; subst);
+try elim H2; reflexivity.
+(* box *)
+repeat (case_if; simpl in * ); subst; simpl in *;
+try_rewrite_subst; simpl;
+repeat rewrite subst_t__outer with (w':= fctx w_fresh); eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try rewrite IHN; auto;
+try destruct w0;
+try destruct w1;
+try destruct w;
+try destruct w';
+try discriminate;
+try (simpl in *; rewrite notin_singleton in *; simpl; intro nn;
+     inversion nn; subst);
+try (elim H; reflexivity);
+try (elim H0; reflexivity);
+try (elim H1; reflexivity);
+try (elim H2; reflexivity);
+try (elim H3; reflexivity);
+try (simpl; intro nn; inversion nn; subst);
+try (elim H4; reflexivity). 
+(* unbox_fetch *)
+repeat (case_if; simpl in * ); subst; simpl in *;
+try_rewrite_subst; simpl;
+repeat rewrite subst_t__outer with (w':= fctx w_fresh); eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try rewrite IHN; auto;
+try destruct w;
+try destruct w';
+try destruct w0;
+try destruct w1;
+try discriminate;
+try (simpl in *; rewrite notin_singleton in *; intro nn;
+  inversion nn; subst);
+try (elim H; reflexivity);
+try (elim H0; reflexivity);
+try (elim H1; reflexivity);
+try (elim H2; reflexivity);
+try (elim H3; reflexivity);
+try (elim H4; reflexivity);
+try (elim H5; reflexivity);
+try (elim H6; reflexivity).
+(* get_here *)
+repeat (case_if; simpl in * ); subst; simpl in *;
+try_rewrite_subst; simpl;
+repeat rewrite subst_t__outer with (w':= fctx w_fresh); eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try rewrite IHN; auto;
+try destruct w;
+try destruct w';
+try destruct w0;
+try destruct w1;
+try discriminate;
+try (simpl in *; rewrite notin_singleton in *; intro nn;
+  inversion nn; subst);
+try (elim H; reflexivity);
+try (elim H0; reflexivity);
+try (elim H1; reflexivity);
+try (elim H2; reflexivity);
+try (elim H3; reflexivity);
+try (elim H4; reflexivity);
+try (elim H5; reflexivity);
+try (elim H6; reflexivity).
+(* letdia_get *)
+repeat (case_if; simpl in * ); subst; simpl in *;
+try_rewrite_subst; simpl;
+repeat rewrite subst_t__outer with (w':= fctx w_fresh); eauto;
+repeat rewrite subst_ctx__outer with (curr := fctx w_fresh); eauto;
+try rewrite IHN1;
+try rewrite IHN2; auto;
+try destruct w;
+try destruct w';
+try destruct w0;
+try destruct w1;
+try discriminate;
+simpl;
+try (simpl in *; rewrite notin_singleton in *);
+try (intro nn; inversion nn; subst);
+try (elim H; reflexivity);
+try (elim H0; reflexivity);
+try (elim H1; reflexivity);
+try (elim H2; reflexivity);
+try (elim H3; reflexivity);
+try (elim H4; reflexivity);
+try (elim H5; reflexivity);
+try (elim H6; reflexivity);
+try (elim H7; reflexivity);
+simpl in H1; rewrite notin_singleton in H1; elim H1; reflexivity.
 Qed.
 
 End Lemmas.
