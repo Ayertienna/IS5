@@ -25,8 +25,11 @@ Inductive var_LF :=
 | fvar: var -> var_LF
 .
 
-Definition Context_LF := env ty_LF.
-Definition Background_LF := env Context_LF.
+(* Context_LF = (world, [(variable, type)]) *)
+Definition Context_LF := prod var (env ty_LF).
+
+(* Background_LF = [(world, [(variable, type)])] *)
+Definition Background_LF := env (env ty_LF).
 
 Inductive te_LF :=
 | hyp_LF: var_LF -> te_LF
