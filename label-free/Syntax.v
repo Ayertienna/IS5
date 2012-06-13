@@ -1,4 +1,4 @@
-Require Import Metatheory.
+Require Export Metatheory.
 Require Import List.
 
 Inductive ty_LF :=
@@ -15,18 +15,21 @@ Notation " '<*>' A " := (tdia_LF A) (at level 30) : label_free_is5_scope.
 
 Open Scope label_free_is5_scope.
 
-Definition Context_LF := prod var (list ty_LF).
-
-(* TODO: consider using env (list ty_LF) instead *)
-Definition Background_LF := list Context_LF.
-
 Inductive ctx_LF :=
 | bctx: nat -> ctx_LF
 | fctx: var -> ctx_LF
 .
 
+Inductive var_LF :=
+| bvar: nat -> var_LF
+| fvar: var -> var_LF
+.
+
+Definition Context_LF := env ty_LF.
+Definition Background_LF := env Context_LF.
+
 Inductive te_LF :=
-| hyp_LF: nat -> te_LF
+| hyp_LF: var_LF -> te_LF
 | lam_LF: ty_LF -> te_LF -> te_LF
 | appl_LF: te_LF -> te_LF -> te_LF
 | box_LF: te_LF -> te_LF
@@ -35,26 +38,32 @@ Inductive te_LF :=
 | letdia_get_LF: ctx_LF -> te_LF -> te_LF -> te_LF
 .
 
-Axiom eq_var_LF_dec:
+Axiom eq_var_dec:
   forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
 
 Theorem eq_context_LF_dec:
 forall c1 c2: Context_LF, {c1 = c2} + {c1 <> c2}.
 intros;
-try repeat decide equality;
-apply eq_var_LF_dec.
+repeat decide equality;
+apply eq_var_dec.
+Qed.
+
+Theorem eq_var_LF_dec:
+forall v1 v2: var_LF, {v1 = v2} + {v1 <> v2}.
+intros; repeat decide equality;
+apply eq_var_dec.
 Qed.
 
 Theorem eq_ctx_LF_dec:
 forall c1 c2: ctx_LF, {c1 = c2} + {c1 <> c2}.
 intros;
 try repeat decide equality;
-apply eq_var_LF_dec.
+apply eq_var_dec.
 Qed.
 
-(* When a term is locally closed at level n *)
+(* When a term is context-wise locally closed at level n *)
 Inductive lc_w_n_LF : te_LF -> nat -> Prop :=
- | lcw_hyp_LF: forall x n, lc_w_n_LF (hyp_LF x) n
+ | lcw_hyp_LF: forall v n, lc_w_n_LF (hyp_LF v) n
  | lcw_lam_LF: forall t M n,
      lc_w_n_LF M n ->
      lc_w_n_LF (lam_LF t M) n
@@ -76,9 +85,9 @@ Inductive lc_w_n_LF : te_LF -> nat -> Prop :=
 .
 Definition lc_w_LF (t:te_LF) : Prop := lc_w_n_LF t 0.
 
+(* When a term is term-wise locally closed at level n *)
 Inductive lc_t_n_LF: te_LF -> nat -> Prop :=
-| lct_hyp_LF: forall n m,
-    n < m -> lc_t_n_LF (hyp_LF n) m
+| lct_hyp_LF: forall v n, lc_t_n_LF (hyp_LF (fvar v)) n
 | lct_lam_LF: forall t M n, 
     lc_t_n_LF M (S n) ->
     lc_t_n_LF (lam_LF t M) n
@@ -130,6 +139,32 @@ match M with
 | letdia_get_LF (fctx w) M N => unbound_worlds n M ++ unbound_worlds (S n) N
 end.
 
+(* Calculate list of free variables used in term M *)
+Fixpoint free_vars_LF (M: te_LF) : fset var :=
+match M with
+| hyp_LF (fvar v) => \{v}
+| hyp_LF (bvar _) => \{}
+| lam_LF _ M => free_vars_LF M
+| appl_LF M N => free_vars_LF M \u free_vars_LF N
+| box_LF M => free_vars_LF M
+| unbox_fetch_LF _ M => free_vars_LF M
+| get_here_LF _ M => free_vars_LF M
+| letdia_get_LF _ M N => free_vars_LF M \u free_vars_LF N
+end.
+
+(* Calculate list of unbound variables of level above n *)
+Fixpoint unbound_vars (n:nat) (M:te_LF):=
+match M with
+| hyp_LF (bvar n) => n::nil
+| hyp_LF (fvar n) => nil 
+| lam_LF t M => unbound_vars (S n) M
+| appl_LF M N => unbound_vars n M ++ unbound_vars n N
+| box_LF M => unbound_vars n M
+| unbox_fetch_LF _ M => unbound_vars n M
+| get_here_LF _ M => unbound_vars n M
+| letdia_get_LF _ M N => unbound_vars n M ++ unbound_vars (S n) N
+end.
+
 Section Lemmas.
 
 Lemma generate_fresh:
@@ -160,7 +195,7 @@ try apply closed_w_succ;
 assumption.
 Qed.
 
-Lemma closed_no_unbound_worlds:
+Lemma closed_w_no_unbound_worlds:
 forall M n,
   lc_w_n_LF M n -> unbound_worlds n M = nil.
 intros;
@@ -176,6 +211,27 @@ forall M n,
 intros; generalize dependent n;
 induction M; intros; inversion H; subst;
 eauto using lc_t_n_LF.
+Qed.
+
+Lemma closed_t_addition:
+forall M n m,
+  lc_t_n_LF M n -> lc_t_n_LF M (n + m).
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ;
+assumption.
+Qed.
+
+Lemma closed_t_no_unbound_vars:
+forall M n,
+  lc_t_n_LF M n -> unbound_vars n M = nil.
+intros;
+generalize dependent n;
+induction M; intros; simpl in *;
+inversion H; subst; eauto;
+rewrite IHM1; try rewrite IHM2; auto;
+apply closed_t_succ; assumption.
 Qed.
 
 End Lemmas.
