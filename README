@@ -4,4 +4,4 @@ This developement formalizes the IS5 logic. Two formalizations are used:
 
 * "Label-free Proof Systems for Intuitionistic Modal Logic IS5" by Didier Galmiche and Yakoub Salhi provides label-free approach
 
-On a technical side, wea re using tlc and Metatheory libraries available at http://www.chargueraud.org/softs/ln/
+On a technical side, we are using tlc and Metatheory libraries available at http://www.chargueraud.org/softs/ln/
