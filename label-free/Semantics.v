@@ -1697,9 +1697,9 @@ forall G_HT G_TS G0 Gamma_HT Gamma_TS Gamma_fresh Gamma_subst w_TS w_HT
             w_TS = w_HT /\ w_HT = w_step /\
             Gamma_TS = Gamma_HT /\ Gamma_HT = Gamma_fresh ++ Gamma_subst)
   (HT: G_HT |= (w_HT, Gamma_HT) |- {{ fctx w_subst // fctx w_fresh }} 
-                                   [ {{fctx w_fresh // bctx k }}  [ M | fctx w_step, 0] |
-                                     fctx w_step, length Gamma_fresh] ::: A),
-  G_TS |= (w_TS, Gamma_TS) |- {{ fctx w_subst // bctx k }} [ M | fctx w_TS, 0] ::: A.
+                                   [ {{fctx w_fresh // bctx k }}  [ M | fctx w_step, 0, 0] |
+                                     fctx w_step, length Gamma_fresh, 0] ::: A),
+  G_TS |= (w_TS, Gamma_TS) |- {{ fctx w_subst // bctx k }} [ M | fctx w_TS, 0, 0] ::: A.
 Admitted.
 
 Lemma inv_subst_ctx_preserv_types_outer:
@@ -1707,8 +1707,8 @@ forall G0 G w w' w0 Gamma Gamma' Gamma0 M A k
   (Fresh: w' \notin free_worlds_LF M)
   (HT_G: permut G (G0 & (w, Gamma' ++ Gamma)))
   (HT: G |= (w0, Gamma0) |- {{ fctx w // fctx w'}} 
-    [ {{fctx w' // bctx k}} [M | fctx w0, 0] | fctx w0, (length Gamma')] ::: A),
-  G |= (w0, Gamma0) |- {{fctx w // bctx k}}[M | fctx w0, 0] ::: A.
+    [ {{fctx w' // bctx k}} [M | fctx w0, 0, 0] | fctx w0, (length Gamma'), 0] ::: A),
+  G |= (w0, Gamma0) |- {{fctx w // bctx k}}[M | fctx w0, 0, 0] ::: A.
 intros;
 assert (w0 <> w) by (eapply unique_worlds; eauto);
 eapply inv_subst_ctx_preserv_types 
@@ -1723,8 +1723,8 @@ Lemma inv_subst_ctx_preserv_types_new:
 forall G w w' Gamma Gamma' M A k
   (Fresh: w' \notin free_worlds_LF M)
   (HT: G |= (w, Gamma' ++ Gamma) |- {{fctx w // fctx w'}} 
-    [ {{ fctx w' // bctx k }} [M | fctx w, 0] | fctx w, length Gamma'] ::: A),
-  G |= (w, Gamma'++Gamma) |- {{fctx w // bctx k }}[ M | fctx w, 0] ::: A.
+    [ {{ fctx w' // bctx k }} [M | fctx w, 0,0] | fctx w, length Gamma',0] ::: A),
+  G |= (w, Gamma'++Gamma) |- {{fctx w // bctx k }}[ M | fctx w, 0,0] ::: A.
 intros; 
 eapply inv_subst_ctx_preserv_types with (w_HT:=w);
 eauto.
@@ -1736,8 +1736,8 @@ Lemma inv_subst_ctx_preserv_types_old:
 forall G w w' Gamma Gamma' M A k
   (Fresh: w' \notin free_worlds_LF M)
   (HT: G |= (w, Gamma'++Gamma) |- {{fctx w // fctx w'}} 
-    [ {{ fctx w' // bctx k }} [M | fctx w', 0] | fctx w', length Gamma'] ::: A),
-  G |= (w, Gamma'++Gamma) |- {{fctx w // bctx k }}[ M | fctx w, 0] ::: A.
+    [ {{ fctx w' // bctx k }} [M | fctx w', 0,0] | fctx w', length Gamma',0] ::: A),
+  G |= (w, Gamma'++Gamma) |- {{fctx w // bctx k }}[ M | fctx w, 0,0] ::: A.
 intros; 
 eapply inv_subst_ctx_preserv_types with (w_step:=w');
 eauto.
@@ -1746,55 +1746,54 @@ intros; repeat split; auto.
 Qed.
 
 Lemma rename_ctx_preserv_types:
-forall G0 G_HT G_TS Gamma Gamma' Gamma_HT Gamma_TS w w' w_HT w_TS M A
-  (H_outer: w_HT <> w -> w_HT <> w' ->
-    permut G_HT (G0 & (w, Gamma) & (w', Gamma')) /\
-    w_HT = w_TS /\ Gamma_HT = Gamma_TS)
-  (H_old: w_HT = w' ->
-    permut G_HT (G0 & (w, Gamma)) /\ w_TS = w /\
-    Gamma_HT = Gamma' /\ Gamma_TS = Gamma' ++ Gamma /\ G_TS = G0)
-  (H_new: w_HT = w ->
-    permut G_HT (G0 & (w', Gamma')) /\ Gamma_HT = Gamma /\
-    w_TS = w /\ Gamma_TS = Gamma' ++ Gamma /\ G_TS = G0)
-  (HT: G_HT |= (w_HT, Gamma_HT) |- M ::: A),
-  G_TS |= (w_TS, Gamma_TS) |- {{ fctx w // fctx w'}}[ M | fctx w_HT, length Gamma'] ::: A.
+forall G w Gamma M A k
+  (Ok: ok_Bg ((w, Gamma)::G) nil)
+  (HT: G |= (w, Gamma) |- M ::: A),
+  forall G0 G' w0 w1 Gamma0 Gamma1,
+  ( permut G (G0 & (w0, Gamma0) & (w1, Gamma1)) ->
+    permut G' (G0 & (w0, Gamma1 ++ Gamma0)) ->
+    G' |= (w, Gamma) |- {{fctx w0 // fctx w1}} [M | fctx w, length Gamma1, k] ::: A)
+  /\
+  ( permut G (G0 & (w0, Gamma0)) ->
+    permut G' G0 ->
+    G' |= (w0, Gamma ++ Gamma0) |- {{fctx w0 // fctx w}} [ M | fctx w, length Gamma, k] ::: A)
+  /\
+  ( permut G (G0 & (w1, Gamma1)) ->
+    permut G' G0 ->
+    G' |= (w, Gamma1 ++ Gamma) |- {{fctx w // fctx w1}} [M | fctx w, length Gamma1, k] ::: A)
+.
 Admitted.
 
 Lemma rename_ctx_preserv_types_outer:
 forall G G' G'' w w' w0 Gamma Gamma' Gamma0 M A
+  (Ok: ok_Bg ((w0, Gamma0)::G') nil)
   (HT_G': permut G' (G & (w, Gamma) & (w', Gamma')))
   (HT_G'': permut G'' (G & (w, Gamma' ++ Gamma)))
   (HT: G' |= (w0, Gamma0) |- M ::: A),
-  G'' |= (w0, Gamma0) |- {{fctx w // fctx w'}} [M | fctx w0, length (Gamma')] ::: A.
+  G'' |= (w0, Gamma0) |- {{fctx w // fctx w'}} [M | fctx w0, length (Gamma'), 0] ::: A.
 intros;
 eapply rename_ctx_preserv_types; eauto.
-assert (w0 <> w') by (eapply unique_worlds; eauto);
-intro n; subst; elim H; reflexivity.
-assert (w0 <> w). 
-eapply unique_worlds with (G':=G'); eauto.
-  apply permut_trans with (l2:=(G & (w', Gamma') & (w, Gamma))); eauto.
-  apply permut_trans with (l2:=(G & (w, Gamma) & (w', Gamma'))); auto; permut_simpl.
-intro n; subst; elim H; reflexivity.
 Qed.
 
 Lemma rename_ctx_preserv_types_old:
 forall G G' w0 w1 Gamma0 Gamma1 M A
+  (Ok: ok_Bg ((w1, Gamma0)::G') nil)
   (HT_G': permut G' (G & (w0, Gamma0)))
   (HT: G' |= (w1, Gamma1) |- M ::: A),
-  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w1, length (Gamma1)] ::: A.
+  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w1, length (Gamma1), 0] ::: A.
 intros;
-eapply rename_ctx_preserv_types with (w_HT:=w1); eauto.
-intros a b; elim b; reflexivity.
-assert (w1 <> w0) by (eapply unique_worlds; eauto).
-intro; subst; elim H; reflexivity.
+eapply rename_ctx_preserv_types; eauto.
 Qed.
 
 Lemma rename_ctx_preserv_types_new:
 forall G G' w0 w1 Gamma0 Gamma1 M A
+  (Ok: ok_Bg ((w0,Gamma0)::G') nil)
   (HT_G': permut G' (G & (w1, Gamma1)))
   (HT: G' |= (w0, Gamma0) |- M ::: A),
-  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w0, length (Gamma1)] ::: A.
-Admitted.
+  G |= (w0, Gamma1++Gamma0) |- {{fctx w0 // fctx w1}} [M | fctx w0, length (Gamma1), 0] ::: A.
+intros;
+eapply rename_ctx_preserv_types; eauto.
+Qed.
 
 Lemma Progress:
 forall G w M A
@@ -1958,6 +1957,7 @@ intros; repeat split; eauto.
 intros; repeat split; eauto. (* ?this should give contradiction? *)
 replace (w0, (@nil ty_LF)) with (w0, nil ++ (@nil ty_LF)).
 apply rename_ctx_preserv_types_old with (G':=(emptyEquiv G0 & (w0, nil))).
+skip.
 permut_simpl.
 apply HT0; auto.
 (* unbox_fetch_box *)
@@ -1973,6 +1973,7 @@ intros; repeat split; eauto.
 intros; repeat split; eauto.
 replace (w0, (@nil ty_LF)) with (w0, nil ++ (@nil ty_LF)).
 apply rename_ctx_preserv_types_old with (G':=(emptyEquiv G0 & (w0, nil))).
+skip.
 permut_simpl.
 apply BackgroundSubsetImpl with (G:= G & (w0,nil) & (w,Gamma)).
   rew_app in *; apply HT0; auto.
@@ -1986,7 +1987,6 @@ apply emptyEquiv_nil with (G:=G0) (G':=G & (w, Gamma)) (w:=w).
   apply Mem_last.
 subst.
 apply IHHT with (G0:=G & (w0, nil)) (w1 := w); auto.
-
 apply ok_Bg_permut with (G:=(w0, nil)::emptyEquiv G0).
 apply permut_trans with (l2:=(w0,nil) :: G & (w, nil)); permut_simpl.
 apply permut_sym; assumption.
@@ -2038,6 +2038,7 @@ unfold open_ctx in *.
   replace (w0, (nil & A)) with (w0, (A::nil) ++ (@nil ty_LF)).
   eapply inv_subst_ctx_preserv_types_new; eauto.
   apply rename_ctx_preserv_types_new with (G':=(emptyEquiv G0 & (w1, A::nil))).
+  skip.
   permut_simpl.
   apply BackgroundSubsetImpl with (G:= (w1, A::nil) :: emptyEquiv G0).
   apply HT2; auto.
@@ -2082,6 +2083,7 @@ intros. rewrite Mem_cons_eq in H5; destruct H5.
   permut_simpl.
   apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G0 & (w1, A::nil)))
     (G := G) (Gamma := nil).
+  skip.
   permut_simpl; apply permut_sym; assumption.
   permut_simpl.
   apply BackgroundSubsetImpl with (G:= (w1, A :: nil) :: emptyEquiv G0).
@@ -2130,6 +2132,7 @@ intros. rewrite Mem_cons_eq in H4; destruct H4.
   permut_simpl.
   apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G1 & (w2, A::nil)))
     (G := G) (Gamma := nil).
+  skip.
   permut_simpl; apply permut_sym; assumption.
   permut_simpl.
   apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: G & (w,nil)).
@@ -2183,6 +2186,7 @@ replace (w1, (nil & A)) with (w1, (A::nil) ++ (@nil ty_LF)).
   apply inv_subst_ctx_preserv_types_new with (w':=w2) (k:=0). 
   assumption.
 apply rename_ctx_preserv_types_new with (G':=(emptyEquiv G1 & (w2, A::nil))).
+skip.
 permut_simpl.
   apply BackgroundSubsetImpl with (G:= (w2, A :: nil) :: G & (w, nil)).
   apply HT2.
@@ -2278,6 +2282,7 @@ unfold open_ctx in *.
   permut_simpl.
   replace (fctx w0) with (fctx (fst (w0, (@nil ty_LF)))).
   apply rename_ctx_preserv_types_outer with (G':=(emptyEquiv G1 & (w2, A::nil))) (Gamma:=nil) (G:=GH''++GT'' & (w,nil)).
+  skip.
   permut_simpl; rew_app in H10.
   apply permut_trans with (l2:=GH'' ++ GT'' ++ (w, nil) :: (w1, nil) :: nil).
     assumption.

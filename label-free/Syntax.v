@@ -74,8 +74,30 @@ Inductive lc_w_n_LF : te_LF -> nat -> Prop :=
      lc_w_n_LF N (S n) -> lc_w_n_LF M n ->
      lc_w_n_LF (letdia_get_LF (fctx w) M N) n
 .
-
 Definition lc_w_LF (t:te_LF) : Prop := lc_w_n_LF t 0.
+
+Inductive lc_t_n_LF: te_LF -> nat -> Prop :=
+| lct_hyp_LF: forall n m,
+    n < m -> lc_t_n_LF (hyp_LF n) m
+| lct_lam_LF: forall t M n, 
+    lc_t_n_LF M (S n) ->
+    lc_t_n_LF (lam_LF t M) n
+| lct_appl_LF: forall M N n,
+    lc_t_n_LF M n -> lc_t_n_LF N n ->
+    lc_t_n_LF (appl_LF M N) n
+ | lct_box_LF: forall M n,
+     lc_t_n_LF M n ->
+     lc_t_n_LF (box_LF M) n
+ | lct_unbox_fetch_LF: forall M n w,
+     lc_t_n_LF M n ->
+     lc_t_n_LF (unbox_fetch_LF (fctx w) M) n
+ | lct_get_here_LF: forall M n w ,
+     lc_t_n_LF M n ->
+     lc_t_n_LF (get_here_LF (fctx w) M) n
+ | lct_letdia_get_LF: forall M N n w,
+     lc_t_n_LF N n -> lc_t_n_LF M n ->
+     lc_t_n_LF (letdia_get_LF (fctx w) M N) n
+.
 
 (* Calculate list of free worlds used in term M *)
 Fixpoint free_worlds_LF (M: te_LF) : fset var :=
@@ -146,6 +168,14 @@ generalize dependent n;
 induction M; intros; simpl in *;
 inversion H; subst; eauto;
 rewrite IHM1; try rewrite IHM2; auto.
+Qed.
+
+Lemma closed_t_succ:
+forall M n,
+  lc_t_n_LF M n -> lc_t_n_LF M (S n).
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
 Qed.
 
 End Lemmas.

@@ -95,127 +95,131 @@ Definition recalculate_ctx (ctx1: ctx_LF) (ctx2: ctx_LF) : prod ctx_LF ctx_LF :=
 (* In subst_ctx_outer it is assumed that current context is neither ctx1
    nor ctx2 *)
 Fixpoint subst_ctx_outer (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF)
-                         (len_old: nat) :=
+                         (len_old: nat) (d_new: nat):=
 match M0 with 
 | hyp_LF n => hyp_LF n
 
-| lam_LF A M => lam_LF A (subst_ctx_outer M ctx1 ctx2 len_old)
+| lam_LF A M => lam_LF A (subst_ctx_outer M ctx1 ctx2 len_old d_new)
 
-| appl_LF M N => appl_LF (subst_ctx_outer M ctx1 ctx2 len_old) 
-                         (subst_ctx_outer N ctx1 ctx2 len_old)
+| appl_LF M N => appl_LF (subst_ctx_outer M ctx1 ctx2 len_old d_new) 
+                         (subst_ctx_outer N ctx1 ctx2 len_old d_new)
 
 | box_LF M => 
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
-    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old d_new)
 
 | unbox_fetch_LF w M => 
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new 
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
-  let N' := subst_ctx_outer N ctx1' ctx2' len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
+  let N' := subst_ctx_outer N ctx1' ctx2' len_old d_new in
   letdia_get_LF w M' N'
 end
 
 (* In subst_ctx_old we assume that current context was ctx2 *)
-with subst_ctx_old (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
+with subst_ctx_old (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) (d_new : nat):=
 match M0 with 
 | hyp_LF n => hyp_LF n
 
-| lam_LF A M => lam_LF A (subst_ctx_old M ctx1 ctx2 (len_old))
+| lam_LF A M =>
+  let len_old' := match ctx2 with (* ? *)
+                  | bctx _ => len_old
+                  | fctx _ => S len_old
+                  end in
+  lam_LF A (subst_ctx_old M ctx1 ctx2 len_old' d_new)
 
-| appl_LF M N => appl_LF (subst_ctx_old M ctx1 ctx2 len_old) 
-                         (subst_ctx_old N ctx1 ctx2 len_old)
+| appl_LF M N => appl_LF (subst_ctx_old M ctx1 ctx2 len_old d_new) 
+                         (subst_ctx_old N ctx1 ctx2 len_old d_new)
 
 | box_LF M =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in     
-    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old d_new)
 
 | unbox_fetch_LF w M =>
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
-  let N' := subst_ctx_old N ctx1' ctx2' len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
+  let N' := subst_ctx_old N ctx1' ctx2' len_old d_new in
   letdia_get_LF w M' N'
 end
 
 (* In subst_ctx_new we assume that current context is ctx1 *)
-with subst_ctx_new (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) :=
+with subst_ctx_new (M0 : te_LF) (ctx1: ctx_LF) (ctx2: ctx_LF) (len_old: nat) (d_new: nat) :=
 match M0 with 
-
 (* It is assumed that when ctx2 = bctx _, then len_old is 0 *)
-| hyp_LF n => hyp_LF (len_old + n)
+| hyp_LF n => If n < d_new then hyp_LF n else hyp_LF (len_old + n)
 
-| lam_LF A M => lam_LF A (subst_ctx_new M ctx1 ctx2 len_old)
+| lam_LF A M =>  lam_LF A (subst_ctx_new M ctx1 ctx2 len_old (S d_new))
 
-| appl_LF M N => appl_LF (subst_ctx_new M ctx1 ctx2 len_old) 
-                         (subst_ctx_new N ctx1 ctx2 len_old)
+| appl_LF M N => appl_LF (subst_ctx_new M ctx1 ctx2 len_old d_new) 
+                         (subst_ctx_new N ctx1 ctx2 len_old d_new)
 
 | box_LF M =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in 
-    box_LF (subst_ctx_outer M ctx1' ctx2' len_old)
+    box_LF (subst_ctx_outer M ctx1' ctx2' len_old d_new)
 
 | unbox_fetch_LF w M =>
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   unbox_fetch_LF w M'
 
 | get_here_LF w M =>
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
   get_here_LF w M'
 
 | letdia_get_LF w M N =>
   let (ctx1', ctx2') := recalculate_ctx ctx1 ctx2 in
-  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old
-            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old
-            else subst_ctx_outer M ctx1 ctx2 len_old in
-  let N' := subst_ctx_old N ctx1' ctx2' len_old in
+  let M' := If (w = ctx1) then subst_ctx_new M ctx1 ctx2 len_old d_new
+            else If (w = ctx2) then subst_ctx_old M ctx1 ctx2 len_old d_new
+            else subst_ctx_outer M ctx1 ctx2 len_old d_new in
+  let N' := subst_ctx_old N ctx1' ctx2' len_old d_new in
   letdia_get_LF w M' N'
 end.
 
-Definition subst_ctx M c1 c2 curr len_old :=
+Definition subst_ctx M c1 c2 curr len_old d_new :=
 If c1 = c2 then M
 else
   If curr = c1 then
-    subst_ctx_new M c1 c2 len_old
+    subst_ctx_new M c1 c2 len_old d_new
   else
     If curr = c2 then
-      subst_ctx_old M c1 c2 len_old
+      subst_ctx_old M c1 c2 len_old d_new
     else
-      subst_ctx_outer M c1 c2 len_old.
+      subst_ctx_outer M c1 c2 len_old d_new.
 
-Notation " {{ c1 // c2 }} [ M | curr , m ] " := 
-  (subst_ctx M c1 c2 curr m) (at level 5) : label_free_is5_scope.
+Notation " {{ c1 // c2 }} [ M | curr , m , d ] " := 
+  (subst_ctx M c1 c2 curr m d) (at level 5) : label_free_is5_scope.
 
-Definition open_ctx M ctx curr := subst_ctx M ctx (bctx 0) curr 0.
+Definition open_ctx M ctx curr := subst_ctx M ctx (bctx 0) curr 0 0.
 
 Notation " M ^^ [ w | w' ] " := (open_ctx M w w') (at level 10) : label_free_is5_scope.
 
@@ -240,9 +244,9 @@ case_if; reflexivity.
 Qed.
 
 Lemma subst_ctx__old:
-forall M c1 c2 len_old
+forall M c1 c2 len_old d_new
   (Neq: c1 <> c2),
-  subst_ctx_old M c1 c2 len_old = {{ c1 // c2 }} [M | c2, len_old].
+  subst_ctx_old M c1 c2 len_old d_new  = {{ c1 // c2 }} [M | c2, len_old, d_new].
 intros;
 unfold subst_ctx;
 repeat case_if;
@@ -250,9 +254,9 @@ reflexivity.
 Qed.
 
 Lemma subst_ctx__new:
-forall M c1 c2 len_old
+forall M c1 c2 len_old d_new
   (Neq: c1 <> c2),
-  subst_ctx_new M c1 c2 len_old = {{ c1 // c2 }} [M | c1, len_old].
+  subst_ctx_new M c1 c2 len_old d_new = {{ c1 // c2 }} [M | c1, len_old, d_new].
 intros;
 unfold subst_ctx;
 repeat case_if;
@@ -260,11 +264,11 @@ reflexivity.
 Qed.
 
 Lemma subst_ctx__outer:
-forall M c1 c2 curr len_old
+forall M c1 c2 curr len_old d_new
   (Neq: c1 <> c2)
   (Neq': c1 <> curr)
   (Neq'': c2 <> curr),
-  subst_ctx_outer M c1 c2 len_old = {{ c1 // c2 }} [M | curr, len_old].
+  subst_ctx_outer M c1 c2 len_old d_new = {{ c1 // c2 }} [M | curr, len_old, d_new].
 intros;
 unfold subst_ctx;
 repeat case_if;
@@ -276,33 +280,42 @@ try repeat rewrite subst_t__inner;
 try repeat rewrite subst_ctx__new;
 try repeat rewrite subst_ctx__old.
 
+Lemma no_changes_subst_w_id_d_new:
+forall w w' w0 n k  M,
+  {{w//w'}}[M | w0, n, k] = M ->
+  {{w//w'}}[M | w0, n, S k] = M.
+Admitted.
+Hint Resolve no_changes_subst_w_id_d_new.
+
 Lemma no_unbound_worlds_LF_subst_w_id:
 forall M n
   (H_unbound: unbound_worlds n M = nil),
-  forall w w0, {{ w // bctx n }} [M | w0, 0] = M.
+  forall w w0 k, {{ w // bctx n }} [M | w0, 0, k] = M.
 induction M; intros; unfold subst_ctx.
 (* hyp *)
-repeat case_if; reflexivity.
+repeat case_if; simpl; try reflexivity;
+case_if; reflexivity.
 (* lam *)
-unfold subst_ctx in *;
-simpl in H_unbound;
-specialize IHM with n w w0;
-apply IHM with (w:=w) (w0:=w0) in H_unbound;
-repeat case_if; simpl; 
-try rewrite H_unbound; 
-auto.
+unfold subst_ctx;
+simpl in H_unbound.
+repeat case_if; subst; eauto;
+simpl; try_rewrite_subst; eauto;
+try erewrite IHM with (k:=S k); eauto;
+try erewrite IHM with (k:=k); eauto.
+rewrite subst_ctx__outer with (curr:=w0); auto;
+try erewrite IHM with (k:=k); eauto.
 (* appl *)
 unfold subst_ctx in *;
 simpl in H_unbound;
 apply app_eq_nil in H_unbound;
 destruct H_unbound as (H_Un1, H_Un2);
-apply IHM1 with (w:=w) (w0:=w0) in H_Un1;
-apply IHM2 with (w:=w) (w0:=w0) in H_Un2;
+eapply IHM1 with (w:=w) (w0:=w0) (k:=k) in H_Un1;
+eapply IHM2 with (w:=w) (w0:=w0) (k:=k) in H_Un2;
 repeat case_if; simpl;
 try (rewrite H_Un1; rewrite H_Un2); reflexivity.
 (* box *)
 inversion H_unbound; subst;
-apply IHM with (w:=w) (w0:=w0) in H0;
+apply IHM with (w:=w) (w0:=w0) (k:=k) in H0;
 repeat case_if; simpl; try subst; auto;
 unfold recalc_simpl_ctx;
 assert (exists w0, w0 \notin free_worlds_LF M \u var_from w) by
@@ -400,9 +413,9 @@ try (intro nn; inversion nn; subst; elim H3; reflexivity).
 Qed.
 
 Lemma closed_ctx_subst_id:
-forall M w n curr
+forall M w n curr l
   (H_lc: lc_w_n_LF M n),
-  {{w // bctx n}} [ M | curr, 0] = M.
+  {{w // bctx n}} [ M | curr, 0, l] = M.
 intros;
 apply no_unbound_worlds_LF_subst_w_id;
 apply closed_no_unbound_worlds;
@@ -410,10 +423,10 @@ assumption.
 Qed.
 
 Lemma subst_order_irrelevant:
-forall N w w' M n m w0 w1
+forall N w w' M n m w0 w1 l
   (HT_M: lc_w_LF M),
-    [M // n | w0] [{{w1 // bctx m}}[N | w, 0] | w'] = 
-    {{w1 // bctx m}}[ [M // n | w0] [N | w'] | w, 0].
+    [M // n | w0] [{{w1 // bctx m}}[N | w, 0, l] | w'] = 
+    {{w1 // bctx m}}[ [M // n | w0] [N | w'] | w, 0, l].
 induction N; unfold subst_t; unfold subst_ctx; intros;
 remember (var_from w \u var_from w' \u var_from w0 \u var_from w1) as known_worlds;
 assert (exists w', w' \notin known_worlds) by
