@@ -6,20 +6,30 @@ This is not really a label-free language, as we attach labels to contexts, but t
 I. Statics
 ----------
 
+Note
+----
+# In every rule we assume, that both background and current context are well-formed in the following sense:
+ * map fst ((w, Gamma)::G) contains no duplicates (worlds are unique)
+ * map fst (flat_map snd ((w, Gamma)::G)) contains no duplicates (variables are globally unique)
+
+# ^t^ is variable opening with a term (M ^t^ v = [fvar v // bvar0] M)
+# ^w^ is variable opening with a world (M ^w^ w = {{fctx w // bctx 0}} M)
+
+
 1. Variable
 
   
-       Gamma[n] == A
+      Mem (v, A) Gamma
 ------------------------------- (Id)
- G |= (w, Gamma) |- hyp n : A
+ G |= (w, Gamma) |- hyp v : A
 
 
 2. Arrow
 
 
-     G |= (w, A::Gamma) |- M : B 
--------------------------------------- (-> I)
- G |= (w, Gamma) |- lam A, M : A -> B
+ forall v0, v0 \notin L_t -> G |= (w, (v0, A)::Gamma) |- M ^t^ (hyp v) : B 
+--------------------------------------------------------------------------- (-> I)
+           G |= (w, Gamma) |- lam A, M : A -> B
 
 
  G |= (w, Gamma) |- M : A -> B   G |= (w, Gamma) |- N : A
@@ -30,8 +40,8 @@ I. Statics
 3. Box
 
 
-  forall w0, w0 \notin L -> G & (w, Gamma) |= (w0, nil) |- M^w0 : A
----------------------------------------------------------------------- ([] I)
+ forall w0, w0 \notin L_w -> G & (w, Gamma) |= (w0, nil) |- M ^w^ w0 : A
+------------------------------------------------------------------------- ([] I)
                 G |= (w, Gamma) |- box M : [] A
 
 
@@ -58,14 +68,16 @@ I. Statics
             G' |= (w', Gamma') |- get_here w M : <> A
 
 
- G |= (w, Gamma) |- M : <> A     (w0, A::nil) :: G |= (w, Gamma) |- N ^ w0 : B
-------------------------------------------------------------------------------- (<> E1)
-             G |= (w, Gamma) |- letdia M in N : B
+ G |= (w, Gamma) |- M : <> A     forall v0, v0 \notin L_t -> forall w0, w0 \notin L_w -> 
+                                            (w0, (v0, A)::nil) :: G |= (w, Gamma) |- (N ^t^ (hyp v0)) ^w^ w0 : B
+--------------------------------------------------------------------------------------------------------------- (<> E1)
+                                  G |= (w, Gamma) |- letdia M in N : B
 
 
- G & (w', Gamma') |= (w, Gamma) |- M : <> A   forall w0, w0 \notin L -> (w0, (A::nil)) :: G & (w, Gamma) |= (w', Gamma') |- N ^ w0 : B   Permutation (G & (w, Gamma)) G'
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- (<> E2)
-                                                         G' |= (w', Gamma') |- letdia_get w M in N : B
+ G & (w', Gamma') |= (w, Gamma) |- M : <> A   forall v0, v0 \notin L_t -> forall w0, w0 \notin L_w ->                                      Permutation (G & (w, Gamma)) G'
+                                                         (w0, ((v0, A)::nil)) :: G & (w, Gamma) |= (w', Gamma') |- (N ^t^ (hyp v0)) ^w^ w0 : B   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- (<> E2)
+                                                       G' |= (w', Gamma') |- letdia_get w M in N : B
 
 
 II. Dynamics
@@ -84,19 +96,19 @@ value M ==> value (get_here M)
 
 B. Reductions
 
-appl (lam A, M) N, w  |--> [ N // 0 | w ] [ M | w ], w
+appl (lam A, M) N, w  |--> M ^t^ N, w
 
-unbox (box M), w |--> M ^ w, w
+unbox (box M), w |--> M ^w^ w, w
 
-unbox_fetch w' (box M), w | --> M ^ w, w
+unbox_fetch w' (box M), w | --> M ^w^ w, w
 
-letd (here M) in N, w |--> [ M // 0 | w ] [ N ^ w | w ], w
+letd (here M) in N, w |-->  (N ^w^ w) ^t^ M, w
 
-letd (get_here w' M) in N, w |--> [ M // 0 | w' ] [ N ^ w' | w ], w
+letd (get_here w' M) in N, w |--> (N ^w^ w') ^t^ M, w
 
-letd_get w' (here M) in N, w |--> [ M // 0 | w' ] [ N ^ w' | w ], w
+letd_get w' (here M) in N, w |--> (N ^w^ w') ^t^ M, w
 
-letd_get w' (get_here w'' M) in N, w |--> [ M // 0 | w'' ] [ N ^ w'' | w ], w
+letd_get w' (get_here w'' M) in N, w |--> (N ^w^ w'') ^t^ M, w
 
 (M, w |--> M', w) ==> (appl M N, w |--> appl M' N, w)
 
