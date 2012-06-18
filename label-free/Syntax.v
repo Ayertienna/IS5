@@ -25,11 +25,11 @@ Inductive var_LF :=
 | fvar: var -> var_LF
 .
 
-(* Context_LF = (world, [(variable, type)]) *)
-Definition Context_LF := prod var (env ty_LF).
+(* Alt: Context_LF = (world, [(variable, type)]) = prod var (env ty_LF) *)
+Definition Context_LF := prod var (list (prod var ty_LF)).
 
-(* Background_LF = [(world, [(variable, type)])] *)
-Definition Background_LF := env (env ty_LF).
+(* Background_LF = [(world, [(variable, type)])] = env (env ty_LF) *)
+Definition Background_LF := list Context_LF.
 
 Inductive te_LF :=
 | hyp_LF: var_LF -> te_LF
@@ -40,6 +40,46 @@ Inductive te_LF :=
 | get_here_LF: ctx_LF -> te_LF -> te_LF
 | letdia_get_LF: ctx_LF -> te_LF -> te_LF -> te_LF
 .
+
+Definition var_from_w (w: ctx_LF) :=
+match w with
+| fctx w0 => \{w0}
+| bctx _ => \{}
+end.
+
+Definition var_from_v (v: var_LF) :=
+match v with
+| fvar v0 => \{v0}
+| bvar _ => \{}
+end.
+
+Definition ctx_succ (ctx:ctx_LF) : ctx_LF :=
+match ctx with
+  | fctx _ => ctx
+  | bctx n => bctx (S n)
+end.
+
+Definition var_succ v0 :=
+match v0 with
+| fvar v => fvar v
+| bvar n => bvar (S n)
+end. 
+
+Definition recalc_simpl_ctx (ctx:ctx_LF) : ctx_LF :=
+match ctx with
+    | fctx _ => ctx
+    | bctx n => bctx (S n)
+end.
+
+Definition recalculate_ctx (ctx1: ctx_LF) (ctx2: ctx_LF) : prod ctx_LF ctx_LF :=
+  (recalc_simpl_ctx ctx1, recalc_simpl_ctx ctx2).
+
+
+Definition recalculate_var (v: var_LF) :=
+match v with
+| bvar n => bvar (S n)
+| fvar _ => v
+end.
 
 Axiom eq_var_dec:
   forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
@@ -110,6 +150,8 @@ Inductive lc_t_n_LF: te_LF -> nat -> Prop :=
      lc_t_n_LF N n -> lc_t_n_LF M n ->
      lc_t_n_LF (letdia_get_LF (fctx w) M N) n
 .
+
+Definition lc_t_LF (t:te_LF) : Prop := lc_t_n_LF t 0.
 
 (* Calculate list of free worlds used in term M *)
 Fixpoint free_worlds_LF (M: te_LF) : fset var :=
