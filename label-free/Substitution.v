@@ -60,48 +60,118 @@ Notation " M ^w^ w  " := (open_ctx M w) (at level 10) : label_free_is5_scope.
 
 Section Lemmas.
 
+Lemma no_unbound_vars_LF_subst_var_id:
+forall N M n
+  (H_unbound: unbound_vars n N = nil),
+  [M//bvar n] N = N.
+induction N; intros; simpl in *;
+try rewrite IHN; auto;
+[ case_if; simpl in *; subst;
+  [discriminate | auto] | |]; 
+apply app_eq_nil in H_unbound;
+destruct H_unbound;
+rewrite IHN1;
+try rewrite IHN2; eauto.
+Qed.
+
 Lemma no_unbound_worlds_LF_subst_ctx_id:
 forall M n w
   (H_unbound: unbound_worlds n M = nil),
   {{ w // bctx n }} M = M.
-Admitted.
+induction M; intros; simpl in *;
+try (case_if; destruct c; subst; try discriminate);
+try (apply app_eq_nil in H_unbound; destruct H_unbound);
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+eauto.
+Qed.
+
+Lemma closed_var_subst_var_id:
+forall M n N
+  (H_lc: lc_t_n_LF N n),
+  [ M // bvar n ] N = N.
+intros;
+apply no_unbound_vars_LF_subst_var_id;
+apply closed_t_no_unbound_vars;
+auto.
+Qed.
 
 Lemma closed_ctx_subst_ctx_id:
 forall M w n
   (H_lc: lc_w_n_LF M n),
   {{w // bctx n}} M  = M.
-Admitted.
+intros;
+apply no_unbound_worlds_LF_subst_ctx_id;
+apply closed_w_no_unbound_worlds;
+auto.
+Qed.
 
 Lemma subst_ctx_comm:
 forall M w w' w'' n
   (Neq: w'' <> w),
   {{fctx w'//fctx w''}}({{fctx w//bctx n}}M) = 
   {{fctx w//bctx n}}({{fctx w'//fctx w''}}M).
-Admitted.
+induction M; intros; simpl;
+repeat case_if; subst; simpl;
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+auto.
+Qed.
 
 Lemma subst_ctx_id:
 forall M w n
   (HT: w \notin free_worlds_LF M),
   {{bctx n//fctx w}}({{fctx w//bctx n}}M) = M.
-Admitted.
+induction M; intros; simpl in *;
+try (destruct c); repeat case_if;
+try (rewrite notin_union in HT; 
+     rewrite notin_singleton in HT; 
+     destruct HT);
+try (inversion H0; subst);
+try (inversion H; subst);
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+auto;
+elim H1; auto.
+Qed.
 
 Lemma subst_ctx_neutral_free:
 forall M w w' w0
   (HT: w0 \notin free_worlds_LF M),
   {{w//fctx w0}}({{fctx w0// w'}}M) = {{w//w'}}M.
-Admitted.
+induction M; intros; simpl in *;
+try (destruct c); repeat case_if;
+try (rewrite notin_union in HT; 
+     rewrite notin_singleton in HT; 
+     destruct HT);
+try (inversion H0; subst);
+try (inversion H; subst);
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+auto;
+elim H1; auto.
+Qed.
 
 Lemma subst_ctx_neutral_bound:
 forall M w w' n
   (HT: lc_w_n_LF M n),
   {{w//bctx n}}({{bctx n// w'}}M) = {{w//w'}}M.
-Admitted.
+induction M; intros; simpl in *;
+try (destruct c); repeat case_if;
+inversion HT; subst;
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+auto.
+Qed.
 
 Lemma closed_ctx_step_opening:
 forall M n w
   (HT: lc_w_n_LF M (S n)),
   lc_w_n_LF ({{fctx w//bctx n}}M) n.
-Admitted.
+induction M; intros; inversion HT; subst;
+simpl in *; eauto using lc_w_n_LF;
+case_if; simpl; constructor; eauto.
+Qed.
 
 
 Lemma subst_order_irrelevant:
@@ -109,7 +179,20 @@ forall N w M v m
   (HT_M: lc_w_LF M),
     [M // v ] ({{w // bctx m}} N)  = 
     {{w // bctx m}} ([M // v ] N). 
-Admitted.
+induction N; intros; simpl in *; unfold var_succ in *;
+try ( (* hyp *)
+  case_if;
+  [ rewrite closed_ctx_subst_ctx_id |
+    simpl]; auto;
+  replace m with (0+m) by omega;
+  eapply closed_w_addition;
+  auto);
+try destruct c; 
+try destruct v;
+try rewrite IHN;
+try (rewrite IHN1; try rewrite IHN2);
+auto.
+Qed.
 
 End Lemmas.
 
