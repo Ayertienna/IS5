@@ -60,6 +60,16 @@ Notation " M ^w^ w  " := (open_ctx M w) (at level 10) : label_free_is5_scope.
 
 Section Lemmas.
 
+Lemma subst_w_w:
+forall M w,
+  {{w // w}} M = M.
+induction M; intros; simpl in *;
+try (case_if; subst);
+try (rewrite IHM);
+try (rewrite IHM1; try rewrite IHM2; auto);
+auto.
+Qed.
+
 Lemma no_unbound_vars_LF_subst_var_id:
 forall N M n
   (H_unbound: unbound_vars n N = nil),
@@ -74,7 +84,7 @@ rewrite IHN1;
 try rewrite IHN2; eauto.
 Qed.
 
-Lemma no_unbound_worlds_LF_subst_ctx_id:
+Lemma no_unbound_worlds_LF_subst_ctx_id_bound:
 forall M n w
   (H_unbound: unbound_worlds n M = nil),
   {{ w // bctx n }} M = M.
@@ -84,6 +94,20 @@ try (apply app_eq_nil in H_unbound; destruct H_unbound);
 try rewrite IHM;
 try (rewrite IHM1; try rewrite IHM2);
 eauto.
+Qed.
+
+Lemma no_unbound_worlds_LF_subst_ctx_id_free:
+forall M w w'
+  (H_free: w' \notin free_worlds_LF M),
+  {{ w // fctx w' }} M = M.
+induction M; intros; simpl in *;
+try (case_if; destruct c; subst; try discriminate);
+try (rewrite notin_union in H_free; 
+     destruct H_free; rewrite notin_singleton in *);
+try rewrite IHM;
+try (rewrite IHM1; try rewrite IHM2);
+eauto;
+inversion H; subst; elim H0; reflexivity.
 Qed.
 
 Lemma closed_var_subst_var_id:
@@ -96,15 +120,26 @@ apply closed_t_no_unbound_vars;
 auto.
 Qed.
 
-Lemma closed_ctx_subst_ctx_id:
+(* TODO: remove, duplicate *)
+Lemma closed_ctx_subst_ctx_id_bound:
 forall M w n
   (H_lc: lc_w_n_LF M n),
   {{w // bctx n}} M  = M.
 intros;
-apply no_unbound_worlds_LF_subst_ctx_id;
+apply no_unbound_worlds_LF_subst_ctx_id_bound;
 apply closed_w_no_unbound_worlds;
 auto.
 Qed.
+
+Lemma closed_ctx_subst_ctx_id_free:
+forall M w w'
+  (H_lc: w' \notin free_worlds_LF M),
+  {{w // fctx w'}} M  = M.
+intros;
+apply no_unbound_worlds_LF_subst_ctx_id_free;
+auto.
+Qed.
+
 
 Lemma subst_ctx_comm:
 forall M w w' w'' n
@@ -174,7 +209,7 @@ case_if; simpl; constructor; eauto.
 Qed.
 
 
-Lemma subst_order_irrelevant:
+Lemma subst_order_irrelevant_bound:
 forall N w M v m
   (HT_M: lc_w_LF M),
     [M // v ] ({{w // bctx m}} N)  = 
@@ -182,7 +217,27 @@ forall N w M v m
 induction N; intros; simpl in *; unfold var_succ in *;
 try ( (* hyp *)
   case_if;
-  [ rewrite closed_ctx_subst_ctx_id |
+  [ rewrite closed_ctx_subst_ctx_id_bound |
+    simpl]; auto;
+  replace m with (0+m) by omega;
+  eapply closed_w_addition;
+  auto);
+try destruct c; 
+try destruct v;
+try rewrite IHN;
+try (rewrite IHN1; try rewrite IHN2);
+auto.
+Qed.
+
+Lemma subst_order_irrelevant_free:
+forall N w w' M v
+  (HT_M: w' \notin (free_worlds_LF M)),
+    [M // v ] ({{w // fctx w'}} N)  = 
+    {{w // fctx w'}} ([M // v ] N). 
+induction N; intros; simpl in *; unfold var_succ in *;
+try ( (* hyp *)
+  case_if;
+  [ rewrite closed_ctx_subst_ctx_id_free |
     simpl]; auto;
   replace m with (0+m) by omega;
   eapply closed_w_addition;
