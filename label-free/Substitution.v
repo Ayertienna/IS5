@@ -140,7 +140,6 @@ apply no_unbound_worlds_LF_subst_ctx_id_free;
 auto.
 Qed.
 
-
 Lemma subst_ctx_comm:
 forall M w w' w'' n
   (Neq: w'' <> w),
@@ -151,6 +150,23 @@ repeat case_if; subst; simpl;
 try rewrite IHM;
 try (rewrite IHM1; try rewrite IHM2);
 auto.
+Qed.
+
+Lemma subst_var_comm:
+forall M v v' n N
+  (Neq: v <> v')
+  (Lc: lc_t_LF N),
+  [ N // fvar v] ([ hyp_LF (fvar v') // bvar n] M) =
+  [hyp_LF (fvar v') // bvar n] ([N // fvar v] M).
+induction M; intros; simpl;
+try (rewrite IHM; auto);
+try (rewrite IHM1; try rewrite IHM2; auto);
+repeat (case_if; simpl); subst; simpl;
+auto;
+rewrite closed_var_subst_var_id;
+auto;
+replace n with (0+n) by omega;
+apply closed_t_addition; auto.
 Qed.
 
 Lemma subst_ctx_id:

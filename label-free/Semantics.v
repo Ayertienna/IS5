@@ -8,9 +8,7 @@ Require Import Arith.
 
 Open Scope label_free_is5_scope.
 
-Global Reserved Notation " G '|=' Ctx '|-' M ':::' A " (at level 70).
- 
-(* Statics *)
+
 Fixpoint ok A (G: list (var * A)) (Used: list var) : Prop :=
 match G with 
 | nil => True
@@ -20,6 +18,10 @@ end.
 Definition ok_Bg (G: Background_LF) : Prop :=
 ok (list (var * ty_LF)) G nil  /\
 ok (ty_LF) (flat_map snd G) nil.
+
+Global Reserved Notation " G '|=' Ctx '|-' M ':::' A " (at level 70).
+ 
+(* Statics *)
 
 Inductive types_LF: Background_LF -> Context_LF -> te_LF -> ty_LF -> Prop :=
 
@@ -85,6 +87,7 @@ Inductive types_LF: Background_LF -> Context_LF -> te_LF -> ty_LF -> Prop :=
   forall G0, permut (G & (w, Gamma)) G0 -> 
     G0 |= Ctx' |- letdia_get_LF (fctx w) M N ::: B
 where " G '|=' Ctx '|-' M ':::' A " := (types_LF G Ctx M A) : label_free_is5_scope.
+
 
 (* Dynamics *)
 
@@ -169,55 +172,273 @@ match G with
 | (w, a)::G => (w, nil) :: emptyEquiv G
 end.
 
+Lemma types_weakened:
+forall G w Gamma M A
+  (HT: emptyEquiv G |= (w, nil) |- M ::: A),
+  G |= (w, Gamma) |- M ::: A.
+Admitted.
+
 Lemma subst_t_preserv_types:
-forall L G w Gamma A B M N v
+forall G w Gamma B M N v A
   (H_lc_t: lc_t_LF M)
   (H_lc_w: lc_w_LF M)
-  (Fresh: v \notin L) 
   (HT: G |= (w, Gamma) |- N ::: B), 
+  (* "inner" substitution *)
   ( forall Gamma0,
+    (* this should really be permutation... *)
     Gamma = (v, A) :: Gamma0 ->
     emptyEquiv G |= (w, nil) |- M ::: A ->
-  (* "inner" substitution *)
-    G |= (w, Gamma0) |- N ^t^ M ::: B) /\
+    G |= (w, Gamma0) |- [M // fvar v] N ::: B)
+  /\
   (* "outer" substitution *)
   ( forall G0 G' G'' w' Gamma',
     permut G (G0 & (w', (v,A)::Gamma')) ->
     permut G' (G0 & (w, Gamma)) ->
     permut G'' (G0 & (w', Gamma')) ->
     emptyEquiv G' |= (w', nil) |- M ::: A ->
-    G'' |= (w, Gamma) |- N ^t^ M ::: B).
-Admitted.
+    G'' |= (w, Gamma) |- [M // fvar v] N ::: B).
+intros.
+remember (w, Gamma) as Ctx.
+generalize dependent v;
+generalize dependent A;
+generalize dependent M;
+generalize dependent w;
+generalize dependent Gamma.
+induction HT; split; intros;
+inversion HeqCtx; subst;
+simpl in *.
+(* hyp *)
+case_if.
+inversion H; subst;
+assert (A = A0) by skip; (* Ok_Bg + HT *)
+subst; apply types_weakened; assumption.
+constructor.
+skip. (* ok_Bg *)
+(* Mem part should be automated! *)
+rewrite Mem_cons_eq in HT; destruct HT.
+  inversion H1; subst; elim H; reflexivity.
+  assumption.
+
+case_if.
+inversion H3; subst;
+(* v = v0 ->
+   Ok_Bg + H + H0 + HT -->
+   v0 occurs both in Gamma0 and in G -->
+   contradiction *)
+skip.
+constructor.
+skip. (* ok_Bg *)
+assumption.
+(* lam *)
+apply t_lam_LF with (L:=L \u \{v}).
+skip. (* ok_Bg *)
+intros.
+rewrite notin_union in H0; rewrite notin_singleton in H0; destruct H0.
+unfold open_var in *.
+rewrite <- subst_var_comm.
+eapply H; eauto.
+skip. (* this should really be permutations *)
+intro; elim H2; subst; auto.
+auto.
+
+apply t_lam_LF with (L:=L \u \{v}).
+skip. (* ok_Bg *)
+intros.
+rewrite notin_union in H4; rewrite notin_singleton in H4; destruct H4.
+unfold open_var in *.
+rewrite <- subst_var_comm.
+eapply H; eauto.
+skip. (* empty equiv + permut *)
+intro; subst; elim H5; auto.
+auto.
+(* appl *)
+econstructor; [ skip | eapply IHHT1 | eapply IHHT2]; eauto.
+econstructor; [ skip | eapply IHHT1 | eapply IHHT2]; eauto.
+(* box *)
+econstructor; [skip | intros].
+unfold open_ctx.
+rewrite <- subst_order_irrelevant_bound.
+eapply H; eauto.
+skip. (* form H1 + weakening + emptyEquiv_last *)
+auto.
+
+econstructor; [skip | intros].
+unfold open_ctx.
+rewrite <- subst_order_irrelevant_bound.
+eapply H with (G'' := G'' & (w0, Gamma0)); eauto.
+skip. (* H0 + H2 *)
+skip. (* H3 + H1 + Weakening *)
+auto.
+(* unbox *)
+econstructor; [skip | eapply IHHT]; eauto.
+econstructor; [skip | eapply IHHT]; eauto.
+(* unbox_fetch *)
+apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma).
+skip. (* ok_Bg *)
+eapply IHHT; eauto.
+skip. (* emptyEquiv + permut *)
+assumption.
+
+assert (w <> w0) by skip. (* from Ok_Bg *)
+assert (w <> w'0) by skip. (* Ok_bg + H + H0 *) 
+(* H0 + H + ok_Bg + w <> w'0 -->
+   G & (w, Gamma) ~=~ G0 & (w'0, (v, A0) :: Gamma'0) -->
+   exists GH, exists GT, G = GH & (w'0, (v,A0)::Gamma'0) ++ GT. *)
+assert (exists GH, exists GT, G = GH & (w'0, (v, A0)::Gamma'0) ++ GT) by skip.
+destruct H6 as (GH, H6); destruct H6 as (GT, H6).
+apply t_unbox_fetch_LF with (G:=GH ++ GT & (w'0, Gamma'0)) (Gamma:=Gamma).
+skip. (* ok_Bg *)
+eapply IHHT with (w1:=w) (Gamma1:=Gamma) (w':=w'0) (Gamma':=Gamma'0)
+                 (G0:=GH ++ GT & (w0, Gamma0)); eauto.
+subst; permut_simpl.
+subst; permut_simpl.
+skip. (* emptyEquiv + permut *)
+skip. (* H2 + H + H0 *)
+(* here *)
+econstructor; [skip | eapply IHHT]; eauto.
+econstructor; [skip | eapply IHHT]; eauto.
+(* get_here *)
+apply t_get_here_LF with (G:=G) (Gamma:=Gamma).
+skip. (* ok_Bg *)
+eapply IHHT; eauto.
+skip. (* emptyEquiv + permut *)
+assumption.
+
+assert (w <> w0) by skip. (* from Ok_Bg *)
+assert (w <> w') by skip. (* Ok_bg + H + H0 *) 
+(* H0 + H + ok_Bg + w <> w'0 -->
+   G & (w, Gamma) ~=~ G0 & (w'0, (v, A0) :: Gamma'0) -->
+   exists GH, exists GT, G = GH & (w', (v,A0)::Gamma'0) ++ GT. *)
+assert (exists GH, exists GT, G = GH & (w', (v, A0)::Gamma') ++ GT) by skip.
+destruct H7 as (GH, H7); destruct H7 as (GT, H7).
+apply t_get_here_LF with (G:=GH ++ GT & (w', Gamma')) (Gamma:=Gamma).
+skip. (* ok_Bg *)
+eapply IHHT with (w1:=w) (Gamma1:=Gamma) (w':=w') (Gamma':=Gamma')
+                 (G0:=GH ++ GT & (w0, Gamma0)); eauto.
+subst; permut_simpl.
+subst; permut_simpl.
+skip. (* emptyEquiv + permut *)
+skip. (* H2 + H + H0 *)
+
+(* letdia *)
+eapply t_letdia_LF with (L_t := L_t \u \{v}); [skip | eapply IHHT | intros]; eauto.
+unfold open_var in *. unfold open_ctx in *.
+rewrite notin_union in H0; rewrite notin_singleton in H0; destruct H0.
+rewrite <- subst_order_irrelevant_bound.
+rewrite <- subst_var_comm.
+eapply H; eauto.
+skip. (* weakening + assumption *)
+intro; subst; elim H3; auto.
+assumption.
+assumption.
+
+eapply t_letdia_LF with (L_t := L_t \u \{v}); [skip | eapply IHHT | intros]; eauto.
+unfold open_var in *. unfold open_ctx in *.
+rewrite notin_union in H4; rewrite notin_singleton in H4; destruct H4.
+rewrite <- subst_order_irrelevant_bound.
+rewrite <- subst_var_comm.
+eapply H with (G0:=(w'0, (v',A)::nil)::G0) (w'0:=w') (Gamma':=Gamma') (A0:=A0); eauto.
+permut_simpl; auto.
+permut_simpl; auto.
+skip. (* weakening + assumption *)
+intro; subst; elim H6; auto.
+assumption.
+assumption.
+
+(* letdia_get *)
+assert (w <> w0) by skip. (* from Ok_bg *)
+eapply t_letdia_get_LF with (G:=G) (Gamma:=Gamma) (L_t := L_t \u \{v}); eauto.
+skip. (* ok_Bg *)
+eapply IHHT; eauto.
+skip. (* permut + assumption *)
+intros. 
+unfold open_var in *; unfold open_ctx in *.
+rewrite notin_union in H4; rewrite notin_singleton in H4; destruct H4.
+rewrite <- subst_order_irrelevant_bound.
+rewrite <- subst_var_comm.
+eapply H; eauto.
+skip. (* weakening + permut + assumption *)
+intro; subst; elim H6; auto.
+auto.
+auto.
+
+assert (w <> w0) by skip. (* from ok_Bg *)
+destruct (eq_var_dec w w').
+subst.
+(* from ok_Bg + H0 + H1 *)
+assert (Gamma = (v, A0) :: Gamma') by skip.
+assert (G1 = G) by skip.
+subst.
+eapply t_letdia_get_LF with (G:=G) (Gamma:=Gamma') (L_t:=L_t \u \{v}); eauto.
+skip. (* ok_Bg *)
+eapply IHHT; eauto.
+skip. (* permut + emptyEquiv *)
+intros.
+unfold open_var in *; unfold open_ctx in *.
+rewrite notin_union in H7; rewrite notin_singleton in H7; destruct H7.
+rewrite <- subst_order_irrelevant_bound.
+rewrite <- subst_var_comm.
+eapply H with (G0:=G & (w'0, (v', A)::nil) ) (w'1:=w') (Gamma'0:=Gamma'); eauto.
+permut_simpl.
+permut_simpl.
+skip. (* Weakening + permut + assumption *)
+auto.
+auto.
+auto.
+apply permut_sym; auto.
+
+(* w <> w' /\
+   Ok Bg /\
+   (G & (w, Gamma)) ~=~ G0
+   G0 ~=~ (G1 & (w', (v, A0) :: Gamma')) -->
+   G & (w, Gamma) ~=~ G1 & (w', (v,A0)::Gamma') -->
+   exists GH, exists GT, G1 = GH & (w, Gamma) ++ GT *)
+assert (exists GH, exists GT, G1 = GH & (w, Gamma) ++ GT) by skip.
+destruct H7 as (GH, H7). destruct H7 as (GT, H7).
+eapply t_letdia_get_LF with (G:=GH++GT & (w', Gamma')) (Gamma:=Gamma) (L_t:=L_t \u \{v}).
+skip. (* ok_Bg *)
+eapply IHHT with (G0:=GH++GT & (w0,Gamma0)) (Gamma':=Gamma'); eauto.
+permut_simpl. skip. (* H7 + H0 + H1 *)
+permut_simpl.
+skip. (* permut + assumption *)
+intros.
+unfold open_var in *; unfold open_ctx in *.
+rewrite notin_union in H8; rewrite notin_singleton in H8; destruct H8.
+rewrite <- subst_order_irrelevant_bound.
+rewrite <- subst_var_comm.
+eapply H with (G0:=(w'0, (v', A) :: nil) :: (GH ++ GT) & (w, Gamma)) (Gamma':=Gamma'); eauto. 
+subst; permut_simpl. skip. (* H7 + H0 + H1 *)
+permut_simpl.
+skip. (* Weakening + permut + assumption *)
+auto.
+auto.
+auto.
+skip. (* permut + permut_sym *)
+Admitted. (* No more subgoals but non-instantiated existential variables *)
 
 Lemma subst_t_preserv_types_inner:
-forall L G w Gamma A B M N
+forall G w Gamma A B M N v
   (H_lc_t: lc_t_LF M)
   (H_lc_w: lc_w_LF M)
-  (HT: forall v, v \notin L -> 
-    G |= (w, (v, A) :: Gamma) |- N ::: B)
+  (HT: G |= (w, (v, A) :: Gamma) |- N ::: B)
   (HM: emptyEquiv G |= (w, nil) |- M ::: A),
-  G |= (w, Gamma) |- N ^t^ M ::: B.
+  G |= (w, Gamma) |- [M//fvar v] N ::: B.
 intros;
-assert (exists v, v \notin L) as HF by apply Fresh;
-destruct HF as (v_fresh);
-eapply subst_t_preserv_types with (Gamma := (v_fresh, A) :: Gamma); eauto.
+eapply subst_t_preserv_types with (Gamma := (v, A) :: Gamma); eauto.
 Qed.  
 
 Lemma subst_t_preserv_types_outer:
-forall L G0 G' G'' w w' Gamma Gamma' A B M N
+forall G0 G G' G'' w w' Gamma Gamma' A B M N v
   (H_lc_t: lc_t_LF M)
   (H_lc_w: lc_w_LF M)
+  (G0G: permut G (G0 & (w', (v, A) :: Gamma')))
   (G0G': permut G' (G0 & (w, Gamma)))
+  (G0G'': permut G'' (G0 & (w', Gamma')))
   (HM: emptyEquiv G' |= (w', nil) |- M ::: A)
-  (HT: forall G v, v \notin L -> 
-    permut G (G0 & (w', (v, A) :: Gamma')) ->
-    G |= (w, Gamma) |- N ::: B)
-  (G0G'': permut G'' (G0 & (w', Gamma'))),
-  G'' |= (w, Gamma) |- N ^t^ M ::: B.
+  (HT: G |= (w, Gamma) |- N ::: B),
+  G'' |= (w, Gamma) |- [M // fvar v] N ::: B.
 intros; 
-assert (exists v, v \notin L) as HF by apply Fresh;
-destruct HF as (v_fresh);
-eapply subst_t_preserv_types with (Gamma := Gamma); eauto.
+eapply subst_t_preserv_types; eauto. 
 Qed.  
 
 Lemma rename_w_preserv_types:
@@ -885,8 +1106,9 @@ eauto using types_LF.
 inversion HT1; subst;
 unfold open_var in *;
 assert (exists v, v \notin L) as HF by apply Fresh;
-destruct HF as (v_fresh);
-eapply subst_t_preserv_types_inner; eauto;
+destruct HF as (v_fresh).
+replace ( [N // bvar 0]M0 ) with ( [N // fvar v_fresh] [hyp_LF (fvar v_fresh) // bvar 0] M0 ) by skip. (* ! TODO ! *)
+eapply subst_t_preserv_types_inner; eauto.
 (* TODO: Double emptyEquiv doesn't change more than single *)
 skip.
 (* unbox_box *)
