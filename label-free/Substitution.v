@@ -203,6 +203,19 @@ auto;
 elim H1; auto.
 Qed.
 
+Lemma subst_var_neutral_free:
+forall M v n N 
+  (HT: v \notin free_vars_LF M),
+  [ N // bvar n] M = [N // fvar v] [hyp_LF (fvar v) // bvar n] M.
+induction M; intros; simpl in *;
+try (rewrite notin_union in HT; destruct HT);
+try erewrite IHM;
+try (erewrite IHM1; try erewrite IHM2; eauto);
+eauto;
+case_if; simpl; case_if; auto;
+subst; rewrite notin_singleton in HT; elim HT; auto.
+Qed.
+
 Lemma subst_ctx_neutral_bound:
 forall M w w' n
   (HT: lc_w_n_LF M n),
@@ -214,6 +227,7 @@ try rewrite IHM;
 try (rewrite IHM1; try rewrite IHM2);
 auto.
 Qed.
+
 
 Lemma closed_ctx_step_opening:
 forall M n w

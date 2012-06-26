@@ -1105,12 +1105,13 @@ eauto using types_LF.
 (* appl_lam *)
 inversion HT1; subst;
 unfold open_var in *;
-assert (exists v, v \notin L) as HF by apply Fresh;
+assert (exists v, v \notin L \u free_vars_LF M0) as HF by apply Fresh;
 destruct HF as (v_fresh).
-replace ( [N // bvar 0]M0 ) with ( [N // fvar v_fresh] [hyp_LF (fvar v_fresh) // bvar 0] M0 ) by skip. (* ! TODO ! *)
+rewrite subst_var_neutral_free with (v:=v_fresh).
 eapply subst_t_preserv_types_inner; eauto.
 (* TODO: Double emptyEquiv doesn't change more than single *)
 skip.
+rewrite notin_union in H; destruct H; auto.
 (* unbox_box *)
 inversion HT; subst;
 assert (exists v, v \notin L \u (free_worlds_LF M0)) as HF by apply Fresh;
@@ -1150,21 +1151,146 @@ eapply IHHT with (G0:=G & (w0, nil)); eauto;
 skip.
 (* letdia + (here | get_here ) *)
 assert (exists w1, w1 \notin L_w \u free_worlds_LF N) as HF by apply Fresh;
-assert (exists v1, v1 \notin L_w) as HF2 by apply Fresh;
+assert (exists v1, v1 \notin L_t \u free_vars_LF (N ^w^ fctx w0 )) as HF2 by apply Fresh;
 destruct HF as (w_fresh); destruct HF2 as (v_fresh);
 inversion HT; subst. 
-(* letdia here *)
-apply subst_t_preserv_types_inner with (L:=L_t) (A:=A); auto.
-intros.
-unfold open_ctx in *; unfold open_var in *.
-rewrite <- subst_ctx_neutral_free with (w0:=w_fresh);
-eauto; rewrite <- subst_ctx_neutral_bound with (n:=0).
-eapply rename_w_preserv_types_new.
-[ | skip ]. (* emptyEquiv (emptyEquiv G) = emptyEquiv G + HT0 *)
-intros. apply 
+(* letdia #1 *)
+rewrite notin_union in *; destruct H0; destruct H1.
+unfold open_var in *; unfold open_ctx in *.
+rewrite subst_var_neutral_free with (v:=v_fresh).
+rewrite subst_order_irrelevant_bound.
+rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
+apply subst_t_preserv_types_inner with (A:=A); eauto.
+replace ((v_fresh, A) :: nil) with (nil ++ (v_fresh, A) :: nil) by auto.
+apply rename_w_preserv_types_new with (G:= (w_fresh, (v_fresh, A)::nil) :: emptyEquiv G0).
+rewrite <- subst_order_irrelevant_bound.
+eapply HT2; eauto.
+constructor.
+permut_simpl.
+skip. (* double emptyEquiv *)
+skip. (* preserv_free_worlds_subst_t lemma, maybe? *)
+constructor.
+skip. (* preserv_free_vars_subst_w lemma! *)
+(* letdia #2 *)
+rewrite notin_union in *; destruct H0; destruct H1.
+unfold open_var in *; unfold open_ctx in *.
+rewrite subst_var_neutral_free with (v:=v_fresh).
+rewrite subst_order_irrelevant_bound.
+rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
+eapply subst_t_preserv_types_outer with (A:=A) (G0:=G) (Gamma':=Gamma) (w':=w); eauto.
+apply permut_sym; assumption.
+skip. (* permut + assumption *)
+apply rename_w_preserv_types_outer with (G0:=G) (Gamma'':=(v_fresh,A) :: nil) 
+      (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil)).
+replace (G & (w, Gamma) & (w_fresh, (v_fresh, A) :: nil)) with ((w_fresh, (v_fresh, A) :: nil) :: emptyEquiv G0) by skip. (* H9 + permut_equiv *)
+rewrite <- subst_order_irrelevant_bound.
+eapply HT2; eauto.
+constructor.
+permut_simpl.
+permut_simpl; skip. (* this is really permutation of permutations *)
+skip. (* preserv_free_worlds_subst_t lemma, maybe? *)
+constructor.
+skip. (* preserv_free_vars_subst_w lemma! *)
+(* letdia_get + (here | get_here *)
+assert (exists w1, w1 \notin L_w \u free_worlds_LF N) as HF by apply Fresh;
+assert (exists v1, v1 \notin L_t \u free_vars_LF (N ^w^ fctx w0 )) as HF2 by apply Fresh;
+destruct HF as (w_fresh); destruct HF2 as (v_fresh);
+inversion HT; subst. 
+(* letdia #1 *)
+rewrite notin_union in *; destruct H1; destruct H2.
+unfold open_var in *; unfold open_ctx in *.
+rewrite subst_var_neutral_free with (v:=v_fresh).
+rewrite subst_order_irrelevant_bound.
+rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
+eapply subst_t_preserv_types_outer with (A:=A) (G0:=G) (w':=w) (Gamma':=Gamma); eauto.
+apply permut_sym;auto.
+skip. (* permut + auto *)
+assert (Gamma = nil) by skip; subst. (* H0 *)
+eapply rename_w_preserv_types_outer
+  with (G:= (w_fresh, (v_fresh,A)::nil):: G & (w,nil))
+       (Gamma'':=(v_fresh,A)::nil) (Gamma':=nil) (G0:=G).
+rewrite <- subst_order_irrelevant_bound.
+eapply HT2; eauto.
+constructor.
+permut_simpl.
+permut_simpl.
+skip. (* preserv_free_worlds_subst_t lemma, maybe? *)
+constructor.
+skip. (* preserv_free_vars_subst_w lemma! *)
+(* letdia #2 *)
+assert (Gamma = nil) by skip; subst. (* H0 *)
+assert (w <> w0) by skip. (* Ok_Bg *)
+assert (w1 <> w) by skip. (* Ok_Bg0 *)
+replace (emptyEquiv G1) with (G & (w, nil)) by skip. (* permut *)
+rewrite notin_union in *; destruct H1; destruct H2.
+unfold open_var in *; unfold open_ctx in *.
 
-skip.
-skip.
+(* G0 & (w1, Gamma0) ~=~ G & (w0, nil) /\ w1 =?= w0  ? *)
+destruct (eq_var_dec w1 w0).
+
+(* =  + Ok_bg --> G0 = G *)
+subst.
+assert (G = G0) by skip.
+assert (Gamma0 = nil) by skip; subst.
+rewrite subst_var_neutral_free with (v:=v_fresh).
+eapply subst_t_preserv_types_inner with (A:=A); eauto.
+rewrite subst_order_irrelevant_bound.
+rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
+replace ((v_fresh,A)::nil) with (nil++(v_fresh,A)::nil) by auto.
+apply rename_w_preserv_types_new with (G:= (w_fresh, (v_fresh,A)::nil) :: G0 & (w, nil));
+eauto.
+rewrite <- subst_order_irrelevant_bound.
+eapply HT2; eauto.
+constructor.
+permut_simpl.
+skip. (* subst_preserv_notin_free or just use stronget L_* *)
+constructor.
+skip. (* emptyEquiv (emptyEquiv.. ) *)
+skip. (* subst_preserv_notin_free. *)
+(* <> --> exists GH, exists GT, G = GH & (w1, Gamma0) ++ GT *)
+assert (exists GH, exists GT, G = GH & (w1, Gamma0) ++ GT) by skip;
+destruct H12 as (GH, H12); 
+destruct H12 as (GT, H12).
+assert (Gamma0 = nil) by skip; subst Gamma0. (* H0 + H12 *)
+
+rewrite subst_var_neutral_free with (v:=v_fresh).
+apply subst_t_preserv_types_outer 
+  with (A:=A) 
+       (G0 :=GH ++ GT & (w, nil)) 
+       (G  := GH ++ GT & (w,nil) & (w1, (v_fresh, A) :: nil)) 
+       (G' := GH ++ GT & (w,nil) & (w0, nil))
+       (w' :=w1) 
+       (Gamma':=nil);
+try (subst; permut_simpl);
+eauto.
+subst.
+skip. (* emptyEquiv redundant, H10 + HT0 *)
+
+rewrite subst_order_irrelevant_bound.
+rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
+Check rename_w_preserv_types_outer.
+apply rename_w_preserv_types_outer
+  with (G0 := GH ++ GT & (w,nil)) 
+       (G := (w_fresh, (v_fresh, A) :: nil) :: G & (w, nil)) 
+       (Gamma':=nil)
+       (Gamma'':=(v_fresh, A)::nil);
+eauto.
+rewrite <- subst_order_irrelevant_bound.
+eapply HT2; eauto.
+constructor.
+subst; permut_simpl.
+permut_simpl.
+skip. (* subst_preserv_notin_free or just use stronget L_* *)
+constructor.
+skip. (* subst_preserv_notin_free. *)
+(* letdia_step *)
+destruct (eq_var_dec w0 w).
+subst; skip. (* contradiction in Ok_Bg*)
+assert (Gamma = nil) by skip. (* from permut *)
+subst.
+replace (emptyEquiv G1) with (G & (w, nil)) by skip. (* permut *)
+econstructor; eauto;
+skip. 
 Qed.
 
 End Lemmas.
