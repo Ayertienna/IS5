@@ -1,0 +1,74 @@
+\documentclass[12pt]{article}
+\usepackage{semantic}
+\usepackage{amssymb}
+\newcommand{\tab}[0]{\;\;\;\;}
+\newcommand{\mathinfer}[3]{\inference[$\mathrm{#1}$]{#2}{#3}}
+\newtheorem{note}{Note}
+
+\title{Languages details - draft}
+
+\begin{document}
+\maketitle
+
+\section{Labeled language}
+\subsection{Statics}
+
+\begin{note}
+This is just current, not final implementation of labeled language. Planned changes include using locally nameless instead of de Bruijn indices for variables and replacing current implementation of $\Omega$ (using fsets from Metatheory library) with one using lists and their permutations.
+\\
+Both changes are due to compatibility in translation with label-free language.
+\end{note}
+
+\mathinfer{hyp_L}
+	{w \in \Omega \tab \Gamma[n]=(A, w)}
+	{\Omega; \Gamma \vdash \mathrm{hyp_L} n : A @ w}
+
+\mathinfer{lam_L}
+	{\Omega; (A, w) :: \Gamma \vdash M : A' @ w}
+	{\Omega; \Gamma \vdash \lambda_L A, M : A \rightarrow A' @ w}
+
+\mathinfer{appl_L}
+	{\Omega; \Gamma \vdash M : A \rightarrow A' @ w \tab
+	 \Omega; \Gamma \vdash N : A @ w}
+	{\Omega; \Gamma \vdash \mathrm{appl_L}M N : A' @ w}
+
+\mathinfer{box_L}
+	{w \in \Omega \tab 
+	 \forall_w w  \notin \mathrm{L} \rightarrow w' \cup \Omega; \Gamma \vdash M^{w'} : A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{box_L} M : \Box A @ w}
+
+\mathinfer{unbox_L}
+	{\Omega; \Gamma \vdash M : \Box A @ w}
+	{\Omega; \Gamma \vdash \mathrm{unbox_L} M : A @ w }
+
+\mathinfer{here_L}
+	{\Omega; \Gamma \vdash M : A @ w}
+	{\Omega; \Gamma \vdash \mathrm{here_L} M : \Diamond A @ w}
+
+\mathinfer{letd_L}
+	{w \in \Omega \tab
+	 \Omega; \Gamma \vdash M : \Diamond A @ w \tab
+	 \forall_{w'} 
+		w' \notin \mathrm{L} \rightarrow w' 
+		\cup \Omega; (A, w') :: \Gamma \vdash N^{w'} : B @ w}
+	{\Omega; \Gamma \vdash \mathrm{letdia_L} M \mathrm{in } N : B @ w  }
+
+\mathinfer{fetch_L}
+	{w \in \Omega \tab
+	 \Omega; \Gamma \vdash M : \Box A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{fetch_L} w' M : \Box A @ w'}
+
+\mathinfer{get_L}
+	{w \in \Omega \tab
+	 \Omega; \Gamma \vdash M : \Diamond A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{get_L} w' M : \Diamond A @ w'}
+
+\subsection{Dynamics}
+
+\section{Label-free language}
+\subsection{Statics}
+\subsection{Dynamics}
+
+\section{Translation}
+
+\end{document}            
