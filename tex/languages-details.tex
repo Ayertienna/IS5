@@ -1,6 +1,8 @@
 \documentclass[12pt]{article}
 \usepackage{semantic}
 \usepackage{amssymb}
+\usepackage{setspace}
+
 \newcommand{\tab}[0]{\;\;\;\;}
 \newcommand{\mathinfer}[3]{\inference[$\mathrm{#1}$]{#2}{#3}}
 \newtheorem{note}{Note}
@@ -12,13 +14,62 @@
 
 \section{Labeled language}
 \subsection{Statics}
+\subsubsection{Language}
+This is a description of actual language, as presented in \cite{murphy04}.
 
+\begin{spacing}{2.5}
+\mathinfer{hyp_L}
+	{w \in \Omega}
+	{\Omega; (x : A @ w) \cup \Gamma \vdash \mathrm{hyp_L} x : A @ w}
+
+\mathinfer{lam_L}
+	{\Omega; (x: A @ w) \cup \Gamma \vdash M : A' @ w}
+	{\Omega; \Gamma \vdash \lambda_L x, M : A \rightarrow A' @ w}
+
+\mathinfer{appl_L}
+	{\Omega; \Gamma \vdash M : A \rightarrow A' @ w \tab
+	 \Omega; \Gamma \vdash N : A @ w}
+	{\Omega; \Gamma \vdash \mathrm{appl_L}M N : A' @ w}
+
+\mathinfer{box_L}
+	{w \in \Omega \tab 
+	w' \mathrm{fresh} \tab
+	w' \cup \Omega; \Gamma \vdash M : A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{box_L} w' . M : \Box A @ w}
+
+\mathinfer{unbox_L}
+	{\Omega; \Gamma \vdash M : \Box A @ w}
+	{\Omega; \Gamma \vdash \mathrm{unbox_L} M : A @ w }
+
+\mathinfer{here_L}
+	{\Omega; \Gamma \vdash M : A @ w}
+	{\Omega; \Gamma \vdash \mathrm{here_L} M : \Diamond A @ w}
+
+\mathinfer{letd_L}
+	{\Omega; \Gamma \vdash M : \Diamond A @ w \tab
+	 w' \mathrm{fresh} \tab
+	\cup \Omega; (A, w') \cup \Gamma \vdash N : B @ w}
+	{\Omega; \Gamma \vdash \mathrm{letdia_L} x := M \mathrm{in } N : B @ w  }
+
+\mathinfer{fetch_L}
+	{w \in \Omega \tab
+	 \Omega; \Gamma \vdash M : \Box A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{fetch_L} w' M : \Box A @ w'}
+
+\mathinfer{get_L}
+	{w \in \Omega \tab
+	 \Omega; \Gamma \vdash M : \Diamond A @ w'}
+	{\Omega; \Gamma \vdash \mathrm{get_L} w' . M : \Diamond A @ w'}
+\end{spacing}
+
+\subsubsection{Implementation}
 \begin{note}
 This is just current, not final implementation of labeled language. Planned changes include using locally nameless instead of de Bruijn indices for variables and replacing current implementation of $\Omega$ (using fsets from Metatheory library) with one using lists and their permutations.
 \\
 Both changes are due to compatibility in translation with label-free language.
 \end{note}
 
+\begin{spacing}{2.5}
 \mathinfer{hyp_L}
 	{w \in \Omega \tab \Gamma[n]=(A, w)}
 	{\Omega; \Gamma \vdash \mathrm{hyp_L} n : A @ w}
@@ -62,13 +113,76 @@ Both changes are due to compatibility in translation with label-free language.
 	{w \in \Omega \tab
 	 \Omega; \Gamma \vdash M : \Diamond A @ w'}
 	{\Omega; \Gamma \vdash \mathrm{get_L} w' M : \Diamond A @ w'}
+\end{spacing}
 
 \subsection{Dynamics}
+
+\subsubsection{Values}
+$$\mathrm{value_L}(\lambda_L A, M)$$
+$$\mathrm{value_L}(\mathrm{box_L} M)$$
+$$\mathrm{value_L}(M) \rightarrow \mathrm{value_L}(\mathrm{here_L} M)$$
+
+\subsubsection{Reductions}
+For reduction steps, we silently use assumption that all terms are locally closed with respect to worlds.
+This requirement may later be moved to static semantics, as is is widely used both in definitions and lemmas.
+
+We do not list trivial inductive reduction steps here.
+
+$$ \mathrm{appl_L} (\lambda_L A, M) N, w  \mapsto [ N / 0 ] M, w $$
+$$ \mathrm{unbox_L} (\mathrm{box_L} M ), w \mapsto M^w, w $$
+$$ \mathrm{letd_L} (\mathrm{here_L} M) \mathrm{in} N, w \mapsto [ M / 0 ] N^w, w $$
+$$ \mathrm{value_L} M \rightarrow \mathrm{fetch_L} w M, w' \mapsto \{ w' / w \} M, w' $$
+$$ \mathrm{value_L} M \rightarrow 
+		\mathrm{get_L} w (\mathrm{here_L} M) , w' \mapsto 
+		\mathrm{here_L} \{ w' / w \} M, w' $$
+
+\subsection{Substitution}
+Since the labeled language has only one context stack, both definition and actual implementation of substitution functions is streight forward. For the sake of completeness, we will provide the definitions.
+
+\subsubsection{"world" substitution}
+We use helper function $\mathrm{shift}$, which does the following:
+\begin{itemize}
+	\item On free world, it is an identity function
+	\item On bound world, it increases the binding number by $1$
+\end{itemize}
+
+$$ \{ w_1 / w_2 \} (\mathrm{hyp_L} n) \Rightarrow \mathrm{hyp_L} n $$  
+$$ \{ w_1 / w_2 \} (\lambda_L A, M) \Rightarrow \lambda_L A, \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{appl_L} M N) \Rightarrow \mathrm{appl_L}  \{w_1 / w_2 \}M \{w_1 / w_2 \} N$$  
+$$ \{ w_1 / w_2 \} (\mathrm{box_L} M) \Rightarrow 
+			   \mathrm{box_L} \{\mathrm{shift} w_1 / \mathrm{shift} w_2' \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{unbox_L} M) \Rightarrow \mathrm{unbox_L} \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{here_L} n) \Rightarrow \mathrm{here_L} \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{letd_L} M N) \Rightarrow 
+			    \mathrm{letd_L} \{w_1 / w_2 \}M \{\mathrm{shift} w_1 / \mathrm{shift} w_2 \} M$$  
+$$ \{ w_1 / w_2 \} (\mathrm{fetch_L} w_2 M) \Rightarrow \mathrm{fetch_L} w_1 \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{fetch_L} w M) \Rightarrow \mathrm{fetch_L} w \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{get_L} w_2 M) \Rightarrow \mathrm{get_L} w_1 \{w_1 / w_2 \} M $$  
+$$ \{ w_1 / w_2 \} (\mathrm{get_L} w M) \Rightarrow \mathrm{get_L} w \{w_1 / w_2 \} M $$ 
+
+\subsubsection{"term" substitution}
+
+$$ [ M / n ] \mathrm{hyp_L} n \Rightarrow M $$
+$$ [ M / n ] \mathrm{hyp_L} m \Rightarrow \mathrm{hyp_L} m $$
+$$ [ M / n ] \lambda_L A, N \Rightarrow \lambda_L A, [M / \mathrm{S } n] N$$
+$$ [ M / n ] \mathrm{appl_L} N_1 N_2 \Rightarrow \mathrm{appl_L} [M / n] N_1 [M / n] N_2$$
+$$ [ M / n ] \mathrm{box_L} N \Rightarrow \mathrm{box_L} [M / n] N $$
+$$ [ M / n ] \mathrm{unbox_L} N \Rightarrow \mathrm{unbox_L} [M / n ]N $$
+$$ [ M / n ] \mathrm{here_L} N \Rightarrow \mathrm{here_L} [M / n ]N $$
+$$ [ M / n ] \mathrm{letd_L} N_1 \mathrm{in} N_2 \Rightarrow \mathrm{letd_L} [M / n ]N_1 \mathrm{ in } [M/\mathrm{S } n]N_2 $$
+$$ [ M / n ] \mathrm{fetch_L} N \Rightarrow \mathrm{fetch_L} [M / n ]N $$
+$$ [ M / n ] \mathrm{get_L} N \Rightarrow \mathrm{get_L} [M / n ]N $$
 
 \section{Label-free language}
 \subsection{Statics}
 \subsection{Dynamics}
 
 \section{Translation}
+
+\begin{thebibliography}{9}
+\bibitem{murphy04}
+ 	Tom Murphy VII, Karl Crary, Robert Harper, Frank Pfenning
+	A Symetric Modal Lambda calculus for Distributed Computing
+\end{thebibliography}
 
 \end{document}            
