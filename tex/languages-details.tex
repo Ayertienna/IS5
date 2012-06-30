@@ -13,6 +13,9 @@
 \maketitle
 
 \section{Labeled language}
+
+TODO: short intro + some facts important from implementation perspective (one context etc) + maybe some motivation behind choosing one formalism over others; may be split across subsections
+
 \subsection{Statics}
 \subsubsection{Language}
 This is a description of actual language, as presented in \cite{murphy04}.
@@ -101,7 +104,7 @@ Both changes are due to compatibility in translation with label-free language.
 	 \Omega; \Gamma \vdash M : \Diamond A @ w \tab
 	 \forall_{w'} 
 		w' \notin \mathrm{L} \rightarrow w' 
-		\cup \Omega; (A, w') :: \Gamma \vdash N^{w'} : B @ w}
+		\cup \Omega; (x: A, w') :: \Gamma \vdash N^{w'} : B @ w}
 	{\Omega; \Gamma \vdash \mathrm{letdia_L} M \mathrm{in } N : B @ w  }
 
 \mathinfer{fetch_L}
@@ -124,8 +127,7 @@ $$\mathrm{value_L}(M) \rightarrow \mathrm{value_L}(\mathrm{here_L} M)$$
 
 \subsubsection{Reductions}
 For reduction steps, we silently use assumption that all terms are locally closed with respect to worlds.
-This requirement may later be moved to static semantics, as is is widely used both in definitions and lemmas.
-
+This requirement may later be moved to static semantics, as is is widely used both in definitions and lemmas.\\
 We do not list trivial inductive reduction steps here.
 
 $$ \mathrm{appl_L} (\lambda_L A, M) N, w  \mapsto [ N / 0 ] M, w $$
@@ -174,8 +176,66 @@ $$ [ M / n ] \mathrm{fetch_L} N \Rightarrow \mathrm{fetch_L} [M / n ]N $$
 $$ [ M / n ] \mathrm{get_L} N \Rightarrow \mathrm{get_L} [M / n ]N $$
 
 \section{Label-free language}
+TODO: write why this language is even called label-free and how we got to the point where labels were necessary.
+
 \subsection{Statics}
+
+\subsubsection{Language}
+Formalization of label-free language, based on the logic descibed in \cite{galmiche11}.
+\begin{spacing}{2.5}
+\mathinfer{hyp_{LF}}
+	{}
+	{G \vdash w, (x : A) \cup \Gamma \vdash \mathrm{hyp_{LF}} x : A}
+
+\mathinfer{lam_{LF}}
+	{G \vdash w, (x: A) \cup \Gamma \vdash M : A'}
+	{G \vdash w, \Gamma \vdash \lambda_{LF} x, M : A \rightarrow A'}
+
+\mathinfer{appl_{LF}}
+	{G \vdash w, \Gamma \vdash M : A \rightarrow A' \tab
+	 G \vdash w, \Gamma \vdash N : A}
+	{G \vdash w, \Gamma \vdash \mathrm{appl_{LF}}M N : A'}
+
+\mathinfer{box_{LF}}
+	{w' \mathrm{fresh} \tab
+	 (w, \Gamma) \cup G \vdash w', \emptyset \vdash M : A}
+	{G \vdash w, \Gamma \vdash \mathrm{box_{LF}}  M : \Box A}
+
+\mathinfer{unbox_{LF}}
+	{G \vdash w, \Gamma \vdash M : \Box A}
+	{G \vdash w, \Gamma \vdash \mathrm{unbox_{LF}} M : A }
+
+\mathinfer{unbox\_fetch_{LF}}
+	{(w, \Gamma)  \cup G \vdash w', \Gamma' \vdash M : \Box A}
+	{(w', \Gamma') \cup G \vdash w, \Gamma \vdash \mathrm{unbox\_fetch_{LF}} w' M : A }
+
+\mathinfer{here_{LF}}
+	{G \vdash w, \Gamma \vdash M : A}
+	{G \vdash w, \Gamma \vdash \mathrm{here_{LF}} M : \Diamond A}
+
+\mathinfer{get\_here_{LF}}
+	{(w, \Gamma) \cup G \vdash w', \Gamma' \vdash M : \Diamond A}
+	{(w', \Gamma') \cup G \vdash w, \Gamma \vdash \mathrm{get\_here_{LF}} w' . M : \Diamond A}
+
+\mathinfer{letdia_{LF}}
+	{G \vdash w, \Gamma \vdash M : \Diamond A \tab
+	 w' \mathrm{fresh} \tab
+	(x: A, w') \cup G \vdash w, \Gamma \vdash N : B}
+	{G \vdash w, \Gamma \vdash \mathrm{letdia_{LF}} x := M \mathrm{in } N : B }
+
+\mathinfer{letdia\_get_{LF}}
+	{(w, \Gamma) \cup G \vdash w', \Gamma' \vdash M : \Diamond A \tab
+	 w' \mathrm{fresh} \tab
+	(x: A, w') \cup G \vdash w, \Gamma \vdash N : B}
+	{(w', \Gamma') \cup G \vdash w, \Gamma \vdash \mathrm{letdia\_get_{LF}} x := M \mathrm{in } N : B }
+
+\end{spacing}
+
+\subsection{Implementation}
+
 \subsection{Dynamics}
+
+\subsection{Substitution}
 
 \section{Translation}
 
@@ -183,6 +243,10 @@ $$ [ M / n ] \mathrm{get_L} N \Rightarrow \mathrm{get_L} [M / n ]N $$
 \bibitem{murphy04}
  	Tom Murphy VII, Karl Crary, Robert Harper, Frank Pfenning
 	A Symetric Modal Lambda calculus for Distributed Computing
+
+\bibitem{galmiche11}
+	Didier Galmiche, Yakoub Salhi
+	Label-free Proof Systems for Intuitionistic Modal Logic IS5
 \end{thebibliography}
 
 \end{document}            
