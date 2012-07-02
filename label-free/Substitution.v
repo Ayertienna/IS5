@@ -279,6 +279,31 @@ try (rewrite IHN1; try rewrite IHN2);
 auto.
 Qed.
 
+
+Lemma subst_var_preserv_free_worlds:
+forall N v k w,
+  w \notin free_worlds_LF N ->
+  w \notin free_worlds_LF [ hyp_LF (fvar v) // bvar k ] N.
+induction N; intros;
+simpl in *;
+repeat case_if;
+try destruct c;
+simpl;
+auto.
+Qed.
+
+Lemma subst_world_preserv_free_vars:
+forall N w w' v,
+  v \notin free_vars_LF N ->
+  v \notin free_vars_LF {{w // w'}} N.
+induction N; intros;
+simpl in *;
+repeat case_if;
+try destruct c;
+simpl;
+auto.
+Qed.
+
 End Lemmas.
 
 Close Scope label_free_is5_scope.
