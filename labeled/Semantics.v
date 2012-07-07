@@ -2,6 +2,8 @@ Require Import Syntax.
 Require Import Substitution.
 Require Import FSets.
 Require Import Arith.
+Require Import Relations.
+
 
 Open Scope labeled_is5_scope.
 
@@ -99,6 +101,8 @@ Inductive value_L: te_L -> Prop :=
    (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
 where " M |-> N " := (step_LF M N ) : labeled_is5_scope.
 
+Definition steps_LF := clos_refl_trans_1n _ step_LF.
+Notation " M |->* N " := (steps_LF M N) : labeled_is5_scope.
 
 Section Lemmas.
 
@@ -135,10 +139,10 @@ forall Omega Delta  M N A B w w'
   (HT2: Omega; Delta ++ (A, fwo w')::nil |- N ::: B @ w)
   (HT_lc: lc_w M),
   Omega; Delta|- [M // length Delta]N ::: B @ w.
-intros.
-remember (Delta ++ (A, fwo w')::nil) as Delta'.
-generalize dependent Delta.
-induction HT2. intros.
+intros;
+remember (Delta ++ (A, fwo w')::nil) as Delta';
+generalize dependent Delta;
+induction HT2;
 intros; simpl in *; subst; simpl;
 eauto using types_L.
 (* hyp *)
