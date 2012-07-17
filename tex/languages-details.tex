@@ -2,6 +2,7 @@
 \usepackage{semantic}
 \usepackage{amssymb}
 \usepackage{setspace}
+\usepackage{bussproofs}
 
 \newcommand{\tab}[0]{\;\;\;\;}
 \newcommand{\mathinfer}[3]{\inference[$\mathrm{#1}$]{#2}{#3}}
@@ -176,12 +177,68 @@ $$ [ M / n ] \mathrm{fetch_L} N \Rightarrow \mathrm{fetch_L} [M / n ]N $$
 $$ [ M / n ] \mathrm{get_L} N \Rightarrow \mathrm{get_L} [M / n ]N $$
 
 \section{Label-free language}
-TODO: write why this language is even called label-free and how we got to the point where labels were necessary.
+
+The original description of logic behind this language is in \cite{galmiche11} and is, indeed, label-free.
+The paper does not provide any terms to go with the logic, so we had to add them on out own. We will use the example of $\Box A$ type.\\
+$\Box_I$ rule is very streightforward\\
+
+\mathinfer{box_{LF}}
+	{ \Gamma; G \vdash \emptyset \vdash M : A}
+	{G \vdash \Gamma \vdash \mathrm{box_{LF}}  M : \Box A}
+
+First, we wanted $\Box_E$ rules to be the following:
+
+\mathinfer{unbox_{LF}}
+	{G \vdash \Gamma \vdash M : \Box A}
+	{G \vdash \Gamma \vdash \mathrm{unbox_{LF}} M : A }
+
+\mathinfer{unbox\_fetch_{LF}}
+	{\Gamma; G \vdash \Gamma' \vdash M : \Box A}
+	{\Gamma'; G \vdash \Gamma \vdash \mathrm{unbox\_fetch_{LF}} M : A }
+
+So without explicitly stating in the term, what is the context used for $\mathrm{fetch}$ operation. But this causes problems when we start to think of how to define reduction for $\Box$ type. We want to have this proof
+
+\alwaysNoLine
+\AxiomC{$\mathcal{D}$}
+\UnaryInfC{$G;\Gamma;\Gamma' \vdash \emptyset \vdash M : A$}
+\alwaysSingleLine
+\UnaryInfC{$G; \Gamma \vdash \Gamma' \vdash \mathrm{box} M : \Box A$}
+\UnaryInfC{$G; \Gamma' \vdash \Gamma \vdash \mathrm{unbox\_fetch} (\mathrm{box} M) : A$}
+\DisplayProof
+
+reduced to 
+
+\alwaysNoLine
+\AxiomC{$\mathcal{D}$}
+\UnaryInfC{$G; \Gamma' \vdash \Gamma \vdash M : A$}
+\DisplayProof
+
+with some modifications on $\mathcal{D}$ and $M$ - namely, e.g. whenever we see $\mathrm{unbox_fetch}$ within $M$, we have to figure out whether we are exchanging the current context for $\Gamma$ - if so, we should use $\mathrm{unbox}$ instead.\\
+
+Of course this approach would require looking at entire judgements, not just terms, in order to make the change - since we do not know, what context will be switched by $\mathrm{unbox_fetch}$.\\
+
+One solution would be to try and unify $\mathrm{unbox\_fetch}$ with $\mathrm{unbox}$ terms by stating:\\
+\mathinfer{unbox_{LF}}
+	{G \vdash \Gamma \vdash M : \Box A}
+	{G \vdash \Gamma \vdash \mathrm{unbox\_fetch{LF}} M : A }
+but this would be incorrect, since then we add disambiguity to the typing system.\\
+
+Let us then try to add context to the term when we are switching it. The rule for fetch would change to the following:\\
+
+\mathinfer{unbox\_fetch_{LF}}
+	{\Gamma; G \vdash \Gamma' \vdash M : \Box A}
+	{\Gamma'; G \vdash \Gamma \vdash \mathrm{unbox\_fetch_{LF}} \Gamma' M : A }
+
+This allows us to easily make modifications on $M$, but brings our attention to a different problem. What if two identical contexts $\Gamma$ exist in the system, one being the 'close' context and the other the 'background' one, $ G; \Gamma \vdash \Gamma \vdash M : A$?\\
+Then we can no longer be sure that our modified $M$ is correctly transformed, since we cannot distinguish between two contexts, one being in the background and the other in the front.\\
+
+It seems that the only solution is to avoid such situation - ensure that contexts are easily distinguishable. One obvious way is to  state that each variable name occurs only once in all the contexts. It solves almost all of the problems - except for the case of empty contexts. To distinguish between those, we do in fact need to explicitly name each context with a unique name.\\
+
+In other applications we may consider undistinguishable empty contexts, but since we do intend to create a language equivalent to labeled IS5, here we have to tell them apart.
 
 \subsection{Statics}
 
 \subsubsection{Language}
-Formalization of label-free language, based on the logic descibed in \cite{galmiche11}.
 \begin{spacing}{2.5}
 \mathinfer{hyp_{LF}}
 	{}
@@ -228,16 +285,21 @@ Formalization of label-free language, based on the logic descibed in \cite{galmi
 	 w' \mathrm{fresh} \tab
 	(x: A, w') \cup G \vdash w, \Gamma \vdash N : B}
 	{(w', \Gamma') \cup G \vdash w, \Gamma \vdash \mathrm{letdia\_get_{LF}} x := M \mathrm{in } N : B }
-
 \end{spacing}
 
 \subsection{Implementation}
 
+*implementation details to come as they will be finalized in the development
+
 \subsection{Dynamics}
+
+* with trees :) and justification
 
 \subsection{Substitution}
 
 \section{Translation}
+
+\section{Normalization properties}
 
 \begin{thebibliography}{9}
 \bibitem{murphy04}
