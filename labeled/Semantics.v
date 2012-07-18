@@ -65,32 +65,32 @@ Inductive value_L: te_L -> Prop :=
 | val_L_here: forall M (HT: value_L M), value_L (here_L M)
 .
 
- Inductive step_LF: te_L*wo -> te_L*wo -> Prop :=
- | red_appl_lam_L: forall A M N w,
+Inductive step_LF: te_L*wo -> te_L*wo -> Prop :=
+| red_appl_lam_L: forall A M N w,
    lc_w M -> lc_w N ->
    (appl_L (lam_L A M) N, w) |-> ([N//0]M, w)
- | red_unbox_box_L: forall M w,
+| red_unbox_box_L: forall M w,
    lc_w_n M 1 ->
    (unbox_L (box_L M), w) |-> (M^w, w)
- | red_letd_here_L: forall M N w (HVal: value_L M),
+| red_letd_here_L: forall M N w (HVal: value_L M),
    lc_w M -> lc_w_n N 1 ->
    (letd_L (here_L M) N, w) |-> ([M//0](N^w), w)
- | red_appl_L: forall M N M' w (HRed: (M, w) |-> (M', w)),
+| red_appl_L: forall M N M' w (HRed: (M, w) |-> (M', w)),
    lc_w M -> lc_w N ->
    (appl_L M N, w) |-> (appl_L M' N, w)
- | red_unbox_L: forall M M' w (HRed: (M, w) |-> (M', w)),
+| red_unbox_L: forall M M' w (HRed: (M, w) |-> (M', w)),
    lc_w M ->
    (unbox_L M, w) |-> (unbox_L M', w)
- | red_fetch_L: forall M M' w w'  (HRed: (M, w) |-> (M', w)),
+| red_fetch_L: forall M M' w w'  (HRed: (M, w) |-> (M', w)),
    lc_w M ->
    (fetch_L w M, w') |-> (fetch_L w M', w')
- | red_fetch_val_L: forall w M w' (HVal: value_L M),
+| red_fetch_val_L: forall w M w' (HVal: value_L M),
    lc_w M ->
    (fetch_L w M, w') |-> ({{w'//w}}M, w')
- | red_here_L: forall N N' w (HRed: (N, w) |-> (N',w)),
+| red_here_L: forall N N' w (HRed: (N, w) |-> (N',w)),
    lc_w N ->
    (here_L N, w) |-> (here_L N', w)
- | red_letd_L: forall M M' N w (HRed: (M, w) |-> (M', w)),
+| red_letd_L: forall M M' N w (HRed: (M, w) |-> (M', w)),
    lc_w M -> lc_w_n N 1 ->
    (letd_L M N, w) |-> (letd_L M' N, w)
 | red_get_L: forall w M M' w' (HRed: (M, w) |-> (M', w)),
@@ -101,6 +101,15 @@ Inductive value_L: te_L -> Prop :=
    (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
 where " M |-> N " := (step_LF M N ) : labeled_is5_scope.
 
+Inductive steps_n_L: nat -> te_L -> wo -> te_L -> wo -> Prop:=
+| Steps0: forall M w, steps_n_L 0 M w M w
+| StepsS: forall n M N N' w,
+      (M, w) |-> (N, w) ->
+      steps_n_L n N w N' w ->
+      steps_n_L (S n) M w N' w
+.
+
+(* alt: exists n, steps_n_L n (M, w) (N, w) *)
 Definition steps_LF := clos_refl_trans_1n _ step_LF.
 Notation " M |->* N " := (steps_LF M N) : labeled_is5_scope.
 
