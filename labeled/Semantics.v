@@ -115,6 +115,59 @@ Notation " M |->* N " := (steps_LF M N) : labeled_is5_scope.
 
 Section Lemmas.
 
+Lemma closed_step_subst_term:
+forall M N k l,
+  lc_w_n M l ->
+  lc_w_n N l ->
+  lc_w_n  [N // k] M l.
+induction M; intros; simpl in *; 
+repeat case_if; auto;
+try constructor;
+inversion H; subst;
+try apply IHM; auto;
+try apply IHM1; auto;
+try apply IHM2; auto;
+try apply closed_w_succ; auto;
+inversion H; subst;
+constructor; apply IHM; auto.
+Qed.
+
+Lemma closed_step_renaming_world:
+forall M n w w',
+  lc_w_n M n ->
+  lc_w_n ({{fwo w//fwo w'}} M) n.
+induction M; intros; inversion H; subst; simpl;
+auto;
+repeat case_if;
+try constructor;
+try eapply IHM; eauto.
+Qed.
+
+Lemma closed_step_propag:
+forall M N w,
+  lc_w M ->
+  (M, fwo w) |-> (N, fwo w) ->
+  lc_w N.
+induction M; intros;
+inversion H0; subst.
+apply closed_step_subst_term; auto.
+constructor; auto; eapply IHM1; eauto.
+apply closed_step_opening; auto.
+constructor; eapply IHM; eauto.
+inversion H; subst; constructor;
+eapply IHM; eauto.
+constructor; inversion H; subst;
+apply closed_step_renaming_world; auto.
+apply closed_step_subst_term; auto;
+apply closed_step_opening; auto.
+constructor; auto; eapply IHM1; eauto.
+constructor; auto; eapply IHM; eauto.
+inversion H; subst; constructor;
+eapply IHM; eauto.
+inversion H; subst;
+apply closed_step_renaming_world; auto.
+Qed.
+
 Lemma Weakening:
 forall Omega Gamma Delta M A w 
   (HT: Omega; Gamma |- M ::: A@w),
