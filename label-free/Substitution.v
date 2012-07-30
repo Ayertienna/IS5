@@ -1,9 +1,8 @@
+Add LoadPath "./..".
 Require Export Syntax.
 Require Import Metatheory.
 Require Import Arith.
 Require Import List.
-
-Open Scope label_free_is5_scope.
 
 Global Reserved Notation " [ M // v ] N " (at level 5).
 Global Reserved Notation " {{ w1 // w2 }} N " (at level 5).
@@ -32,6 +31,7 @@ where " [ M // v ] N " := (subst_t M v N) : label_free_is5_scope.
 Definition open_var (M: te_LF) (t: te_LF) := subst_t t (bvar 0) M.
 Notation " M '^t^' t " := (open_var M t) (at level 5) : label_free_is5_scope.
 
+Open Scope label_free_is5_scope.
 
 (* Context substitution *)
 
@@ -77,7 +77,7 @@ forall N M n
 induction N; intros; simpl in *;
 try rewrite IHN; auto;
 [ case_if; simpl in *; subst;
-  [discriminate | auto] | |]; 
+  [discriminate | auto] | |];
 apply app_eq_nil in H_unbound;
 destruct H_unbound;
 rewrite IHN1;

@@ -1,19 +1,9 @@
+Add LoadPath "./..".
+Require Export Shared.
 Require Export Metatheory.
 Require Import List.
 
-Inductive ty_LF :=
-| tvar_LF: ty_LF
-| tarrow_LF: ty_LF -> ty_LF -> ty_LF
-| tbox_LF: ty_LF -> ty_LF
-| tdia_LF: ty_LF -> ty_LF
-.
-
-Notation " A '--->' B " := (tarrow_LF A B) (at level 30, right associativity)
-                           : label_free_is5_scope.
-Notation " '[*]' A " := (tbox_LF A) (at level 30) : label_free_is5_scope.
-Notation " '<*>' A " := (tdia_LF A) (at level 30) : label_free_is5_scope.
-
-Open Scope label_free_is5_scope.
+Definition ty_LF := ty.
 
 Inductive ctx_LF :=
 | bctx: nat -> ctx_LF
@@ -24,12 +14,6 @@ Inductive var_LF :=
 | bvar: nat -> var_LF
 | fvar: var -> var_LF
 .
-
-(* Alt: Context_LF = (world, [(variable, type)]) = prod var (env ty_LF) *)
-Definition Context_LF := prod var (list (prod var ty_LF)).
-
-(* Background_LF = [(world, [(variable, type)])] = env (env ty_LF) *)
-Definition Background_LF := list Context_LF.
 
 Inductive te_LF :=
 | hyp_LF: var_LF -> te_LF
@@ -89,6 +73,21 @@ forall c1 c2: Context_LF, {c1 = c2} + {c1 <> c2}.
 intros;
 repeat decide equality;
 apply eq_var_dec.
+Qed.
+
+Require Import LibListSorted.
+(* FIXME: is this going to give us trouble? I.e., should we proove this? *)
+Axiom permut_dec:
+forall (a: list (var * ty_LF)) a',
+  { permut a a' } + { ~permut a a' }.
+
+Theorem permut_context_LF_dec:
+forall (c1 c2: Context_LF),
+  { permut (snd c1) (snd c2) /\ (fst c1) = (fst c2)} + { ~permut (snd c1) (snd c2) \/ (fst c1) <> (fst c2)}.
+intros; destruct c1 as (w, a); destruct c2 as (w', a');
+destruct (eq_var_dec w w'); subst; simpl;
+destruct (permut_dec a a'); simpl;
+auto.
 Qed.
 
 Theorem eq_var_LF_dec:
@@ -281,4 +280,3 @@ Qed.
 
 End Lemmas.
 
-Close Scope label_free_is5_scope.
