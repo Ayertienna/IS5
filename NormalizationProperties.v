@@ -167,7 +167,7 @@ match A with
     (H_lc_N: lc_w N)
     (HR: Reducible N A1 w),
     Reducible (appl_L M N) A2 w
-| tbox_L A1 => False
+| tbox_L A1 => Reducible (unbox_L M) A1 w
 | tdia_L A1 => False
 end.
 
@@ -187,7 +187,8 @@ apply H; auto.
 apply IHA2 with (M:=appl_L M N); auto;
 constructor; auto.
 (* box type *)
-auto.
+eapply IHA; eauto;
+constructor; auto.
 (* dia type *)  
 auto.
 Qed.
@@ -234,8 +235,8 @@ inversion H1; subst;
 inversion H;
 apply H0; auto.
 (* box type *)
-intro; contradiction.
-skip. (* not finished *)
+skip.
+intros. skip.
 (* dia type *)
 intro; contradiction.
 skip. (* not finished *)
@@ -361,7 +362,7 @@ forall M Omega Gamma A w D
   Reducible (subst_list D 0 M) A w.
 induction M; intros; inversion HT; subst.
 (* hyp : TODO *)
-assert (exists M, nth_error D n = Some M) by skip.
+assert (exists M, nth_error D n = Some M) by skip. (* should be a lemma *)
 destruct H as (M).
 assert (Reducible M A w) by skip.
 assert (subst_list D 0 (hyp_L n) = M) by (eapply subst_hyp; eauto).
