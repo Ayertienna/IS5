@@ -1,12 +1,6 @@
-Add LoadPath "./..".
-Require Export Syntax.
-
+Require Export LFSyntax.
 Require Import LibList.
-(*
-Require Import Metatheory.
-Require Import Arith.
 
-*)
 Global Reserved Notation " [ M // v ] N " (at level 5).
 Global Reserved Notation " {{ w1 // w2 }} N " (at level 5).
 

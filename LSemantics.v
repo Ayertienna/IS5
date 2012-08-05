@@ -1,17 +1,17 @@
-Require Import Syntax.
-Require Import Substitution.
+Require Import LSyntax.
+Require Import LSubstitution.
 Require Import FSets.
 Require Import Arith.
 Require Import Relations.
 
-
 Open Scope labeled_is5_scope.
+Open Scope is5_scope.
 
 Global Reserved Notation " Omega ';' Gamma '|-' M ':::' A '@' w " (at level 70).
 
-Definition Context_L := list (ty_L * wo).
+Definition Context_L := list (ty * vwo).
 
-Inductive types_L : worlds_L -> Context_L -> te_L -> ty_L -> var -> Prop :=
+Inductive types_L : worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
  | t_hyp_L: forall A w_n Gamma Omega v_n
    (Old: w_n \in Omega)
    (H_hyp: nth_error Gamma v_n = Some (A, fwo w_n)),
@@ -65,7 +65,7 @@ Inductive value_L: te_L -> Prop :=
 | val_L_here: forall M (HT: value_L M), value_L (here_L M)
 .
 
-Inductive step_LF: te_L*wo -> te_L*wo -> Prop :=
+Inductive step_LF: te_L*vwo -> te_L*vwo -> Prop :=
 | red_appl_lam_L: forall A M N w,
    lc_w M -> lc_w N ->
    (appl_L (lam_L A M) N, w) |-> ([N//0]M, w)
@@ -101,7 +101,7 @@ Inductive step_LF: te_L*wo -> te_L*wo -> Prop :=
    (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
 where " M |-> N " := (step_LF M N ) : labeled_is5_scope.
 
-Inductive steps_n_L: nat -> te_L -> wo -> te_L -> wo -> Prop:=
+Inductive steps_n_L: nat -> te_L -> vwo -> te_L -> vwo -> Prop:=
 | Steps0: forall M w, steps_n_L 0 M w M w
 | StepsS: forall n M N N' w,
       (M, w) |-> (N, w) ->
@@ -270,7 +270,7 @@ induction L; destruct Delta; simpl in *; intros; try contradiction.
 replace Gamma with (Gamma ++ nil).
   assumption.
   symmetry; apply app_nil_end.
-destruct p; destruct w0; destruct HT1.
+destruct p; destruct v; destruct HT1.
 apply subst_t_type_preserv_end with (A:=t)(w':=v).
   assumption.
 replace (S(length Gamma)) with (length(Gamma ++ (t, fwo v)::nil)).
@@ -281,10 +281,10 @@ auto.
 Qed.
 
 
-Fixpoint rename_world_context (w:wo) (w':wo) (Gamma: Context_L) : Context_L:=
+Fixpoint rename_world_context (w:vwo) (w':vwo) (Gamma: Context_L) : Context_L:=
 match Gamma with
-| nil => @nil (ty_L*wo)
-| (A,w0) :: Gamma' => let w_res := if (eq_wo_dec w0 w') then w else w0 in
+| nil => @nil (ty*vwo)
+| (A,w0) :: Gamma' => let w_res := if (eq_vwo_dec w0 w') then w else w0 in
                       (A, w_res) :: rename_world_context w w' Gamma'
 end.
 
@@ -298,7 +298,7 @@ induction Gamma; intros.
 destruct n; simpl in *; discriminate.
 destruct a; simpl in *; induction n; simpl in *.
 inversion HT; subst; 
-destruct (eq_wo_dec w w);
+destruct (eq_vwo_dec w w);
 [ | elim n]; reflexivity.
 apply IHGamma;
 assumption.
@@ -313,7 +313,7 @@ intros; generalize dependent n; induction Gamma; intros.
 destruct n; simpl in *; discriminate.
 destruct a; induction n; 
 simpl in *; inversion HT.
-  subst; destruct (eq_wo_dec w'' w).
+  subst; destruct (eq_vwo_dec w'' w).
     elim Neq; symmetry; assumption.
     reflexivity.
   replace (nth_error Gamma n) with (Some (A, w''));
@@ -351,12 +351,12 @@ destruct (eq_var_dec w0 w); subst.
 replace ((A, fwo w') :: rename_world_context (fwo w') (fwo w) Gamma) 
    with (rename_world_context (fwo w') (fwo w) ((A, fwo w) :: Gamma)). 
 apply IHHT; auto.
-simpl; destruct (eq_wo_dec (fwo w) (fwo w)); [|elim n]; reflexivity.
+simpl; destruct (eq_vwo_dec (fwo w) (fwo w)); [|elim n]; reflexivity.
 (* w0 <> w *)
 replace ((A, fwo w0) :: rename_world_context (fwo w') (fwo w) Gamma) 
    with (rename_world_context (fwo w') (fwo w) ((A, fwo w0) :: Gamma)). 
 apply IHHT; auto.
-simpl; destruct (eq_wo_dec (fwo w0) (fwo w)).
+simpl; destruct (eq_vwo_dec (fwo w0) (fwo w)).
   inversion e; elim n; assumption.
   reflexivity.  
 (* appl *)
@@ -388,7 +388,7 @@ elim H0; symmetry; assumption.
 (* unbox *)
 constructor; apply IHHT; assumption.
 (* get *)
-destruct (eq_wo_dec (fwo w') (fwo w));
+destruct (eq_vwo_dec (fwo w') (fwo w));
 constructor
 destruct (eq_var_dec w0 w); subst;
 try assumption.
@@ -447,7 +447,7 @@ apply IHHT.
   rewrite in_union; right; assumption.
   apply union_comm_assoc.
   simpl.
-  destruct (eq_wo_dec (fwo w'0) (fwo w)).
+  destruct (eq_vwo_dec (fwo w'0) (fwo w)).
     inversion e; subst.
     apply notin_singleton in H0; elim H0; reflexivity.
     reflexivity.
@@ -460,7 +460,7 @@ apply IHHT.
 (* here *)
 constructor; apply IHHT; assumption.
 (* fetch *)
-destruct (eq_wo_dec (fwo w') (fwo w));
+destruct (eq_vwo_dec (fwo w') (fwo w));
 constructor;
 destruct (eq_var_dec w0 w); subst;
 try assumption.
@@ -578,7 +578,7 @@ Lemma Preservation:
 forall Omega M N A w w' (HType: Omega; nil |- M ::: A@w) (HStep: (M, fwo w) |-> (N,fwo w')),
   Omega; nil |- N ::: A@w'.
 intros.
-remember (@nil (ty_L*wo)) as Gamma.
+remember (@nil (ty*vwo)) as Gamma.
 generalize dependent N.
 generalize dependent w'.
 induction HType; intros;
@@ -586,7 +586,7 @@ inversion HStep; subst;
 eauto using types_L.
 (* red_appl_lam *)
 inversion HType2; subst;
-replace ([N//0] M0) with (subst_list (N::nil) (length (@nil (te_L*wo))) M0) by auto;
+replace ([N//0] M0) with (subst_list (N::nil) (length (@nil (te_L*vwo))) M0) by auto;
 apply subst_t_type_preserv with (Delta:=(A', fwo w')::nil).
   simpl; auto.
   simpl; assumption.
@@ -600,7 +600,7 @@ apply notin_union in H; destruct H.
 unfold open_w in *.
 replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//bwo 0}}({{bwo 0//fwo x}}({{fwo x//bwo 0}}M0))).
 rewrite subst_neutral.
-replace (@nil (ty_L*wo)) with (rename_world_context (fwo w') (fwo x) (@nil (ty_L*wo))).
+replace (@nil (ty*vwo)) with (rename_world_context (fwo w') (fwo x) (@nil (ty*vwo))).
 apply rename_w_type_preserv with (w'':=x).
 assumption.
 destruct (eq_var_dec x x). 
@@ -613,7 +613,7 @@ apply closed_step_opening; assumption.
 rewrite (subst_id M0 x 0 H1); reflexivity.
 (* red_get_here *)
 replace (here_L {{fwo w'0//fwo w'}}M0) with ({{fwo w'0//fwo w'}}(here_L M0)) by auto;
-replace (@nil (ty_L*wo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
+replace (@nil (ty*vwo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
 apply rename_w_type_preserv with (w'':=w').
   assumption.
   destruct (eq_var_dec w' w'). 
@@ -627,7 +627,7 @@ assert (exists w0, w0 \notin (L \u (free_worlds N))).
 apply Fresh.
 destruct H.
 apply notin_union in H; destruct H.
-replace ([M0//0](N^(fwo w'))) with (subst_list (M0::nil) (length (@nil (te_L*wo))) (N^(fwo w'))).
+replace ([M0//0](N^(fwo w'))) with (subst_list (M0::nil) (length (@nil (te_L*vwo))) (N^(fwo w'))).
 apply subst_t_type_preserv with (Delta:=(A, fwo w')::nil).
   simpl; auto.
   simpl.
@@ -641,7 +641,7 @@ apply subst_t_type_preserv with (Delta:=(A, fwo w')::nil).
   apply HT.
   assumption.
   simpl.
-  destruct (eq_wo_dec (fwo x) (fwo x)).
+  destruct (eq_vwo_dec (fwo x) (fwo x)).
     reflexivity.
     elim n; reflexivity.
     apply closed_step_opening; assumption.
@@ -651,7 +651,7 @@ simpl; intros. destruct H1; subst.
   contradiction.
 simpl; reflexivity.
 (* red_fetch_val *)
-replace (@nil (ty_L*wo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
+replace (@nil (ty*vwo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
 apply rename_w_type_preserv with (w'':=w').
   assumption.
   destruct (eq_var_dec w' w').

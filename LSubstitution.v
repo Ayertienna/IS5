@@ -1,9 +1,6 @@
-Require Export Syntax.
+Require Export LSyntax.
 Require Import Arith.
 Require Import LibList.
-
-Open Scope labeled_is5_scope.
-
 
 (* Term variable substitution *)
 Reserved Notation " [ M // x ] N " (at level 5).
@@ -21,6 +18,9 @@ match N with
 | fetch_L w N' => fetch_L w [M//x]N'
 end
 where " [ M // x ] N " := (subst_t M x N) : labeled_is5_scope.
+
+Open Scope labeled_is5_scope.
+
 
 (* Substitute L[0] for n, L[1] for n+1,.. in M *)
 Fixpoint subst_list L n N :=
@@ -44,7 +44,7 @@ match N with
               | bwo w1', fwo w2' => box_L {{bwo (S w1')//w2}} N'
             end
 | unbox_L N' => unbox_L {{w1//w2}}N'
-| get_L w N' => get_L (if eq_wo_dec w w2 then w1 else w) {{w1//w2}}N'
+| get_L w N' => get_L (if eq_vwo_dec w w2 then w1 else w) {{w1//w2}}N'
 | letd_L N' N'' => match w1, w2 with
                    | fwo w1', bwo w2' => letd_L {{w1 // w2}}N' {{w1 // bwo (S w2')}}N''
                    | fwo w1', fwo w2' => letd_L {{w1 // w2}}N' {{w1 // w2}}N''
@@ -52,7 +52,7 @@ match N with
                    | bwo w1', fwo w2' => letd_L {{w1//w2}}N' {{bwo (S w1')//w2}}N''
                  end
 | here_L N' => here_L {{w1//w2}}N'
-| fetch_L w N' => fetch_L (if eq_wo_dec w w2 then w1 else w) {{w1//w2}}N'
+| fetch_L w N' => fetch_L (if eq_vwo_dec w w2 then w1 else w) {{w1//w2}}N'
 end
 where " {{ w1 // w2 }} N " := (subst_w w1 w2 N) : labeled_is5_scope.
 
@@ -77,10 +77,10 @@ rewrite IHM1; try rewrite IHM2; auto.
 (* box *)
 destruct w; try rewrite IHM; auto.
 (* get *)
-destruct (eq_wo_dec w (bwo n));
+destruct (eq_vwo_dec v (bwo n));
 [ subst; discriminate | reflexivity ];
-try (destruct w; [discriminate | assumption]).
-destruct w; [discriminate | assumption].
+try (destruct v; [discriminate | assumption]).
+destruct v; [discriminate | assumption].
 (* letd *)
 destruct w;
 inversion H_unbound; auto;
@@ -88,10 +88,10 @@ apply app_eq_nil in H_unbound;
 destruct H_unbound;
 rewrite IHM1; try rewrite IHM2; auto.
 (* fetch *)
-destruct (eq_wo_dec w (bwo n));
+destruct (eq_vwo_dec v (bwo n));
 [ subst; discriminate | reflexivity ];
 try (destruct w; [discriminate | assumption]).
-destruct w; [discriminate | assumption].
+destruct v; [discriminate | assumption].
 Qed.
 
 
@@ -136,33 +136,11 @@ induction M; intros; simpl; try (rewrite IHM; auto).
 reflexivity.
 rewrite IHM1; try rewrite IHM2; auto.
 (* get *)
-destruct (eq_wo_dec w (bwo n));
-destruct (eq_wo_dec w (fwo w''));
-destruct (eq_wo_dec (fwo w0) (fwo w''));
-destruct (eq_wo_dec w (bwo n));
-destruct (eq_wo_dec (fwo w') (bwo n));
-subst; 
-  try discriminate;
-  try (inversion e0; subst; elim Neq; reflexivity);
-  try reflexivity.
-elim n2; reflexivity.
-elim n0; reflexivity.
-elim n0; reflexivity.
+repeat case_if; subst; auto.
 (* letd *)
 rewrite IHM1; try rewrite IHM2; auto. 
 (* fetch *)
-destruct (eq_wo_dec w (bwo n));
-destruct (eq_wo_dec w (fwo w''));
-destruct (eq_wo_dec (fwo w0) (fwo w''));
-destruct (eq_wo_dec w (bwo n));
-destruct (eq_wo_dec (fwo w') (bwo n));
-subst; 
-  try discriminate;
-  try (inversion e0; subst; elim Neq; reflexivity);
-  try reflexivity.
-elim n2; reflexivity.
-elim n0; reflexivity.
-elim n0; reflexivity.
+repeat case_if; subst; auto.
 Qed.
 
 Lemma subst_id:
@@ -179,35 +157,20 @@ apply notin_union in HT;
 destruct HT;
 rewrite IHM1; try rewrite IHM2; auto.
 (* get *)
-destruct (eq_wo_dec w0 (bwo n)).
-destruct (eq_wo_dec (fwo w) (fwo w)).
-  subst; reflexivity.
-  elim n0; reflexivity.
-destruct (eq_wo_dec w0 (fwo w)).
+repeat case_if; subst; auto.
   subst; apply notin_union in HT; destruct HT;
   elim H; rewrite in_singleton; reflexivity.
-  reflexivity.
-destruct w0.
-  assumption.
-  apply notin_union in HT; destruct HT; assumption.
+destruct v; auto.
 (* letd *)
 apply notin_union in HT;
 destruct HT;
 rewrite IHM1; try rewrite IHM2; auto.
 (* fetch *)
-destruct (eq_wo_dec w0 (bwo n)).
-destruct (eq_wo_dec (fwo w) (fwo w)).
-  subst; reflexivity.
-  elim n0; reflexivity.
-destruct (eq_wo_dec w0 (fwo w)).
+repeat case_if; subst; auto.
   subst; apply notin_union in HT; destruct HT;
   elim H; rewrite in_singleton; reflexivity.
-  reflexivity.
-destruct w0.
-  assumption.
-  apply notin_union in HT; destruct HT; assumption.
+destruct v; auto.
 Qed.
-
 
 Lemma subst_neutral:
 forall M w w' n
@@ -220,17 +183,9 @@ try rewrite IHM;
 try (rewrite IHM1; try rewrite IHM2); 
 auto.
 (* get *)
-destruct (eq_wo_dec (fwo w1) (fwo w')).
-  destruct (eq_wo_dec (bwo n) (bwo n));
-    [ | elim n0]; reflexivity.
-  destruct (eq_wo_dec (fwo w1) (bwo n));
-    [discriminate | reflexivity].
+repeat case_if; subst; auto.
 (* fetch *)
-destruct (eq_wo_dec (fwo w1) (fwo w')).
-  destruct (eq_wo_dec (bwo n) (bwo n));
-    [ | elim n0]; reflexivity.
-  destruct (eq_wo_dec (fwo w1) (bwo n));
-    [discriminate | reflexivity].
+repeat case_if; subst; auto.
 Qed.
 
 Lemma closed_step_opening:
@@ -240,10 +195,10 @@ forall M n w
 intros; generalize dependent n; induction M;
 intros; inversion HT; subst; simpl;
 eauto using lc_w_n.
-destruct (eq_wo_dec (fwo w1) (bwo n)); try discriminate;
-apply lcw_get; auto.
-destruct (eq_wo_dec (fwo w1) (bwo n)); try discriminate;
-apply lcw_fetch; auto.
+repeat case_if; subst; auto.
+constructor; auto.
+repeat case_if; subst; auto.
+constructor; auto.
 Qed.
 
 End Substitution_lemmas.

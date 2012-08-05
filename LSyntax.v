@@ -1,55 +1,21 @@
-(* Metatheory package by Arthur Chargueraud, http://www.chargueraud.org/softs/ln/ *)
+Require Export Shared.
 Require Export Metatheory.
 Require Import Arith.
 Require Import List.
 
-Inductive ty_L :=
-| tvar_L: ty_L
-| tarrow_L: ty_L -> ty_L -> ty_L
-| tbox_L: ty_L -> ty_L
-| tdia_L: ty_L -> ty_L
-.
-
-Notation " A '--->' B " := (tarrow_L A B) (at level 30, right associativity) : labeled_is5_scope.
-Notation " '[*]' A " := (tbox_L A) (at level 30) : labeled_is5_scope.
-Notation " '<*>' A " := (tdia_L A) (at level 30) : labeled_is5_scope.
-
-Open Scope labeled_is5_scope.
-
-(* We use var from Metatheory package to represent free worlds *)
-Inductive wo := 
-| bwo: nat -> wo
-| fwo: var -> wo
-.
-
 (* vars = fset var *)
 Definition worlds_L := vars.
 
-Theorem eq_ty_L_dec:
-forall a b: ty_L, {a = b} + {a <> b}.
-decide equality. 
-Qed.
-
-Axiom eq_var_dec:
-  forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
-
-Theorem eq_wo_dec:
-  forall w1 w2: wo, {w1 = w2} + {w1 <> w2}.
-  decide equality.
-    decide equality.
-    apply eq_var_dec.
-Qed.
-
 Inductive te_L :=
 | hyp_L: nat -> te_L
-| lam_L: ty_L -> te_L -> te_L
+| lam_L: ty -> te_L -> te_L
 | appl_L: te_L -> te_L -> te_L
 | box_L: te_L -> te_L
 | unbox_L: te_L -> te_L
-| get_L: wo -> te_L -> te_L
+| get_L: vwo -> te_L -> te_L
 | letd_L: te_L -> te_L -> te_L
 | here_L: te_L -> te_L
-| fetch_L: wo -> te_L -> te_L
+| fetch_L: vwo -> te_L -> te_L
 .
 
 (* Calculate list of free worlds used in term M *)
@@ -130,9 +96,7 @@ induction M; intros; simpl in *;
 try (reflexivity);
 try (apply IHM; inversion H; subst; assumption);
 try (inversion H; subst; rewrite IHM1; try rewrite IHM2; auto);
-try (destruct w; [ | apply IHM]; inversion H; subst; auto).
+try (destruct v; [ | apply IHM]; inversion H; subst; auto).
 Qed.
 
 End Lemmas.
-
-Close Scope labeled_is5_scope.

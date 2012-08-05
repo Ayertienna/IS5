@@ -1,5 +1,3 @@
-Add LoadPath "./labeled" as Labeled.
-Add LoadPath "./label-free" as LabelFree.
 Require Import Labeled.
 Require Import LabelFree.
 Require Import Metatheory.
@@ -9,30 +7,10 @@ Require Import LibListSorted.
 Open Scope labeled_is5_scope.
 Open Scope label_free_is5_scope.
 
-Section Types.
-
-Fixpoint labeled_type (A: ty_LF) : ty_L :=
-match A with
-| tvar_LF => tvar_L
-| tarrow_LF A' A'' => tarrow_L (labeled_type A') (labeled_type A'')
-| tbox_LF A' => tbox_L (labeled_type A')
-| tdia_LF A' => tdia_L (labeled_type A')
-end.
-
-Fixpoint label_free_type (A: ty_L) : ty_LF :=
-match A with
-| tvar_L => tvar_LF
-| tarrow_L A' A'' => tarrow_LF (label_free_type A') (label_free_type A'')
-| tbox_L A' => tbox_LF (label_free_type A')
-| tdia_L A' => tdia_LF (label_free_type A')
-end.
-
-End Types.
-
 Section Contexts.
 
 (* labeled from label-free *)
-Fixpoint annotate_worlds (w: var) (L: list (var * ty_LF)) := 
+Fixpoint annotate_worlds (w: var) (L: list (var * ty)) := 
 (* TODO: add explicit result type: Context_L (when possible) *)
 match L with 
   | nil => nil

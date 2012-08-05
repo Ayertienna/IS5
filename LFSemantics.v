@@ -1,17 +1,8 @@
-(* TODO: imports are messed up now that there's a module *) 
-Add LoadPath "./..".
-
 Require Import Utf8.
 
-Require Import Syntax.
-Require Import Substitution.
+Require Import LFSyntax.
+Require Import LFSubstitution.
 Require Import LibList.
-
-(*
-Require Import Metatheory.
-Require Import LibListSorted.
-Require Import Arith.
-*)
 Require Import PermutLib.
 Require Import PPermutLib.
 Require Import OkLib.

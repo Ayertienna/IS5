@@ -1,4 +1,3 @@
-Add LoadPath "./..".
 Require Export Shared.
 Require Import LibList.
 Require Import LibListSorted.
