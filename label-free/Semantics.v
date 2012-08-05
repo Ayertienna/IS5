@@ -149,10 +149,18 @@ exists (var_gen L);
 apply var_gen_spec.
 Qed.
 
+(* FIXME: Move to OkLib *)
 Lemma ok_Bg_cons_last:
 forall G a,
   ok_Bg (G & a) <-> ok_Bg (a :: G).
 Admitted.
+
+Lemma ok_Bg_swap:
+forall C C' G,
+  ok_Bg (C :: G & C') ->
+  ok_Bg (C' :: G & C).
+Admitted.
+Hint Resolve ok_Bg_cons_last ok_Bg_swap.
 (* / FIXME *)
 
 (* FIXME: Move to PPermutLib *)
@@ -160,7 +168,20 @@ Lemma PPermut_swap_inner:
 forall G G' C C',
   C :: G ++ C' :: G' ~=~ C' :: G ++ G' & C.
 Admitted.
+
+Lemma PPermut_swap_inner2:
+forall G G' C C',
+  C :: G ++ G' & C' ~=~ C' :: G ++ G' & C.
+Admitted.
+
+Lemma PPermut_swap3:
+forall C C' G,
+  C :: G & C' ~=~ C' :: G & C.
+Admitted.
+
 Hint Resolve PPermut_swap_inner.
+Hint Resolve PPermut_swap_inner2.
+Hint Resolve PPermut_swap3.
 (* /FIXME *)
 
 Lemma BackgroundSubsetImpl:
@@ -180,9 +201,7 @@ apply t_lam_LF with (L:=L \u used_t_vars ((w, Gamma)::G'));
 destruct HSubst as [GT];
 apply t_box_LF with (L:=L \u used_w_vars (G' & (w, Gamma))); intros.
 apply ok_Bg_cons_last; auto. 
-apply H;
-[ | exists GT | ]; 
-auto. 
+apply H; [ | exists GT | ]; auto. 
 apply ok_Bg_fresh_wo; 
 [ apply ok_Bg_cons_last |
   rewrite notin_union in H1; destruct H1]; auto.
@@ -322,7 +341,7 @@ Lemma Weakening_general:
   (HT: G |= (w, Gamma) |- M ::: A),
   (forall G' w' Delta Delta',
     PPermut G (G' & (w', Delta)) ->
-    ok_Bg (G' & (w', Delta ++ Delta')) ->
+    ok_Bg ((w, Gamma) :: G' & (w', Delta ++ Delta')) ->
     G' & (w', Delta ++ Delta') |= (w, Gamma) |- M ::: A) /\ 
   (forall Gamma', 
     ok_Bg ((w, Gamma ++ Gamma') :: G) ->
@@ -336,53 +355,72 @@ intros; subst; simpl;
 try (inversion HeqCtx; subst).
 (* hyp *)
 constructor; auto. 
-rewrite H in Ok_Bg.
-skip.
-constructor. skip. 
-rewrite Mem_app_or_eq; left; assumption.
+constructor; auto; rewrite Mem_app_or_eq; left; assumption.
 (* lam *)
-apply t_lam_LF with (L:=L). skip. intros; eapply H; eauto.
-apply t_lam_LF with (L:=L). skip. 
+apply t_lam_LF with (L:=L \u used_t_vars ((w0, Gamma0) :: G' & (w', Delta ++ Delta'))).
+  auto.
+  intros; eapply H; eauto.
+apply t_lam_LF with (L:=L \u used_t_vars ((w0, Gamma0++Gamma')::G)). 
+auto.
 intros; eapply H with (v':=v')  (w:=w0) (Gamma:=(v' ,A)::Gamma0); auto.
+rew_app; auto.
 (* appl *)
-econstructor; [skip | eapply IHHT1| eapply IHHT2]; eauto.
-econstructor; [skip | eapply IHHT1| eapply IHHT2]; eauto.
+econstructor; [ | eapply IHHT1| eapply IHHT2]; eauto.
+econstructor; [ | eapply IHHT1| eapply IHHT2]; eauto.
 (* box 1 *)
-apply t_box_LF with (L:=L); intros. skip.
-apply BackgroundSubsetImpl with (G:=G' & (w0, Gamma0) & (w', Delta ++ Delta')).
-  apply H with (w:=w'0) (Gamma:=nil); assumption || eauto.
-  exists (@nil Context_LF); rew_app; auto.
+apply t_box_LF with (L:=L \u used_w_vars (G' & (w0, Gamma0) & (w', Delta ++ Delta'))); 
+intros.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w', Delta ++ Delta')); auto.
+assert (G' & (w', Delta ++ Delta') & (w0, Gamma0) ~=~ G' & (w0, Gamma0) & (w', Delta ++ Delta')) by auto;
+rewrite H3;
+apply H with (w:=w'0) (Gamma:=nil); assumption || eauto.
+apply ok_Bg_fresh_wo; auto. 
+apply ok_Bg_ppermut with (G:=((w0, Gamma0) :: G' & (w', Delta ++ Delta')));
+auto.
 (* box 2 *)
-apply t_box_LF with (L:=L). skip. 
+apply t_box_LF with (L:=L \u used_w_vars (G & (w0, Gamma0++Gamma'))).
+apply ok_Bg_ppermut with (G:= (w0, Gamma0++Gamma') :: G); auto.
 intros; eapply H; eauto. 
+apply ok_Bg_fresh_wo; auto.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0++Gamma')::G); auto.
 (* unbox *)
-constructor. skip. eapply IHHT; eauto.
-constructor. skip. eapply IHHT; eauto.
+constructor. auto. eapply IHHT; eauto.
+constructor. auto. eapply IHHT; eauto.
 (* unbox_fetch 1 *)
 destruct (permut_context_LF_dec (w'0, Delta) (w, Gamma)) as [Eq|Neq]; simpl in *.
 (* = *)
-destruct Eq; subst.
-apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma++Delta');
-[ skip |
-  apply IHHT; reflexivity | 
-   ];
-(* FIXME: does this deserve a tactic? *)
+destruct Eq; subst;
 assert (G ~=~ G'0) by
    (apply PPermut_last_rev with (Gamma := Gamma) (Gamma':= Delta) (w:=w);
     [ apply permut_sym |
-      transitivity G' ]; auto);
-apply PPermut_last; [ permut_simpl; apply permut_sym  | ]; assumption.
+      transitivity G' ]; auto).
+assert ((w0, Gamma0) :: G'0 & (w, Delta ++ Delta') ~=~ (w, Gamma ++ Delta') :: G & (w0, Gamma0)).
+  rewrite H3.
+  transitivity ((w, Delta ++ Delta') :: G'0 & (w0, Gamma0)).
+    transitivity ((w0, Gamma0) :: (w, Delta ++ Delta') :: G'0).
+      auto.
+      transitivity ((w, Delta ++ Delta') :: (w0, Gamma0) :: G'0).
+        auto.
+        auto.
+    auto.
+apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma++Delta').
+rewrite <- H4; auto.
+apply IHHT; auto.
+rewrite <- H4; auto.
+rewrite H3; auto.
 (* <> *)
-(* FIXME: or this? *)
 assert (exists G0, exists G1, G'0 = G0 & (w, Gamma) ++ G1) by
   ( apply PPermut_split_neq with (G':=G) (w:=w'0) (Gamma := Delta);
-    [ symmetry; transitivity G' | ]; auto);
-destruct H1 as [GH]; destruct H1 as [GT]; subst G'0.
+    [ symmetry; transitivity G' | ]; auto).
+destruct H2 as [GH]; destruct H2 as [GT]; subst G'0.
 apply t_unbox_fetch_LF with (Gamma:=Gamma) (G:=GH ++ GT & (w'0, Delta ++ Delta')).
-skip.
-apply BackgroundSubsetImpl with (G:= (GH ++ GT & (w0, Gamma0)) & (w'0, Delta ++ Delta')).
+apply ok_Bg_ppermut with 
+  (G := (w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w'0, Delta ++ Delta')).
+rew_app. assert ( GH ++ (w, Gamma) :: GT & (w'0, Delta ++ Delta') ~=~ (w, Gamma) :: GH ++ GT ++ (w'0, Delta ++ Delta') :: nil) by auto.
+rewrite H2. transitivity (((w, Gamma) :: GH ++ GT ++ (w'0, Delta ++ Delta') :: nil) & (w0, Gamma0)). auto. rew_app; auto.
+auto.
+apply PPermut_bg with (G:= (GH ++ GT & (w0, Gamma0)) & (w'0, Delta ++ Delta')).
   apply IHHT with (w1:=w) (Gamma1:=Gamma) (G':=GH ++ GT & (w0, Gamma0)); auto.
-  (* FIXME: more automation ? *)
   assert (G ~=~ GH ++ GT & (w'0, Delta)).
      apply PPermut_last_rev_simpl with (a:=(w, Gamma)).
      transitivity G'. 
@@ -390,37 +428,60 @@ apply BackgroundSubsetImpl with (G:= (GH ++ GT & (w0, Gamma0)) & (w'0, Delta ++ 
        rew_app in *; transitivity (GH ++ (w, Gamma) :: GT & (w'0, Delta)).
          auto.
          transitivity (GH ++ GT ++ (w, Gamma) :: (w'0, Delta) :: nil); auto.
-  transitivity ((GH ++ GT & (w'0, Delta)) & (w0, Gamma0));
-  [apply PPermut_last | rew_app]; auto.
-  exists (@ nil Context_LF); rew_app; auto.
+  rewrite H2; rew_app; auto.
+  rew_app in *.
+  apply ok_Bg_ppermut with (G:= (w0, Gamma0) :: GH ++ (w, Gamma) :: GT & (w'0, Delta ++ Delta')); auto.
+transitivity (((w0, Gamma0) :: GH ++ GT ++ (w, Gamma) :: nil) & (w'0, Delta++Delta')). 
+rew_app; auto.
+transitivity (((w, Gamma) :: GH ++ GT ++ (w0, Gamma0) :: nil) & (w'0, Delta ++ Delta')); auto. rew_app; auto.
+rew_app; auto.
 rew_app; transitivity (GH ++ GT ++ (w, Gamma) :: (w'0, Delta++Delta') :: nil);
 [ | symmetry]; auto.
 (* unbox_fetch 2 *)
 apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma).
-skip.
+rewrite <- H in H0.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma'0) :: G & (w, Gamma)); auto.
 apply IHHT with (w1:=w) (Gamma1:=Gamma); auto.
+rewrite <- H in H0.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma'0) :: G & (w, Gamma)); auto.
 auto.
 (* here *)
-constructor. skip. apply IHHT with (w:=w0)(Gamma:=Gamma0); auto. 
-constructor. skip. apply IHHT; auto.
+constructor. auto. apply IHHT with (w:=w0)(Gamma:=Gamma0); auto. 
+constructor. auto. apply IHHT; auto.
 (* get_here 1 *)
-destruct (permut_context_LF_dec (w', Delta) (w, Gamma)) as [Eq | Neq]; simpl in *.
+destruct (permut_context_LF_dec (w', Delta) (w, Gamma)) as [Eq|Neq]; simpl in *.
 (* = *)
 destruct Eq; subst;
-apply t_get_here_LF with (Gamma:=Gamma++Delta') (G:=G).
-skip.
+assert (G ~=~ G'0) by
+   (apply PPermut_last_rev with (Gamma := Gamma) (Gamma':= Delta) (w:=w);
+    [ apply permut_sym |
+      transitivity G' ]; auto).
+assert ((w0, Gamma0) :: G'0 & (w, Delta ++ Delta') ~=~ (w, Gamma ++ Delta') :: G & (w0, Gamma0)).
+  rewrite H3.
+  transitivity ((w, Delta ++ Delta') :: G'0 & (w0, Gamma0)).
+    transitivity ((w0, Gamma0) :: (w, Delta ++ Delta') :: G'0).
+      auto.
+      transitivity ((w, Delta ++ Delta') :: (w0, Gamma0) :: G'0).
+        auto.
+        auto.
+    auto.
+apply t_get_here_LF with (G:=G) (Gamma:=Gamma++Delta').
+rewrite <- H4; auto.
 apply IHHT; auto.
-apply PPermut_last; 
-[ | apply PPermut_last_rev with (w:=w) (Gamma:=Gamma) (Gamma':=Delta)];
-(permut_simpl; apply permut_sym) || transitivity G'; auto.
+rewrite <- H4; auto.
+rewrite H3; auto.
 (* <> *)
 assert (exists G0, exists G1, G'0 = G0 & (w, Gamma) ++ G1) by
   ( apply PPermut_split_neq with (G':=G) (w:=w') (Gamma := Delta);
-    [ symmetry; transitivity G' | ]; auto);
-destruct H1 as [GH]; destruct H1 as [GT]; subst G'0.
+    [ symmetry; transitivity G' | ]; auto).
+destruct H2 as [GH]; destruct H2 as [GT]; subst G'0.
 apply t_get_here_LF with (Gamma:=Gamma) (G:=GH ++ GT & (w', Delta ++ Delta')).
-skip.
-apply BackgroundSubsetImpl with (G:= (GH ++ GT & (w0, Gamma0)) & (w', Delta ++ Delta')).
+apply ok_Bg_ppermut with 
+  (G := (w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta')).
+rew_app. assert ( GH ++ (w, Gamma) :: GT & (w', Delta ++ Delta') ~=~ (w, Gamma) :: GH ++ GT ++ (w', Delta ++ Delta') :: nil) by auto.
+rewrite H2. transitivity (((w, Gamma) :: GH ++ GT ++ (w', Delta ++ Delta') :: nil) & (w0, Gamma0)). auto. rew_app; auto.
+auto.
+apply PPermut_bg with (G:= (GH ++ GT & (w0, Gamma0)) & (w', Delta ++ Delta')).
   apply IHHT with (w1:=w) (Gamma1:=Gamma) (G':=GH ++ GT & (w0, Gamma0)); auto.
   assert (G ~=~ GH ++ GT & (w', Delta)).
      apply PPermut_last_rev_simpl with (a:=(w, Gamma)).
@@ -429,50 +490,71 @@ apply BackgroundSubsetImpl with (G:= (GH ++ GT & (w0, Gamma0)) & (w', Delta ++ D
        rew_app in *; transitivity (GH ++ (w, Gamma) :: GT & (w', Delta)).
          auto.
          transitivity (GH ++ GT ++ (w, Gamma) :: (w', Delta) :: nil); auto.
-  transitivity ((GH ++ GT & (w', Delta)) & (w0, Gamma0));
-  [apply PPermut_last | rew_app]; auto.
-  exists (@ nil Context_LF); rew_app; auto.
+  rewrite H2; rew_app; auto.
+  rew_app in *.
+  apply ok_Bg_ppermut with (G:= (w0, Gamma0) :: GH ++ (w, Gamma) :: GT & (w', Delta ++ Delta')); auto.
+transitivity (((w0, Gamma0) :: GH ++ GT ++ (w, Gamma) :: nil) & (w', Delta++Delta')). 
+rew_app; auto.
+transitivity (((w, Gamma) :: GH ++ GT ++ (w0, Gamma0) :: nil) & (w', Delta ++ Delta')); auto. rew_app; auto.
+rew_app; auto.
 rew_app; transitivity (GH ++ GT ++ (w, Gamma) :: (w', Delta++Delta') :: nil);
 [ | symmetry]; auto.
 (* get_here 2 *)
 apply t_get_here_LF with (G:=G) (Gamma:=Gamma).
-skip.
+rewrite <- H in H0.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma') :: G & (w, Gamma)); auto.
 apply IHHT with (w1:=w) (Gamma1:=Gamma); auto.
+rewrite <- H in H0.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma') :: G & (w, Gamma)); auto.
 auto.
 (* letdia *)
-apply t_letdia_LF with (A:=A) (L_w:=L_w) (L_t:=L_t).
-skip.
+apply t_letdia_LF with (A:=A) (L_w:=L_w \u used_w_vars((w0, Gamma0) :: G' & (w', Delta ++ Delta'))) (L_t:=L_t \u used_t_vars ((w0, Gamma0) :: G' & (w', Delta ++ Delta'))).
+auto.
 apply IHHT with (w:=w0) (Gamma:=Gamma0); auto.
 intros; destruct H with (v':=v') (w':=w'0) (w:=w0) (Gamma:=Gamma0); auto.
 replace ((w'0, (v', A) :: nil) :: G' & (w', Delta ++ Delta')) with
    (((w'0, (v', A) :: nil) :: G') & (w', Delta ++ Delta')) by
    (rew_app; reflexivity).
-apply H3; rew_app; auto.
-eapply t_letdia_LF with (A:=A).
-skip.
+apply H4; rew_app; auto.
+apply ok_Bg_ppermut with (G:=(w'0, (v', A) :: nil) :: (w0, Gamma0) :: G' & (w', Delta ++ Delta')). auto.
+apply ok_Bg_fresh_wo_te; auto.
+eapply t_letdia_LF with (A:=A) (L_t := L_t \u used_t_vars ((w0, Gamma0 ++ Gamma') :: G))
+  (L_w := L_w \u used_w_vars ((w0, Gamma0 ++ Gamma') :: G)).
+auto.
 apply IHHT; auto.
 intros; eapply H; eauto.
+apply ok_Bg_ppermut with (G:=(w', (v', A) :: nil) :: (w0, Gamma0 ++ Gamma') :: G).
+auto. 
+apply ok_Bg_fresh_wo_te; auto.
 (* letdia_get 1 *)
 destruct (permut_context_LF_dec (w', Delta) (w, Gamma)) as [Eq | Neq]; simpl in *.
 (* = *)
 destruct Eq; subst;
-apply t_letdia_get_LF with (Gamma:=Gamma++Delta') (G:=G) (A:=A) (L_w:=L_w) (L_t:=L_t).
-skip.
+assert (G ~=~ G').
+  apply PPermut_last_rev with (w:=w) (Gamma:=Gamma) (Gamma':=Delta);
+  [apply permut_sym | transitivity G0]; auto. 
+apply t_letdia_get_LF with (Gamma:=Gamma++Delta') (G:=G) (A:=A) (L_w:=L_w \u used_w_vars ((w0, Gamma0) :: G & (w, Gamma ++ Delta'))) (L_t:=L_t \u used_t_vars ((w0, Gamma0) :: G & (w, Gamma ++ Delta'))).
+apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w, Delta ++ Delta')).
+rewrite <- H4;
+transitivity ((w, Delta ++ Delta') :: G & (w0, Gamma0)); auto.
+auto.
 apply IHHT; auto.
+apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w, Delta ++ Delta')).
+rewrite <- H4;
+transitivity ((w, Delta ++ Delta') :: G & (w0, Gamma0)); auto.
+auto.
 intros; destruct H with (v':=v') (w':=w') (w1:=w0) (Gamma1:=Gamma0); eauto.
 replace ( (w', (v', A) :: nil) :: G & (w, Gamma ++ Delta') ) with
   (( (w', (v', A) :: nil) :: G) & (w, Gamma ++ Delta')) by
   (rew_app; reflexivity).
-eapply H5; auto.
-assert (G ~=~ G').
-  apply PPermut_last_rev with (w:=w) (Gamma:=Gamma) (Gamma':=Delta);
-  [apply permut_sym | transitivity G0]; auto. 
-apply PPermut_last; [permut_simpl; apply permut_sym | ]; auto.
+eapply H7; auto.
+apply ok_Bg_ppermut with (G:=(w', (v', A) :: nil ) :: (w0, Gamma0) :: G & (w, Gamma ++ Delta')). rew_app; auto. apply ok_Bg_fresh_wo_te; auto. apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w, Delta ++ Delta')); auto.
+rewrite H4; auto.
 (* <> *)
 assert (exists G0, exists G1, G' = G0 & (w, Gamma) ++ G1) by 
   ( apply PPermut_split_neq with (G':=G) (w:=w') (Gamma := Delta);
-    [ symmetry; transitivity G0 | ]; auto);
-destruct H2 as [GH]; destruct H2 as [GT]; subst G'.
+    [ symmetry; transitivity G0 | ]; auto).
+destruct H3 as [GH]; destruct H3 as [GT]; subst G'.
 assert (G ~=~ GH ++ GT & (w', Delta)).
   apply PPermut_last_rev_simpl with (a:=(w, Gamma)).
   transitivity G0. 
@@ -481,44 +563,59 @@ assert (G ~=~ GH ++ GT & (w', Delta)).
   auto.
   transitivity (GH ++ GT ++ (w, Gamma) :: (w', Delta) :: nil); auto.
 apply t_letdia_get_LF with 
-  (Gamma:=Gamma) (G:=GH ++ GT & (w', Delta ++ Delta')) (L_w:=L_w) (L_t:=L_t)(A:=A).
-skip.
-apply BackgroundSubsetImpl with (G:= (GH ++ GT & (w0, Gamma0)) & (w', Delta ++ Delta')).
+  (Gamma:=Gamma) (G:=GH ++ GT & (w', Delta ++ Delta')) (L_w:=L_w \u used_w_vars ((w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta'))) (L_t:=L_t \u used_t_vars ((w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta')))(A:=A).
+apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta')); rew_app in *; auto.
+transitivity ((w0, Gamma0) :: (w, Gamma) :: GH ++ GT & (w', Delta ++ Delta')).
+auto. transitivity (((w,Gamma) :: GH ++ GT & (w', Delta++Delta')) & (w0, Gamma0));
+auto. rew_app; auto.
+apply PPermut_bg with (G:= (GH ++ GT & (w0, Gamma0)) & (w', Delta ++ Delta')).
 apply IHHT with (w1:=w) (Gamma1:=Gamma); auto. 
-  transitivity ((GH ++ GT & (w', Delta)) & (w0, Gamma0));
-  [apply PPermut_last | rew_app]; auto.
-  exists (@ nil Context_LF); rew_app; auto.
+rewrite H3; rew_app; auto.  
+rew_app; apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: (GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta')); auto.
+rew_app. transitivity ((w0, Gamma0) :: (w, Gamma) :: GH ++ GT & (w', Delta ++ Delta')).
+auto. transitivity (((w,Gamma) :: GH ++ GT & (w', Delta++Delta')) & (w0, Gamma0));
+auto. rew_app; auto.
+rew_app; auto.
 intros; destruct H with (v':=v')(w':=w'0) (w1:=w0) (Gamma1:=Gamma0); auto.
-apply BackgroundSubsetImpl with 
+apply PPermut_bg with 
   (G:=((w'0, (v', A)::nil) :: GH++GT & (w, Gamma)) & (w', Delta ++ Delta')).
-  apply H5.
+  apply H6.
   rew_app; constructor; [auto | ].
-  transitivity ((GH ++ GT & (w', Delta)) & (w, Gamma));
-  [apply PPermut_last | rew_app]; auto.
-  exists (@ nil Context_LF); rew_app; auto.
-rew_app.
-transitivity (GH ++ GT ++ (w, Gamma) :: (w', Delta ++ Delta') :: nil); 
-[ | symmetry]; auto.
+  rewrite H3; rew_app; auto.
+  apply ok_Bg_ppermut with (G:= ((w'0, (v', A) :: nil) ::(w0, Gamma0) :: GH & (w, Gamma) ++ GT) & (w', Delta ++ Delta')).
+  rew_app; auto. transitivity (((w'0, (v', A) :: nil) ::(w0, Gamma0) :: GH ++GT & (w, Gamma)) & (w', Delta ++ Delta')); rew_app; auto. 
+rew_app in *.
+  apply ok_Bg_fresh_wo_te; auto.
+  rew_app; auto.
+  rew_app; auto.
 (* letdia_get 2 *)
-apply t_letdia_get_LF with (G:=G) (Gamma:=Gamma) (A:=A) (L_w:=L_w)(L_t:=L_t).
-skip.
+apply t_letdia_get_LF with (G:=G) (Gamma:=Gamma) (A:=A) (L_w:=L_w \u used_w_vars (((w0, Gamma0 ++ Gamma') :: G & (w, Gamma))))(L_t:=L_t \u used_t_vars ((w0, Gamma0 ++ Gamma') :: G & (w, Gamma))).
+clear IHHT H HT2. rewrite <- H0 in H1. apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma') :: G & (w, Gamma)); auto.
 apply IHHT with (w1:=w) (Gamma1:=Gamma); auto.
+rewrite <- H0 in H1. apply ok_Bg_ppermut with (G:=(w0, Gamma0 ++ Gamma') :: G & (w, Gamma)); auto.
 intros; destruct H with (v':=v')(w':=w') (w1:=w0)(Gamma1:=Gamma0); auto.  
+apply H5.
+apply ok_Bg_ppermut with (G:= (w', (v', A)::nil) :: (w0, Gamma0 ++ Gamma') :: G & (w, Gamma)). auto. apply ok_Bg_fresh_wo_te. clear IHHT H4 H5 HT2 H. rewrite H0; auto.
+auto.
 assumption.
 Qed.
 
 Lemma WeakeningBackgroundElem:
 forall G G' w Delta Delta' Ctx M A
+  (H_ok: ok_Bg (Ctx :: G & (w, Delta ++ Delta') ++ G'))
   (HT: G & (w, Delta) ++ G' |= Ctx |- M ::: A),
   G & (w, Delta ++ Delta') ++ G' |= Ctx |- M ::: A.
 intros;
 apply BackgroundSubsetImpl with (G:=(G++G') & (w, Delta ++ Delta')).
 destruct Ctx; eapply Weakening_general; eauto.
+apply ok_Bg_ppermut with (G:=(v, l) :: G & (w, Delta ++ Delta') ++ G'); auto.
 eexists nil; rew_app; symmetry; auto.
+auto.
 Qed.
 
 Lemma Weakening:
 forall G w Gamma Gamma' M A
+  (H_ok: ok_Bg ((w,Gamma++Gamma')::G))
   (HT: G |= (w, Gamma) |- M ::: A),
   G |= (w, Gamma ++ Gamma') |- M ::: A.
 intros;
@@ -532,19 +629,12 @@ match G with
 | (w, a)::G => (w, nil) :: emptyEquiv G
 end.
 
-(* TODO! *)
+(* FIXME: Admitted :( *)
 Lemma types_weakened:
 forall G w Gamma M A
   (Ok: ok_Bg ((w, Gamma)::G))
   (HT: emptyEquiv G |= (w, nil) |- M ::: A),
   G |= (w, Gamma) |- M ::: A.
-Admitted.
-
-(* FIXME: move to lib *)
-Lemma Mem_permut:
-forall A (x:A) G G',
-  G *=* G' ->
-  Mem x G -> Mem x G'.
 Admitted.
 
 Lemma subst_t_preserv_types:
@@ -583,7 +673,7 @@ subst; apply types_weakened. skip. (* ok_Bg *)
 assumption.
 constructor.
 skip. (* ok_Bg *)
-apply Mem_permut with (G' := (v0, A0) :: Gamma1) in HT; auto;
+apply Mem_permut with (L2 := (v0, A0) :: Gamma1) in HT; auto;
 rewrite Mem_cons_eq in HT; destruct HT; auto;
 inversion H2; subst; elim H1; reflexivity.
 case_if.
@@ -753,7 +843,6 @@ skip. (* Weakening + permut + assumption *)
 auto.
 auto.
 auto.
-symmetry; auto.
 
 (* w <> w' /\
    Ok Bg /\
@@ -1014,10 +1103,7 @@ assert (G ~=~ G0 & (w'0, Gamma'0)).
 apply t_unbox_fetch_LF with (G:=G0) (Gamma := Gamma'0 ++ Gamma).
 skip. (* ok_Bg *)
 apply IHHT; auto.
-transitivity (G0 & (w'0, Gamma'0) & (w0, Gamma0)); auto.
-symmetry; transitivity (G0 & (w'0, Gamma'0 ++ Gamma'')); auto.
-apply PPermut_last;
-[ permut_simpl; apply permut_sym | ]; auto.
+rewrite H1; auto.
 
 destruct (eq_var_dec w w'0).
 (* w = w'0*)
@@ -1030,10 +1116,7 @@ assert (G ~=~ G0 & (w'', Gamma'')).
 apply t_unbox_fetch_LF with (G:=G0) (Gamma := Gamma ++ Gamma'').
 skip. (* ok_Bg *)
 eapply IHHT with (G':=G0 & (w0, Gamma0)) (Gamma' := Gamma''); auto.
-transitivity (G0 & (w'', Gamma'') & (w0, Gamma0)); auto.
-symmetry; transitivity (G0 & (w'0, Gamma'0 ++ Gamma'')); auto.
-apply PPermut_last;
-[ permut_simpl; apply permut_sym | ]; auto.
+rewrite H1; auto.
 
 (* w <> w'0 /\ w <> w'
    H & H0 -> G0 & (w'0, Gamma'0) & (w'', Gamma'') ~=~ G & (w, Gamma) -->
@@ -1166,10 +1249,7 @@ assert (G ~=~ G0 & (w', Gamma')).
 apply t_get_here_LF with (G:=G0) (Gamma := Gamma' ++ Gamma).
 skip. (* ok_Bg *)
 apply IHHT; auto.
-transitivity (G0 & (w', Gamma') & (w0, Gamma0)); auto.
-symmetry; transitivity (G0 & (w', Gamma' ++ Gamma'')); auto.
-apply PPermut_last;
-[ permut_simpl; apply permut_sym | ]; auto.
+rewrite H1; auto.
 
 destruct (eq_var_dec w w').
 (* w = w'0*)
@@ -1182,10 +1262,7 @@ assert (G ~=~ G0 & (w'', Gamma'')).
 apply t_get_here_LF with (G:=G0) (Gamma := Gamma ++ Gamma'').
 skip. (* ok_Bg *)
 eapply IHHT with (G':=G0 & (w0, Gamma0)) (Gamma' := Gamma''); auto.
-transitivity (G0 & (w'', Gamma'') & (w0, Gamma0)); auto.
-symmetry; transitivity (G0 & (w', Gamma' ++ Gamma'')); auto.
-apply PPermut_last;
-[ permut_simpl; apply permut_sym | ]; auto.
+rewrite H1; auto.
 
 (* w <> w'0 /\ w <> w'
    H & H0 -> G0 & (w'0, Gamma'0) & (w'', Gamma'') ~=~ G & (w, Gamma) -->
@@ -1365,12 +1442,10 @@ inversion H4; subst.
 assert (Gamma *=* Gamma'') by skip.
 assert (G1 & (w', Gamma') ~=~ G).
   apply PPermut_last_rev with (w:=w'') (Gamma:=Gamma'') (Gamma':=Gamma);
-  [ | transitivity G0]; auto. apply permut_sym; auto. symmetry; auto.
-  symmetry; auto.  
+  [ | transitivity G0]; auto. apply permut_sym; auto. 
 eapply t_letdia_get_LF with (G:=G1) (Gamma:=Gamma'++Gamma) (L_w:=L_w \u \{w''}).
 skip.
 eapply IHHT with (Gamma':=Gamma'); auto. 
-symmetry; auto.
 intros. 
 unfold open_var in *; unfold open_ctx in *.
 rewrite <- subst_ctx_comm.
@@ -1383,7 +1458,6 @@ rewrite notin_union in H8;
 rewrite notin_singleton in H8;
 destruct H8; intro; elim H9; auto.
 symmetry; transitivity (G1 & (w', Gamma' ++ Gamma'')); auto.
-apply PPermut_last; auto; permut_simpl; apply permut_sym; auto.
 
 destruct (eq_var_dec w w').
 subst.
@@ -1393,18 +1467,15 @@ assert (G1 & (w'', Gamma'') ~=~ G).
   apply PPermut_last_rev with (w:=w') (Gamma:=Gamma') (Gamma':=Gamma);
   [ | transitivity G0]; auto. apply permut_sym; auto. symmetry; auto.
   transitivity (G1 & (w', Gamma') & (w'', Gamma'')); auto.
-  symmetry; auto.  
 eapply t_letdia_get_LF with (G:=G1) (Gamma:=Gamma++Gamma'') (L_w:=L_w \u \{w''}) (L_t := L_t).
 skip.
 eapply IHHT with (w:=w'); auto. 
-transitivity ((G1 & (w'', Gamma'')) & (w0, Gamma0)). 
-  apply PPermut_last; [ | symmetry]; auto.
-  auto.
 intros. 
 unfold open_var in *; unfold open_ctx in *.
 rewrite <- subst_ctx_comm.
 rewrite subst_order_irrelevant_free.
-eapply H with (w:=w0) (G0:=(w'0, (v',A)::nil)::G1) (Gamma':=Gamma) (Gamma'':=Gamma''); auto.rew_app; constructor; auto.
+eapply H with (w:=w0) (G0:=(w'0, (v',A)::nil)::G1) (Gamma':=Gamma) (Gamma'':=Gamma''); auto.
+rew_app; constructor; auto.
 symmetry; transitivity ((G1 ++ (w'', Gamma'')::nil) & (w', Gamma)); auto.
 rew_app; auto. 
 simpl; auto.
@@ -1412,7 +1483,6 @@ rewrite notin_union in H8;
 rewrite notin_singleton in H8.
 destruct H8. intro. elim H9; eauto.
 symmetry; transitivity (G1 & (w', Gamma' ++ Gamma'')); auto.
-apply PPermut_last; auto; permut_simpl; apply permut_sym; auto.
 
 (* H0 + H1: G & (w, Gamma) ~=~ G1 & (w', Gamma') & (w'', Gamma'') -->
    exists GH, exists GT, G1 = GH & (w, Gamma) & (w', Gamma') ++ GT *)
@@ -1606,8 +1676,8 @@ inversion HT; subst;
 assert (exists v, v \notin L \u (free_worlds_LF M0)) as HF by apply Fresh;
 destruct HF as (w_fresh);
 unfold open_ctx in *;
-replace ({{fwo w0 // bctx 0}}M0)
-  with ({{fwo w0 // fwo w_fresh}} {{fwo w_fresh // bctx 0}}M0)
+replace ({{fwo w0 // bwo 0}}M0)
+  with ({{fwo w0 // fwo w_fresh}} {{fwo w_fresh // bwo 0}}M0)
   by (rewrite subst_ctx_neutral_free; auto);
 replace (@nil (var * ty)) with (nil ++ (@nil (var * ty))); eauto;
 apply rename_w_preserv_types_old with (G := emptyEquiv G0 & (w0, nil));
@@ -1617,8 +1687,8 @@ inversion HT; subst;
 assert (exists v, v \notin L \u (free_worlds_LF M0)) as HF by apply Fresh;
 destruct HF as (w_fresh);
 unfold open_ctx in *;
-replace ({{fwo w0 // bctx 0}}M0)
-  with ({{fwo w0 // fwo w_fresh}} {{fwo w_fresh // bctx 0}}M0)
+replace ({{fwo w0 // bwo 0}}M0)
+  with ({{fwo w0 // fwo w_fresh}} {{fwo w_fresh // bwo 0}}M0)
   by (rewrite subst_ctx_neutral_free; auto);
 replace (@nil (var * ty)) with (nil ++ (@nil (var * ty))); eauto;
 apply rename_w_preserv_types_old with (G := G & (w0, nil) & (w, Gamma));
@@ -1666,7 +1736,6 @@ rewrite subst_var_neutral_free with (v:=v_fresh).
 rewrite subst_order_irrelevant_bound.
 rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
 eapply subst_t_preserv_types_outer with (A:=A) (G0:=G) (Gamma':=Gamma) (w':=w); auto.
-symmetry; auto.
 skip. (* permut + assumption *)
 apply rename_w_preserv_types_outer with (G0:=G) (Gamma'':=(v_fresh,A) :: nil) 
       (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil)).
@@ -1691,7 +1760,6 @@ rewrite subst_var_neutral_free with (v:=v_fresh).
 rewrite subst_order_irrelevant_bound.
 rewrite <- subst_ctx_neutral_free with (w0:=w_fresh).
 eapply subst_t_preserv_types_outer with (A:=A) (G0:=G) (w':=w) (Gamma':=Gamma); eauto.
-symmetry; auto.
 skip. (* permut + auto *)
 assert (Gamma = nil) by skip; subst. (* H0 *)
 eapply rename_w_preserv_types_outer

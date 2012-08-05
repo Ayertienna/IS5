@@ -217,6 +217,12 @@ intros; rewrite H; apply PPermut_cons_last_same.
 Qed.
 Hint Resolve PPermut_cons_last_same PPermut_cons_last.
 
+Lemma PPermut_swap2:
+forall C C' G,
+  C :: G & C' ~=~ G & C & C'.
+Admitted.
+Hint Resolve PPermut_swap2.
+
 (* FIXME: Admitted *)
 Lemma PPermut_last_rev_simpl:
 forall G G' a,
