@@ -1,4 +1,3 @@
-Add LoadPath "./labeled" as Labeled.
 Require Import Labeled.
 Require Import Metatheory.
 Require Import List.
@@ -94,7 +93,7 @@ generalize dependent N;
 induction H0; intros; subst.
 inversion HeqN0; subst; auto.
 destruct y;
-assert (w0 = fwo w) by
+assert (v = fwo w) by
   (inversion H; subst; reflexivity);
 subst;
 apply IHclos_refl_trans_1n with (M:=t);
@@ -129,6 +128,26 @@ constructor; auto;
 apply closed_step_propag with (M:=M0) (w:=w); auto.
 Qed.
 
+Lemma strong_norm_box:
+forall M w,
+  lc_w (unbox_L M) ->
+  strong_norm (unbox_L M) w ->
+  strong_norm M w.
+intros;
+remember (unbox_L M) as T;
+generalize dependent M;
+induction H0; intros; subst;
+[ inversion H0 |
+  assert (neutral M0 \/ value_L M0) by apply neutral_or_value];
+destruct H2;
+[ inversion H; subst |
+  constructor; auto];
+apply step_SN; intros;
+apply H1 with (N:=unbox_L N);
+constructor; auto;
+apply closed_step_propag with (M:=M0) (w:=w); auto.
+Qed.
+
 Definition strong_norm_n (M: te_L) (w: var) (n: nat):=
   forall N m,
     value_L N ->
@@ -159,21 +178,21 @@ apply H with (n:=1); econstructor; eauto; constructor.
 constructor; auto.
 Qed.
 
-Fixpoint Reducible (M: te_L) (A: ty_L) (w: var):=
+Fixpoint Reducible(M: te_L) (A: ty) (w: var):=
 match A with 
-| tvar_L => strong_norm M w
-| tarrow_L A1 A2 =>
+| tvar => strong_norm M w
+| tarrow A1 A2 =>
   forall N
     (H_lc_N: lc_w N)
     (HR: Reducible N A1 w),
     Reducible (appl_L M N) A2 w
-| tbox_L A1 => Reducible (unbox_L M) A1 w
-| tdia_L A1 => False
+| tbox A1 => Reducible (unbox_L M) A1 w
+| tdia A1 => False
 end.
 
 (* CR 2 base *)
 Theorem property_2:
-forall w A M M'
+forall A w M M'
   (HRed: Reducible M A w)
   (H_lc: lc_w M)
   (HStep: (M, fwo w) |-> (M', fwo w)),
@@ -195,7 +214,7 @@ Qed.
 
 (* CR1 + CR3 *)
 Theorem reducibility_props:
-forall A M w
+forall A M w 
   (H_lc: lc_w M),
   (Reducible M A w -> strong_norm M w)
   /\
@@ -235,8 +254,14 @@ inversion H1; subst;
 inversion H;
 apply H0; auto.
 (* box type *)
-skip.
-intros. skip.
+intros; apply strong_norm_box;
+[ constructor | ]; auto.
+apply IHA; [constructor | ]; auto. 
+intros; apply IHA;
+try constructor; auto;
+intros.
+inversion H1; subst; [inversion H | ];
+apply H0; auto.
 (* dia type *)
 intro; contradiction.
 skip. (* not finished *)
@@ -259,7 +284,7 @@ forall A M w
 intros; eapply reducibility_props; eauto.
 Qed.
 
-Fixpoint red_ctx (D: list te_L) (Gamma: list (ty_L * wo)) :=
+Fixpoint red_ctx (D: list te_L) (Gamma: list (ty * vwo)) :=
 match (D, Gamma) with
 | (nil, nil) => True
 | (M :: D', (A, fwo w):: Gamma') => Reducible M A w /\ red_ctx D' Gamma'
@@ -270,6 +295,7 @@ Lemma reducible_abstraction:
 forall A w N B
   (lc_N: lc_w N)
   (HT: forall M, 
+    lc_w M ->
     Reducible M A w ->
     Reducible ([M//0] N) B w),
   Reducible (lam_L A N) (A ---> B) w.
@@ -290,8 +316,7 @@ forall D Omega Gamma n m A w
   (HT': subst_typing Omega D Gamma),
   nth_error D n = Some (subst_list D m (hyp_L (n + m))) /\
   Omega; nil |- subst_list D m (hyp_L (n + m)) ::: A @ w.
-induction D; intros; inversion Gamma; subst; skip.
-Qed.
+Admitted.
 
 Lemma subst_list_lam:
 forall D n A M,
@@ -346,59 +371,111 @@ forall Omega Gamma D n A w M,
 Admitted.
 
 Lemma lc_w_subst_list:
-forall D M k,
+forall D M k m,
   (forall N, In N D -> lc_w N) ->
-  lc_w M ->
-  lc_w (subst_list D k M).
+  lc_w_n M m ->
+  lc_w_n (subst_list D k M) m.
 Admitted.  
-(* / End *)
+
+Lemma subst_list_subst_w:
+forall w k D l M,
+  (forall N, In N D -> lc_w N) ->
+  {{fwo w // bwo k}} (subst_list D l M) = subst_list D l ({{fwo w // bwo k}} M).
+Admitted.
 
 Theorem subst_types_reducible:
-forall M Omega Gamma A w D
-  (H_lc: lc_w M)
+forall M w Omega Gamma A D
+  (H_lc: lc_w_n M 0)
   (H_lc_D: forall N, In N D -> lc_w N)
   (HT: Omega; Gamma |- M ::: A @ w)
   (HRed: red_ctx D Gamma),
   Reducible (subst_list D 0 M) A w.
-induction M; intros; inversion HT; subst.
-(* hyp : TODO *)
-assert (exists M, nth_error D n = Some M) by skip. (* should be a lemma *)
-destruct H as (M).
-assert (Reducible M A w) by skip.
-assert (subst_list D 0 (hyp_L n) = M) by (eapply subst_hyp; eauto).
+intros.
+generalize dependent D.
+induction HT; intros.
+(* should be a lemma *)
+assert (exists M, nth_error D v_n = Some M /\ Reducible M A w_n) by skip; 
+destruct H as (M');
+destruct H.
+assert (subst_list D 0 (hyp_L v_n) = M').
+  eapply subst_hyp; eauto; econstructor; eauto.
 subst; auto.
 (* lam *)
 rewrite subst_list_lam.
-apply reducible_abstraction.
-inversion H_lc; subst; apply lc_w_subst_list; auto.
+simpl.
 intros.
-specialize IHM with 
-  (Omega:=Omega)(Gamma:=(t, fwo w)::Gamma) 
-  (A:=A') (w:=w) (D:= M0 :: D).
-simpl in IHM.
-apply IHM.
+apply property_3.
+repeat constructor; auto; apply lc_w_subst_list; auto. inversion H_lc; subst; auto.
+constructor.
+intros.
+
+inversion H; subst.
+replace ([N // 0](subst_list D 1 M)) with (subst_list (N::D) 0 M) by (simpl; auto).
+apply IHHT.
 inversion H_lc; subst; auto.
-intros; destruct H0; subst; auto.
-skip. (* details... *)
-assumption.
+intros. simpl in H0; destruct H0; subst; auto.
+simpl.
 split; auto.
+
+inversion HRed0.
 (* appl *)
 inversion H_lc; subst.
-assert (Reducible (subst_list D 0 M1) (A'--->A) w) by
-  (eapply IHM1; eauto).
+assert (Reducible (subst_list D 0 M) (A'--->A) w).
+  eapply IHHT2; eauto. 
 simpl in H.
 rewrite subst_list_appl.
 apply H.
-apply lc_w_subst_list; auto.
-eapply IHM2; eauto.
+apply lc_w_subst_list; auto. 
+eapply IHHT1; eauto.
 (* box *)
+inversion H_lc; subst.
+rewrite subst_list_box.  
+simpl.
+(* This is possible *)
+assert (forall w', w' \notin L -> Reducible (unbox_L (box_L (subst_list D 0 M))) A w').
+intros.
+apply property_3.
+repeat constructor; apply lc_w_subst_list; auto.
+constructor.
+intros.
+inversion H2; subst.
+unfold open_w in *;
+rewrite subst_list_subst_w; auto.
+apply H; auto.
+apply closed_step_opening; auto.
+inversion HRed0.
+(* But not the real goal :( *)
+apply property_3.
+repeat constructor; apply lc_w_subst_list; auto.
+constructor.
+intros.
+inversion H2; subst.
+unfold open_w in *;
+rewrite subst_list_subst_w; auto.
+apply H; auto.
+skip.
+apply closed_step_opening; auto.
+inversion HRed0.
 (* unbox *)
+inversion H_lc; subst.
+assert (Reducible (subst_list D 0 M) ([*]A) w).
+  eapply IHHT; eauto. 
+simpl in H.
+rewrite subst_list_unbox.
+apply H.
 (* get *)
+skip.
 (* letd *)
+skip.
 (* here *)
+skip.
 (* fetch *)
-Admitted.
-
+inversion H_lc; subst.
+assert (Reducible (subst_list D 0 M) ([*]A) w').
+  eapply IHHT; eauto. 
+simpl in H.
+skip.
+Qed.
 
 Theorem types_reducible:
 forall Omega M A w,
