@@ -28,7 +28,6 @@ right;
 constructor.
 Qed.
 
-(*
 Lemma neutral_not_value:
 forall M,
   neutral M -> ~value_L M.
@@ -39,7 +38,6 @@ auto;
 subst;
 apply IHM in HT; auto.
 Qed.
-*)
 
 Lemma value_no_step:
 forall M,
@@ -186,7 +184,9 @@ match A with
     (H_lc_N: lc_w N)
     (HR: Reducible N A1 w),
     Reducible (appl_L M N) A2 w
-| tbox A1 => Reducible (unbox_L M) A1 w
+| tbox A1 => 
+  Reducible (unbox_L M) A1 w /\ 
+  forall w', Reducible (unbox_L (fetch_L (fwo w) M)) A1 w'
 | tdia A1 => False
 end.
 
@@ -206,8 +206,11 @@ apply H; auto.
 apply IHA2 with (M:=appl_L M N); auto;
 constructor; auto.
 (* box type *)
+destruct HRed; split.
 eapply IHA; eauto;
 constructor; auto.
+intros; apply IHA with (M:=unbox_L (fetch_L (fwo w) M)); eauto;
+repeat constructor; auto.
 (* dia type *)  
 auto.
 Qed.
@@ -254,16 +257,30 @@ inversion H1; subst;
 inversion H;
 apply H0; auto.
 (* box type *)
-intros; apply strong_norm_box;
-[ constructor | ]; auto.
+intros;
+destruct H;
+apply strong_norm_box;
+[ constructor | ]; auto;
 apply IHA; [constructor | ]; auto. 
-intros; apply IHA;
+
+intros; split. 
+
+apply IHA;
 try constructor; auto;
-intros.
+intros;
 inversion H1; subst; [inversion H | ];
 apply H0; auto.
+
+intros; apply IHA.
+  repeat constructor; auto.
+  constructor.
+  intros;
+  inversion H1; subst;
+  inversion HRed; subst. 
+    apply H0; auto.
+    apply neutral_not_value in H; contradiction.
 (* dia type *)
-intro; contradiction.
+skip. (* not finished *)
 skip. (* not finished *)
 Qed.
 
@@ -445,6 +462,8 @@ apply H; auto.
 apply closed_step_opening; auto.
 inversion HRed0.
 (* But not the real goal :( *)
+split.
+
 apply property_3.
 repeat constructor; apply lc_w_subst_list; auto.
 constructor.
@@ -453,9 +472,21 @@ inversion H2; subst.
 unfold open_w in *;
 rewrite subst_list_subst_w; auto.
 apply H; auto.
-skip.
+skip. (* =( *)
 apply closed_step_opening; auto.
 inversion HRed0.
+
+intros.
+apply property_3.
+repeat constructor; apply lc_w_subst_list; auto.
+constructor.
+intros.
+inversion H2; subst. 
+inversion HRed0; subst.
+  inversion HRed1.
+
+  unfold open_w in *.
+  skip. (* ? *)
 (* unbox *)
 inversion H_lc; subst.
 assert (Reducible (subst_list D 0 M) ([*]A) w).
@@ -471,10 +502,15 @@ skip.
 skip.
 (* fetch *)
 inversion H_lc; subst.
+rewrite subst_list_fetch.
+simpl. 
 assert (Reducible (subst_list D 0 M) ([*]A) w').
   eapply IHHT; eauto. 
 simpl in H.
-skip.
+split. 
+  apply H.
+  intros. 
+  skip. (* double fetch? *)
 Qed.
 
 Theorem types_reducible:
