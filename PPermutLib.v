@@ -297,6 +297,31 @@ forall GH GT C0 C'' C'0,
   GH ++ GT ++ C'0 :: C'' :: C0 :: nil ~=~ GH ++ GT ++ C0 :: C'0 :: C'' :: nil.
 Admitted.
 
+Lemma PPermut_swap_inner:
+forall G G' C C',
+  C :: G ++ C' :: G' ~=~ C' :: G ++ G' & C.
+Admitted.
+
+Lemma PPermut_swap_inner2:
+forall G G' C C',
+  C :: G ++ G' & C' ~=~ C' :: G ++ G' & C.
+Admitted.
+
+Lemma PPermut_swap3:
+forall C C' G,
+  C :: G & C' ~=~ C' :: G & C.
+Admitted.
+
+Lemma PPermut_swap4:
+forall C G' G,
+  G ++ G' & C ~=~ G & C ++ G'.
+Admitted.
+
+
+Hint Resolve PPermut_swap_inner.
+Hint Resolve PPermut_swap_inner2.
+Hint Resolve PPermut_swap3 PPermut_swap4.
+
 Hint Resolve PPermut_specialized1 PPermut_specialized2 
              PPermut_specialized3 PPermut_specialized4
              PPermut_specialized5 PPermut_specialized6.

@@ -61,4 +61,8 @@ Lemma Mem_permut:
 forall A L1 L2, permut L1 L2 -> forall (x : A), Mem x L1 -> Mem x L2.
 Admitted.
 
+Lemma permut_nil_eq:
+forall A L1, permut L1 (@nil A) -> L1 = nil.
+Admitted.
+
 Close Scope permut_scope.
