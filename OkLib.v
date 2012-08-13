@@ -2,9 +2,12 @@ Require Export Shared.
 Require Export PermutLib.
 Require Export PPermutLib.
 
-Require Import Metatheory.
-Require Import LibList.
+Require Export LibLogic.
+Require Export LibVar.
+Require Export LibList.
 Require Import Setoid.
+
+Require Import LibTactics. (* for skip *)
 
 Open Scope permut_scope.
 

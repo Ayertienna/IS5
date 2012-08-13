@@ -2,6 +2,8 @@ Require Export LSyntax.
 Require Import Arith.
 Require Import LibList.
 
+Require Import LibTactics. (* case_if *)
+
 (* Term variable substitution *)
 Reserved Notation " [ M // x ] N " (at level 5).
 

@@ -1,5 +1,7 @@
 Require Export LFSyntax.
+Require Import LibLogic. (* If *)
 Require Import LibList.
+Require Import LibTactics. (* case_if *)
 
 Global Reserved Notation " [ M // v ] N " (at level 5).
 Global Reserved Notation " {{ w1 // w2 }} N " (at level 5).
@@ -73,8 +75,7 @@ forall N M n
   [M//bte n] N = N.
 induction N; intros; simpl in *;
 try rewrite IHN; auto;
-[ case_if; simpl in *; subst;
-  [discriminate | auto] | |];
+[ case_if; simpl in *; subst; auto | |];
 apply app_eq_nil_inv in H_unbound;
 destruct H_unbound;
 rewrite IHN1;
@@ -117,28 +118,23 @@ reflexivity.
 rewrite IHM; auto.
 rewrite IHM1; try rewrite IHM2; auto.
 rewrite IHM; auto.
-case_if; destruct v; subst.
-  discriminate.
-  inversion H; subst;
+case_if; subst.
+  rewrite notin_union in H_free; 
+  destruct H_free; rewrite notin_singleton in *;
+  elim H; reflexivity.
+  destruct v; rewrite IHM; auto.
+  destruct v; rewrite IHM; auto.
+case_if; try destruct v; subst.
+  reflexivity.
+  case_if. inversion H; subst.
   rewrite notin_union in H_free; 
   destruct H_free; rewrite notin_singleton in *;
   elim H0; reflexivity.
-  rewrite IHM; auto.
-  rewrite IHM; auto.
-case_if; destruct v; subst.
-  discriminate.
-  inversion H; subst;
+  auto.
+case_if; try destruct v; subst.  
   rewrite notin_union in H_free; 
   destruct H_free; rewrite notin_singleton in *;
-  elim H0; reflexivity.
-  rewrite IHM; auto.
-  rewrite IHM; auto.
-case_if; destruct v; subst.
-  discriminate.
-  inversion H; subst;
-  rewrite notin_union in H_free; 
-  destruct H_free; rewrite notin_singleton in *;
-  elim H0; reflexivity.
+  elim H; reflexivity.
   rewrite IHM1; try rewrite IHM2; auto.
   rewrite IHM1; try rewrite IHM2; auto.
 Qed.

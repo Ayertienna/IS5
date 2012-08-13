@@ -1,3 +1,7 @@
+(* THIS IS NOT TO BE USED JUST YET *)
+
+Require Import Shared.
+
 (* emptyEquiv = map (fun x => (x, nil)) (map fst G) *)
 Fixpoint emptyEquiv (G: Background_LF) : Background_LF :=
 match G with

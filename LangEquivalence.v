@@ -1,6 +1,7 @@
 Require Import Labeled.
 Require Import LabelFree.
-Require Import Metatheory.
+Require Import LibVar.
+Require Import LibLogic.
 Require Import LibList.
 Require Import LibListSorted.
 
@@ -23,16 +24,15 @@ Definition labeled_context (G: Background_LF) (Ctx:Context_LF) :=
   let Omega := map fst CtxLst in
   let Delta := flat_map (fun x => annotate_worlds (fst x) (snd x)) CtxLst in
   (Omega, Delta, fst Ctx).
-Check labeled_context.
 
 (* label-free from labeled *)
-Fixpoint filter_w (L: list (var * (var * ty_L))) (e: var) :=
+Fixpoint filter_w (L: list (var * (var * ty))) (e: var) :=
 match L with
 | nil => nil
 | v :: L' => 
   If fst v = e then 
     let (x, t) := snd v in
-    (x, label_free_type t) :: filter_w L' e
+    (x, t) :: filter_w L' e
   else filter_w L' e
 end.
 

@@ -4,6 +4,7 @@ Require Import LFSyntax.
 Require Import LFSubstitution.
 
 Require Import LibList.
+Require Import LibTactics. (* case_if *)
 Require Import Setoid.
 
 Require Import PermutLib.
@@ -1428,14 +1429,14 @@ apply t_letdia_LF with (L_w:=L_w \u \{w0}) (L_t:=L_t) (A:=A).
 rewrite H0 in Ok_Bg; eauto.
 eapply IHHT with (w:=w0) (Gamma:=Gamma0); eauto.
 intros. 
-rewrite notin_union in H3; destruct H3.
-rewrite notin_singleton in H4.
+rewrite notin_union in H2; destruct H2.
+rewrite notin_singleton in H3.
 unfold open_var in *; unfold open_ctx in *.
 rewrite <- subst_ctx_comm.
 rewrite subst_order_irrelevant_free.
 eapply H with (w:=w0) (Gamma:=Gamma0) (w':=w'0); eauto.
 simpl; auto.
-intro; subst; elim H4; reflexivity.
+intro; subst; elim H3; reflexivity.
 
 case_if.
 (* w0 = w'' -> H0 + Ok_Bg = contradiction *)

@@ -1,5 +1,5 @@
 Require Import LabelFree.
-Require Import Metatheory.
+Require Import LibTactics.
 Require Import LibList.
 Require Import Relations.
 Require Import Arith.

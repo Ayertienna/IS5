@@ -2,7 +2,7 @@ Require Export Utf8.
 
 (* Package not included in standard Coq builds, needs to be downloaded from
    http://www.chargueraud.org/softs/ln/ *)
-Require Export Metatheory.
+Require Export LibVar.
 
 (*** Definitions ***)
 

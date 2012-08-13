@@ -2,8 +2,8 @@ Require Export Shared.
 Require Export PermutLib.
 
 Require Import Setoid.
-Require Import LibListSorted.
-Require Import LibList.
+Require Export LibListSorted.
+Require Export LibList.
 
 Open Scope permut_scope.
 

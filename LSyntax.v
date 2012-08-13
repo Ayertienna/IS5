@@ -1,5 +1,4 @@
 Require Export Shared.
-Require Export Metatheory.
 Require Import Arith.
 Require Import List.
 

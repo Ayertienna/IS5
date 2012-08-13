@@ -4,6 +4,8 @@ Require Import FSets.
 Require Import Arith.
 Require Import Relations.
 
+Require Import LibTactics. (* case_if *)
+
 Open Scope labeled_is5_scope.
 Open Scope is5_scope.
 

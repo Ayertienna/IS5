@@ -1,5 +1,5 @@
 Require Import Labeled.
-Require Import Metatheory.
+Require Import LibTactics.
 Require Import List.
 Require Import Relations.
 Require Import Arith.
@@ -231,7 +231,7 @@ apply step_SN; auto.
 (* arrow type *)
 intros.
 (* Create variable of type A1 *)
-assert (exists Omega x, Omega; (A1, fwo w) :: nil |- hyp_L x ::: A1 @ w).
+assert (exists Omega, exists x, Omega; (A1, fwo w) :: nil |- hyp_L x ::: A1 @ w).
 exists \{w}; exists 0; constructor; auto; rewrite in_singleton; reflexivity.
 destruct H0 as (Omega'); destruct H0 as (x).
 (* Use it to prove strong_norm (appl_L M (hyp_L x)) *)
