@@ -1,6 +1,11 @@
 (* THIS IS NOT TO BE USED JUST YET *)
 
 Require Import Shared.
+Require Import LibList.
+Require Import PPermutLib.
+Require Import Relations.
+
+Open Scope permut_scope.
 
 (* emptyEquiv = map (fun x => (x, nil)) (map fst G) *)
 Fixpoint emptyEquiv (G: Background_LF) : Background_LF :=
@@ -9,10 +14,7 @@ match G with
 | (w, a)::G => (w, nil) :: emptyEquiv G
 end.
 
-Lemma emptyEquiv_ppermut:
-forall G G',
-  G ~=~ G' ->
-  emptyEquiv G ~=~ emptyEquiv G'.
+Add Morphism emptyEquiv : Permut_emptyEquiv.
 Admitted.
 
 Lemma emptyEquiv_last_change:
@@ -21,12 +23,12 @@ forall G G' w C C',
   emptyEquiv G ~=~ emptyEquiv (G' & (w, C')).
 Admitted.
 
-Lemma emptyEquiv_ppermut_rewrite_simple
-emptyEquiv G |= ... ->
-G ~=~ G' ->
-emptyEquiv G' |= ...
+Lemma emptyEquiv_rewrite:
+forall G H,
+  emptyEquiv (G++H) = emptyEquiv G ++ emptyEquiv H.
+Admitted.
 
-Lemma emptyEquiv_ppermut_rewrite:
-emptyEquiv G |= .. ->
-emptyEquiv G ~=~ G' ->
-emptyEquiv G' |= ... 
+Lemma emptyEquiv_ok:
+forall G,
+  ok_Bg G ->
+  ok_Bg (emptyEquiv G)
