@@ -249,5 +249,10 @@ Admitted.
 Hint Resolve ok_Bg_split1 ok_Bg_split2 ok_Bg_split3 ok_Bg_split4 ok_Bg_split5 ok_Bg_split6 ok_Bg_split7 ok_Bg_split8 ok_Bg_split9 ok_Bg_split10.
 Hint Resolve ok_Bg_permut_no_last ok_Bg_permut_no_last_spec2 ok_Bg_permut_no_last_spec ok_Bg_first_last_neq ok_Bg_last_last2_neq ok_Bg_swap_worlds. 
 
+Lemma ok_Bg_skip_last:
+forall G C,
+  ok_Bg (G & C) -> ok_Bg G.
+Admitted.
+
 
 Close Scope permut_scope.

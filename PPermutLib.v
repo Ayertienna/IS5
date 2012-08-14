@@ -230,6 +230,7 @@ forall G G' a,
   G ~=~ G'.
 Admitted.
 
+
 (* FIXME: Admitted *)
 Lemma PPermut_last_rev:
 forall G G' w Gamma Gamma',

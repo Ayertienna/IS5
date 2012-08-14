@@ -1081,7 +1081,7 @@ inversion HeqCtx; subst;
 simpl in *.
 (* hyp *)
 constructor; 
-[ rewrite H in Ok_Bg  | (* ok_Bg will need some lemmas later on *)
+[ rewrite H in Ok_Bg  | (* ok_Bg *)
   rewrite Mem_app_or_eq; left ]; eauto.
 constructor;
 [ rewrite H in Ok_Bg | (* ok_Bg *)
@@ -1844,20 +1844,40 @@ edestruct IHM with (A := [*]A); eauto;
 eexists; constructor; eauto;
 inversion H3; inversion H4; subst; auto.
 (* unbox_fetch *)
-(* TODO: permut (G0 & (w0, Gamma)) (emptyEquiv G) --> Gamma = nil *)
-assert (Gamma = nil) by skip; subst;
+
+Lemma emptyEquiv_permut_empty:
+forall G G' w,
+  G ~=~ emptyEquiv G' ->
+  forall C, Mem (w, C) G -> C = nil. 
+Admitted.
+
+assert (Gamma = nil).
+  apply emptyEquiv_permut_empty with (G:= (G0 & (w0, Gamma))) (G':=G) (w:=w0); auto.
+  apply Mem_last.
+subst.
 destruct IHM with (A := [*]A) 
                   (Ctx := (w0, (@nil ty)))
-                  (G := G0 & (w0, nil))
+                  (G := G0 & (w, nil))
                   (w := w0); 
-eauto;
-(* TODO: emptyEqiv (G0 & (w0, nil)) = G0 & (w0, nil) by H6 *) 
-[ skip |
-  inversion H0; subst; inversion HT0; subst | 
-  destruct H0 ];
+eauto.
+assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+  repeat rewrite emptyEquiv_rewrite; simpl. 
+  
+Lemma emptyEquiv_permut_split_last:
+forall G C H,
+  G & C ~=~ emptyEquiv H ->
+  emptyEquiv G = G.
+Admitted.
+
+  apply emptyEquiv_permut_split_last in H6. rewrite H6; reflexivity.
+rewrite H0; auto.
+
+inversion H0; subst; inversion HT0; 
 eexists; constructor; eauto;
 inversion H3; inversion H4; subst; 
 eauto.
+destruct H0; 
+eexists; constructor; eauto.
 (* here & get_here *)
 inversion HT; subst;
 inversion H_lc_w; subst;
@@ -1869,12 +1889,18 @@ edestruct IHM; eauto;
 eauto using step_LF.
 (* get_here *)
 (* TODO: permut (G0 & (w0, Gamma)) (emptyEquiv G) --> Gamma = nil *)
-assert (Gamma = nil) by skip; subst;
-edestruct IHM with (A := A0) (G := G0 & (w0, nil)) (w:=w0); eauto;
-(* TODO: emptyEqiv (G0 & (w0, nil)) = G0 & (w0, nil) by H5 *) 
-[ skip | 
-  left; inversion H0; subst; inversion HT0; subst | 
-  right; destruct H0; eexists];
+assert (Gamma = nil).
+  apply emptyEquiv_permut_empty with (G:= (G0 & (w0, Gamma))) (G':=G) (w:=w0); auto.
+  apply Mem_last.
+subst.
+edestruct IHM with (A := A0) (G := G0 & (w, nil)) (w:=w0); eauto.
+assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+  repeat rewrite emptyEquiv_rewrite; simpl. 
+  apply emptyEquiv_permut_split_last in H5. rewrite H5; reflexivity.
+rewrite H0; auto.
+left; inversion H0; subst; inversion HT0; subst;
+econstructor; eauto using step_LF.
+right; destruct H0; eexists;
 econstructor; eauto using step_LF.
 (* letdia & letdia_get *)
 right; inversion HT; subst;
@@ -1889,15 +1915,25 @@ try apply closed_t_succ; auto;
 inversion H5; inversion H7; subst; auto.
 (* letdia_get *)
 (* TODO: permut (G0 & (w0, Gamma)) (emptyEquiv G) --> Gamma = nil *)
-assert (Gamma = nil) by skip; subst;
+assert (Gamma = nil).
+  apply emptyEquiv_permut_empty with (G:= (G0 & (w0, Gamma))) (G':=G) (w:=w0); auto.
+  apply Mem_last.
+subst.
 edestruct IHM1 with (G := G0 & (w, nil)) 
                     (w := w0) 
                     (Ctx := (w0, (@nil ty)))
-                    (A := <*>A0); eauto;
+                    (A := <*>A0); eauto.
 (* TODO: emptyEqiv (G0 & (w0, nil)) = G0 & (w0, nil) by H6 *) 
-[ skip |
-  inversion H0; subst; inversion HT1; subst |
-  destruct H0];
+assert ( emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)).
+   repeat rewrite emptyEquiv_rewrite; simpl. 
+   apply emptyEquiv_permut_split_last in H6. rewrite H6; reflexivity.
+rewrite H0; auto.
+inversion H0; subst; inversion HT1; subst;
+eexists; constructor; eauto;
+try apply closed_t_succ; auto;
+inversion H5; inversion H8; subst; auto.
+
+destruct H0;
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;
 inversion H5; inversion H8; subst; auto.
