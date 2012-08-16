@@ -1,7 +1,6 @@
-(* THIS IS NOT TO BE USED JUST YET *)
-
 Require Import Shared.
 Require Import LibList.
+Require Import OkLib.
 Require Import PPermutLib.
 Require Import Relations.
 
@@ -36,7 +35,7 @@ Admitted.
 Lemma emptyEquiv_permut_empty:
 forall G G' w,
   G ~=~ emptyEquiv G' ->
-  forall C, Mem (w, C) G -> C = nil. 
+  forall C, Mem (w, C) G -> C = nil.
 Admitted.
 
 Lemma double_emptyEquiv:
