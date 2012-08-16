@@ -74,7 +74,7 @@ Inductive lc_t_LF: te_LF -> Prop :=
      lc_t_LF (letdia_get_LF (fwo w) M N)
 .
 
-(* Calculate list of free worlds used in term M *)
+(* Calculate set of free worlds used in term M *)
 Fixpoint free_worlds_LF (M: te_LF) : fset var :=
 match M with
 | hyp_LF _ => \{}
@@ -89,7 +89,7 @@ match M with
 | letdia_get_LF _ M N => free_worlds_LF M \u free_worlds_LF N
 end.
 
-(* Calculate list of free variables used in term M *)
+(* Calculate set of free variables used in term M *)
 Fixpoint free_vars_LF (M: te_LF) : fset var :=
 match M with
 | hyp_LF (fte v) => \{v}
@@ -146,7 +146,7 @@ auto.
 Qed.
 
 
-(* If term is closed at some level, it does not contain bound variables*)
+(* If term is closed it does not contain bound variables*)
 
 Lemma closed_w_no_bound_worlds:
 forall M,
