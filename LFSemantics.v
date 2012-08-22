@@ -1714,7 +1714,8 @@ edestruct IHM1 with (A := A0 ---> A); eauto;
 [ inversion H0; subst; inversion HT1; subst |
   destruct H0];
 eexists; constructor; eauto;
-inversion H4; subst; auto.
+inversion H4; subst; auto;
+erewrite closed_ctx_subst_var; eauto; constructor.
 (* unbox & unbox_fetch *)
 right; inversion HT; subst;
 inversion H_lc_w; subst;
@@ -1724,7 +1725,8 @@ edestruct IHM with (A := [*]A); eauto;
 [ inversion H0; subst; inversion HT0; subst |
   destruct H0];
 eexists; constructor; eauto;
-inversion H1; inversion H2; subst; auto.
+inversion H1; inversion H2; subst; auto;
+erewrite closed_var_subst_ctx; eauto; constructor.
 (* unbox_fetch *)
 assert (Gamma = nil) by
   ( apply emptyEquiv_permut_empty with
@@ -1740,7 +1742,8 @@ assert (emptyEquiv (G0 & (w, nil)) = G0 & (w, nil)) by
    apply emptyEquiv_permut_split_last in H6; rewrite H6; reflexivity);
 rewrite H0; auto.
 inversion H0; subst; inversion HT0; subst;
-eexists; constructor; eauto; inversion H2; auto.
+eexists; constructor; eauto; inversion H2; auto;
+erewrite closed_var_subst_ctx; eauto; constructor.
 destruct H0; eexists; constructor; eauto.
 (* here & get_here *)
 inversion HT; subst;
@@ -1774,7 +1777,7 @@ edestruct IHM1 with (A := <*>A0); eauto;
   destruct H0];
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;
-inversion H4; inversion H6; subst; auto.
+inversion H5; inversion H8; subst; auto.
 (* letdia_get *)
 assert (Gamma = nil) by
   ( apply emptyEquiv_permut_empty with (G:= (G0 & (w0, Gamma))) (G':=G) (w:=w0);
@@ -1790,7 +1793,7 @@ rewrite H0; auto.
 inversion H0; subst; inversion HT1; subst;
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;
-inversion H4; inversion H7; subst; auto.
+inversion H5; inversion H9; subst; auto.
 destruct H0;
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;

@@ -72,8 +72,69 @@ Notation " M ^w^ w  " := (open_ctx M w) (at level 10) : label_free_is5_scope.
 
 Open Scope label_free_is5_scope.
 
+(*
+Property: term is locally closed
+ This means that there are no bound variables.
+*)
+
+Inductive lc_w_LF : te_LF -> Prop :=
+ | lcw_hyp_LF: forall v, lc_w_LF (hyp_LF v)
+ | lcw_lam_LF: forall L t M,
+     forall x, x \notin L -> lc_w_LF (M ^t^ (hyp_LF x)) ->
+     lc_w_LF (lam_LF t M)
+ | lcw_appl_LF: forall M N,
+     lc_w_LF M -> lc_w_LF N ->
+     lc_w_LF (appl_LF M N)
+ | lcw_box_LF: forall M,
+     lc_w_LF M ->
+     lc_w_LF (box_LF M)
+ | lcw_unbox_fetch_LF: forall M w,
+     lc_w_LF M ->
+     lc_w_LF (unbox_fetch_LF (fwo w) M)
+ | lcw_get_here_LF: forall M w,
+     lc_w_LF M ->
+     lc_w_LF (get_here_LF (fwo w) M)
+ | lcw_letdia_get_LF: forall L M N w,
+     forall x, x \notin L -> lc_w_LF (N ^t^ (hyp_LF x)) -> lc_w_LF M ->
+     lc_w_LF (letdia_get_LF (fwo w) M N)
+.
+
+Inductive lc_t_LF: te_LF -> Prop :=
+| lct_hyp_LF: forall v, lc_t_LF (hyp_LF (fte v))
+| lct_lam_LF: forall t M,
+    lc_t_LF M ->
+    lc_t_LF (lam_LF t M)
+| lct_appl_LF: forall M N,
+    lc_t_LF M -> lc_t_LF N ->
+    lc_t_LF (appl_LF M N)
+ | lct_box_LF: forall L M,
+     forall w, w \notin L -> lc_t_LF (M ^w^ w) ->
+     lc_t_LF (box_LF M)
+ | lct_unbox_fetch_LF: forall M w,
+     lc_t_LF M ->
+     lc_t_LF (unbox_fetch_LF (fwo w) M)
+ | lct_get_here_LF: forall M w,
+     lc_t_LF M ->
+     lc_t_LF (get_here_LF (fwo w) M)
+ | lct_letdia_get_LF: forall L M N w,
+     forall w', w' \notin L -> lc_t_LF (N ^w^ w') -> lc_t_LF M ->
+     lc_t_LF (letdia_get_LF (fwo w) M N)
+.
+
 
 (*** Properties ***)
+
+
+Lemma closed_var_subst_ctx:
+forall M w w',
+  lc_t_LF M = lc_t_LF ({{w //w'}} M).
+Admitted.
+
+Lemma closed_ctx_subst_var:
+forall M N k
+  (H: lc_w_LF N),
+  lc_w_LF M = lc_w_LF ([N // k] M).
+Admitted.
 
 (*
 Simplify substitution in special cases
@@ -138,10 +199,13 @@ Lemma closed_subst_t_id:
 forall M n N
   (H_lc: lc_t_LF N),
   [ M // bte n ] N = N.
-intros;
-apply no_bound_vars_subst_t_id;
-apply closed_t_no_bound_vars;
-auto.
+intros; apply no_bound_vars_subst_t_id.
+induction N; simpl;
+try destruct v; inversion H_lc; subst; eauto.
+rewrite IHN1; try rewrite IHN2; simpl; auto.
+apply IHN; unfold open_ctx in *; simpl; erewrite closed_var_subst_ctx; eauto.
+rewrite IHN1; try rewrite IHN2; simpl; auto;
+erewrite closed_var_subst_ctx; eauto.
 Qed.
 
 Lemma closed_subst_w_id:
@@ -150,8 +214,13 @@ forall M w n
   {{w // bwo n}} M  = M.
 intros;
 apply no_bound_worlds_subst_w_id;
-apply closed_w_no_bound_worlds;
-auto.
+induction M; simpl;
+try destruct v; inversion H_lc; subst; eauto.
+apply IHM; unfold open_var in *; erewrite closed_ctx_subst_var;
+eauto; constructor.
+rewrite IHM1; try rewrite IHM2; simpl; auto.
+rewrite IHM1; try rewrite IHM2; simpl; auto;
+erewrite closed_ctx_subst_var; eauto; constructor.
 Qed.
 
 
@@ -224,7 +293,9 @@ forall M w w' n
   {{w//bwo n}}({{bwo n// w'}}M) = {{w//w'}}M.
 induction M; intros; simpl in *; auto;
 inversion HT; repeat case_if; subst;
-rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto.
+rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
+unfold open_var;
+erewrite closed_ctx_subst_var; eauto; constructor.
 Qed.
 
 

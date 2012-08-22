@@ -25,55 +25,6 @@ Inductive te_LF :=
 .
 
 
-(*
-Property: term is locally closed
- This means that there are no bound variables.
-*)
-
-Inductive lc_w_LF : te_LF -> Prop :=
- | lcw_hyp_LF: forall v, lc_w_LF (hyp_LF v)
- | lcw_lam_LF: forall t M,
-     lc_w_LF M ->
-     lc_w_LF (lam_LF t M)
- | lcw_appl_LF: forall M N,
-     lc_w_LF M -> lc_w_LF N ->
-     lc_w_LF (appl_LF M N)
- | lcw_box_LF: forall M,
-     lc_w_LF M ->
-     lc_w_LF (box_LF M)
- | lcw_unbox_fetch_LF: forall M w,
-     lc_w_LF M ->
-     lc_w_LF (unbox_fetch_LF (fwo w) M)
- | lcw_get_here_LF: forall M w,
-     lc_w_LF M ->
-     lc_w_LF (get_here_LF (fwo w) M)
- | lcw_letdia_get_LF: forall M N w,
-     lc_w_LF N -> lc_w_LF M ->
-     lc_w_LF (letdia_get_LF (fwo w) M N)
-.
-
-Inductive lc_t_LF: te_LF -> Prop :=
-| lct_hyp_LF: forall v, lc_t_LF (hyp_LF (fte v))
-| lct_lam_LF: forall t M,
-    lc_t_LF M ->
-    lc_t_LF (lam_LF t M)
-| lct_appl_LF: forall M N,
-    lc_t_LF M -> lc_t_LF N ->
-    lc_t_LF (appl_LF M N)
- | lct_box_LF: forall M,
-     lc_t_LF M ->
-     lc_t_LF (box_LF M)
- | lct_unbox_fetch_LF: forall M w,
-     lc_t_LF M ->
-     lc_t_LF (unbox_fetch_LF (fwo w) M)
- | lct_get_here_LF: forall M w,
-     lc_t_LF M ->
-     lc_t_LF (get_here_LF (fwo w) M)
- | lct_letdia_get_LF: forall M N w,
-     lc_t_LF N -> lc_t_LF M ->
-     lc_t_LF (letdia_get_LF (fwo w) M N)
-.
-
 (* Calculate set of free worlds used in term M *)
 Fixpoint free_worlds_LF (M: te_LF) : fset var :=
 match M with
@@ -143,26 +94,4 @@ intros; destruct c1 as (w, a); destruct c2 as (w', a');
 destruct (eq_var_dec w w'); subst; simpl;
 destruct (permut_dec a a'); simpl;
 auto.
-Qed.
-
-
-(* If term is closed it does not contain bound variables*)
-
-Lemma closed_w_no_bound_worlds:
-forall M,
-  lc_w_LF M -> bound_worlds M = nil.
-intros;
-induction M; intros; simpl in *;
-inversion H; subst; eauto;
-erewrite IHM1; try erewrite IHM2; eauto.
-Qed.
-
-Lemma closed_t_no_bound_vars:
-forall M,
-  lc_t_LF M -> bound_vars M = nil.
-intros;
-induction M; intros; simpl in *;
-inversion H; subst; eauto;
-erewrite IHM1; try erewrite IHM2; eauto;
-apply closed_t_succ; assumption.
 Qed.
