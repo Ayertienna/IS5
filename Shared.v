@@ -86,11 +86,6 @@ add ana axiom for it.
 Axiom eq_var_dec:
   forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
 
-(* FIXME: should there be a proof rather than  just an axiom *)
-Axiom permut_dec:
-forall (a: list (var * ty)) a',
-  { permut a a' } + { ~permut a a' }.
-
 Theorem eq_ty_dec:
 forall a b: ty, {a = b} + {a <> b}.
   decide equality.
@@ -142,6 +137,5 @@ Definition Context_LF := prod var (list (prod var ty)).
 Definition Background_LF := list Context_LF.
 
 
-(* FIXME: not used yet *)
 (* Context for labeled language *)
 Definition Context_L := list (prod var (prod var ty)).

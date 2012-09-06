@@ -1,15 +1,14 @@
+Require Import Setoid.
+Require Import LibTactics.
+
 Require Export Shared.
 Require Export PermutLib.
-
-Require Import Setoid.
-Require Export LibListSorted.
-Require Export LibList.
 
 Open Scope permut_scope.
 
 Inductive PPermut: list Context_LF -> list Context_LF -> Prop :=
 | PPermut_nil: PPermut nil nil
-| PPermut_skip: forall G G' w Gamma Gamma', 
+| PPermut_skip: forall G G' w Gamma Gamma',
     Gamma *=* Gamma' ->
     PPermut G G' ->
     PPermut ((w, Gamma)::G) ((w,Gamma')::G')
@@ -20,25 +19,26 @@ Inductive PPermut: list Context_LF -> list Context_LF -> Prop :=
                 ((w', Gamma1') :: (w, Gamma1) :: G)
 | PPermut_trans: forall G G' G'',
     PPermut G G' -> PPermut G' G'' -> PPermut G G''.
-Hint Constructors PPermut.
+Hint Resolve PPermut_nil PPermut_skip PPermut_swap.
+Hint Constructors PPermut : ppermut_rew.
 
-Notation "G ~=~ G'" := (PPermut G G') (at level 70) : permut_scope. 
+Notation "G ~=~ G'" := (PPermut G G') (at level 70) : permut_scope.
 
 Lemma PPermut_reflexive:
   Reflexive PPermut.
 unfold Reflexive; intros;
 induction x;
-  [ | destruct a]; 
+  [ | destruct a];
   eauto.
-Qed. 
+Qed.
 
 Lemma PPermut_symmetric:
   Symmetric PPermut.
 unfold Symmetric; intros;
-induction H; eauto.
-  apply PPermut_trans with (G':=(w, Gamma')::G); eauto;
+induction H; eauto with ppermut_rew.
+  apply PPermut_trans with (G':=(w, Gamma')::G); eauto with ppermut_rew;
   apply PPermut_skip;
-  [ apply permut_sym | 
+  [ apply permut_sym |
     apply PPermut_reflexive];
   auto.
   apply PPermut_swap; apply permut_sym; assumption.
@@ -47,7 +47,7 @@ Qed.
 Lemma PPermut_transitive:
   Transitive PPermut.
 exact PPermut_trans.
-Qed.  
+Qed.
 Hint Resolve PPermut_reflexive PPermut_symmetric.
 
 Theorem PPermut'oid: Setoid_Theory _ PPermut.
@@ -70,12 +70,14 @@ Qed.
 Hint Resolve PPermut_cons.
 
 Lemma test2:
-  forall G G' w Gamma, PPermut G G' -> PPermut ((w, Gamma)::G) ((w, Gamma) :: G').
+  forall G G' w Gamma,
+  PPermut G G' -> PPermut ((w, Gamma)::G) ((w, Gamma) :: G').
 auto.
 Qed.
 
 Lemma test3:
-  forall G G' w Gamma, PPermut G G' -> PPermut ((w, Gamma)::G') ((w, Gamma) :: G).
+  forall G G' w Gamma,
+    PPermut G G' -> PPermut ((w, Gamma)::G') ((w, Gamma) :: G).
 intros;
 apply PPermutoid;
 auto.
@@ -119,7 +121,7 @@ induction G1; intros; simpl; rew_app;
 [ auto |
  induction G2]; simpl in *;
 [ rewrite app_nil_r; auto |
-  destruct a; destruct a0]; 
+  destruct a; destruct a0];
 transitivity ((v,l) :: (v0, l0) :: G2 ++ G1);
 [ constructor; auto; apply IHG1 |
   transitivity ((v0, l0) :: (v, l) :: G2 ++ G1); auto];
@@ -137,22 +139,132 @@ intros; transitivity (G ++ G0 ++ G'');
 repeat rewrite <- app_assoc; auto.
 Qed.
 
-Theorem PPermut_cons_app:
-forall G2 G1 G3 a,
-  G1 ~=~ G2 ++ G3 ->
-  a :: G1 ~=~ G2 ++ a :: G3.
-induction G2; intros; simpl in *; rew_app; auto;
-transitivity (a0 :: a :: G2 ++ G3); auto;
-transitivity (a :: a0 :: G2 ++ G3); auto;
-destruct a; destruct a0; auto.
-Qed.
-Hint Resolve PPermut_cons_app.
 
-Theorem PPermut_middle:
-forall G1 G2 a,
-  a :: G1 ++ G2 ~=~ G1 ++ a :: G2.
+(*** Automation **)
+(* Based on permutation tactics from tlc's LibListSorted *)
+
+Lemma PPermut_get_1 : forall l1 l2,
+  PPermut (l1 ++ l2) (l1 ++ l2).
 auto.
 Qed.
+
+Lemma PPermut_get_2 : forall l1 l2 l3,
+  PPermut (l1 ++ l2 ++ l3) (l2 ++ l1 ++ l3).
+intros;
+assert (l1 ++ l2 ~=~ l2 ++ l1) as H by auto;
+transitivity ((l1 ++ l2) ++ l3); [ | rewrite H ]; rew_app; auto.
+Qed.
+
+Lemma PPermut_get_3 : forall l1 l2 l3 l4,
+  PPermut (l1 ++ l2 ++ l3 ++ l4) (l2 ++ l3 ++ l1 ++ l4).
+intros;
+do 2 rewrite <- (@app_assoc _ l2); eapply PPermut_get_2.
+Qed.
+
+Lemma PPermut_get_4 : forall l1 l2 l3 l4 l5,
+  PPermut (l1 ++ l2 ++ l3 ++ l4 ++ l5)
+         (l2 ++ l3 ++ l4 ++ l1 ++ l5).
+intros;
+do 2 rewrite <- (@app_assoc _ l2); eapply PPermut_get_3.
+Qed.
+
+Lemma PPermut_get_5 : forall l1 l2 l3 l4 l5 l6,
+  PPermut (l1 ++ l2 ++ l3 ++ l4 ++ l5 ++ l6)
+         (l2 ++ l3 ++ l4 ++ l5 ++ l1 ++ l6).
+intros;
+do 2 rewrite <- (@app_assoc _ l2); eapply PPermut_get_4.
+Qed.
+
+Lemma PPermut_get_6 : forall l1 l2 l3 l4 l5 l6 l7,
+  PPermut (l1 ++ l2 ++ l3 ++ l4 ++ l5 ++ l6 ++ l7)
+         (l2 ++ l3 ++ l4 ++ l5 ++ l6 ++ l1 ++ l7).
+intros;
+do 2 rewrite <- (@app_assoc _ l2); eapply PPermut_get_5.
+Qed.
+
+Lemma PPermut_tactic_setup : forall l1 l2,
+  PPermut (nil ++ l1 ++ nil) (l2 ++ nil) -> PPermut l1 l2.
+intros; rew_app in *; auto.
+Qed.
+
+Lemma PPermut_tactic_keep : forall l1 l2 l3 l4,
+  PPermut ((l1 ++ l2) ++ l3) l4 ->
+  PPermut (l1 ++ (l2 ++ l3)) l4.
+intros; rew_app in *; auto.
+Qed.
+
+Lemma PPermut_tactic_simpl : forall l1 l2 l3 l4,
+  PPermut (l1 ++ l3) l4 ->
+  PPermut (l1 ++ (l2 ++ l3)) (l2 ++ l4).
+intros; rewrite <- H; apply PPermut_get_2.
+Qed.
+
+Lemma PPermut_tactic_trans : forall l1 l2 l3,
+  PPermut l3 l2 -> PPermut l1 l3 -> PPermut l1 l2.
+intros; eauto with ppermut_rew.
+Qed.
+
+Hint Rewrite app_assoc app_nil_l app_nil_r : ppermut_rew.
+
+Ltac PPermut_lemma_get n :=
+  match nat_from_number n with
+  | 1 => constr:(PPermut_get_1)
+  | 2 => constr:(PPermut_get_2)
+  | 3 => constr:(PPermut_get_3)
+  | 4 => constr:(PPermut_get_4)
+  | 5 => constr:(PPermut_get_5)
+  end.
+
+Ltac PPermut_isolate_cons :=
+  do 20 try (* todo : repeat *)
+    match goal with |- context [?x::?l] =>
+      match l with
+      | nil => fail 1
+      | _ => rewrite <- (@app_cons_one _ x l)
+      end
+    end.
+
+Ltac PPermut_simpl_prepare :=
+   autorewrite with ppermut_rew;
+   PPermut_isolate_cons;
+   autorewrite with ppermut_rew;
+   apply PPermut_tactic_setup;
+   repeat rewrite app_assoc.
+
+Ltac PPermut_index_of l lcontainer :=
+  match constr:(lcontainer) with
+  | l ++ _ => constr:(1)
+  | _ ++ l ++ _ => constr:(2)
+  | _ ++ _ ++ l ++ _ => constr:(3)
+  | _ ++ _ ++ _ ++ l ++ _ => constr:(4)
+  | _ ++ _ ++ _ ++ _ ++ l ++ _ => constr:(5)
+  | _ ++ _ ++ _ ++ _ ++ _ ++ l ++ _ => constr:(6)
+  | _ => constr:(0) (* not found *)
+  end.
+
+Ltac PPermut_simpl_once :=
+  match goal with
+  | |- PPermut (_ ++ nil) _ => fail 1
+  | |- PPermut (_ ++ (?l ++ _)) ?l' =>
+     match PPermut_index_of l l' with
+     | 0 => apply PPermut_tactic_keep
+     | ?n => let F := PPermut_lemma_get n in
+            eapply PPermut_tactic_trans;
+            [ apply F
+            | apply PPermut_tactic_simpl ]
+     end
+  end.
+
+Ltac PPermut_simpl :=
+  PPermut_simpl_prepare;
+  repeat PPermut_simpl_once;
+  autorewrite with ppermut_rew;
+  try apply PPermut_reflexive;
+  auto.
+
+
+(*** Other required lemmas - not covered by PPermut_simpl tactic ***)
+
 
 Lemma PPermut_nil_impl:
 forall L,
@@ -171,161 +283,45 @@ Qed.
 
 Hint Resolve PPermut_nil_impl PPermut_nil_contr.
 
-Lemma PPermut_last_simpl:
-forall L L' a, 
-  L ~=~ L' ->
-  L & a ~=~ L' & a.
-intros; apply PPermut_app_tail; auto.
-Qed.
-
-Lemma PPermut_last:
-forall L L' w t t',
-  t *=* t' ->
-  L ~=~ L' ->
-  L & (w, t) ~=~ L' & (w, t').
-induction L; destruct L'; intros; simpl;
-auto.
-Qed.
-
-Hint Resolve PPermut_last_simpl PPermut_last.
-
-Lemma PPermut_mid_last_app:
-forall G' G G0,
-  G ++ G' ~=~ G0 ->
-  forall a,
-    G & a ++ G' ~=~ G0 & a.
-intros; rew_app;
-transitivity (a:: nil ++ G0);
-[ simpl; apply PPermut_symmetric in H; apply PPermut_symmetric | ];
-auto.
-Qed.
-Hint Resolve PPermut_mid_last_app.
-
-Lemma PPermut_cons_last_same:
-forall L a,
-  a :: L ~=~ L & a.
-induction L; intros;
-[ | rew_app]; auto;
-transitivity (a :: a0 :: L); [destruct a0; destruct a | ]; auto.
-Qed.
-
-Lemma PPermut_cons_last:
-forall L L' a,
-  L ~=~ L' ->
-  a :: L ~=~ L' & a.
-intros; rewrite H; apply PPermut_cons_last_same.
-Qed.
-Hint Resolve PPermut_cons_last_same PPermut_cons_last.
-
-Lemma PPermut_swap2:
-forall C C' G,
-  C :: G & C' ~=~ G & C & C'.
-Admitted.
-Hint Resolve PPermut_swap2.
-
-(* FIXME: Admitted *)
 Lemma PPermut_last_rev_simpl:
 forall G G' a,
   G & a ~=~ G' & a ->
   G ~=~ G'.
-Admitted.
+Admitted. (* !!! *)
 
-
-(* FIXME: Admitted *)
 Lemma PPermut_last_rev:
 forall G G' w Gamma Gamma',
   Gamma *=* Gamma' ->
   G & (w, Gamma) ~=~ G' & (w, Gamma') ->
   G ~=~ G'.
-Admitted.
+intros;
+assert (G & (w, Gamma) ~=~ G' & (w, Gamma)) by eauto with ppermut_rew;
+apply PPermut_last_rev_simpl with (a:=(w, Gamma)); auto.
+Qed.
 
-(* FIXME: Admitted *)
 Lemma PPermut_split_neq:
 forall G G' w w' Gamma Gamma',
   G & (w, Gamma) ~=~ G' & (w', Gamma') ->
   ~Gamma *=* Gamma' \/ w <> w' ->
   exists GH, exists GT, G = GH & (w', Gamma') ++ GT.
-Admitted.
+Admitted. (* !!! *)
 
-(* FIXME: Admitted *)
-Lemma PPermut_middle_last:
-forall G G' C,
-  G ++ G' & C ~=~ G ++ C :: G'.
-Admitted.
-Hint Resolve PPermut_middle_last.
-
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized1:
-forall G G' C C',
-  G ++ C :: G' & C' ~=~ G ++ G' ++ C' :: C :: nil.
-Admitted.
-
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized2:
+Lemma PPermut_specialized_case:
 forall GH GT G Gamma Gamma' Gamma'',
   GH ++ Gamma :: GT & Gamma' ~=~ G & Gamma ->
   GH ++ GT ++ Gamma'' :: Gamma' :: nil ~=~ G & Gamma''.
-Admitted.
+intros; PPermut_simpl; apply PPermut_last_rev_simpl with (a:=Gamma);
+rew_app; rewrite <- H; PPermut_simpl.
+Qed.
 
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized3:
-forall G G' C C',
-  G ++ G' ++ C :: C' :: nil ~=~ G ++ C :: G' & C'.
-Admitted.
-
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized4:
+Lemma PPermut_specialized_case2:
 forall G GH GT Gamma Gamma0 Gamma'0,
   GH ++ Gamma :: GT & Gamma'0 ~=~ G & Gamma ->
   G ++ Gamma0 :: Gamma :: nil ~=~ GH ++ GT ++ Gamma0 :: Gamma'0 :: Gamma :: nil.
-Admitted.
+intros; PPermut_simpl; apply PPermut_last_rev_simpl with (a:=Gamma);
+rew_app; rewrite <- H; PPermut_simpl.
+Qed.
 
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized5:
-forall G G' C C' C'',
-  G ++ C :: G' ++ C' :: C'' :: nil ~=~ (G ++ G' ++ C' :: C'' :: nil) & C.
-Admitted.
-
-(* FIXME: Admitted *)
-(* FIXME: Too specialized *)
-Lemma PPermut_specialized6:
-forall GH GT C0 C'' C'0,
-  GH ++ GT ++ C'0 :: C'' :: C0 :: nil ~=~ GH ++ GT ++ C0 :: C'0 :: C'' :: nil.
-Admitted.
-
-Lemma PPermut_swap_inner:
-forall G G' C C',
-  C :: G ++ C' :: G' ~=~ C' :: G ++ G' & C.
-Admitted.
-
-Lemma PPermut_swap_inner2:
-forall G G' C C',
-  C :: G ++ G' & C' ~=~ C' :: G ++ G' & C.
-Admitted.
-
-Lemma PPermut_swap3:
-forall C C' G,
-  C :: G & C' ~=~ C' :: G & C.
-Admitted.
-
-Lemma PPermut_swap4:
-forall C G' G,
-  G ++ G' & C ~=~ G & C ++ G'.
-Admitted.
-
-
-Hint Resolve PPermut_swap_inner.
-Hint Resolve PPermut_swap_inner2.
-Hint Resolve PPermut_swap3 PPermut_swap4.
-
-Hint Resolve PPermut_specialized1 PPermut_specialized2 
-             PPermut_specialized3 PPermut_specialized4
-             PPermut_specialized5 PPermut_specialized6.
+Hint Resolve PPermut_specialized_case PPermut_specialized_case2 : ppermut_rew.
 
 Close Scope permut_scope.
-
