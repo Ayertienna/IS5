@@ -2,6 +2,7 @@ Require Import Setoid.
 
 Require Export LibListSorted.
 Require Export LibList.
+Require Export LibRelation.
 
 Notation " Ctx *=* Ctx'" := (permut Ctx Ctx') (at level 70) : permut_scope.
 
@@ -84,35 +85,59 @@ try eapply IHrtclosure; eauto;
 symmetry in H5; apply nil_eq_app_inv in H5; destruct H5; inversion H3.
 Qed.
 
+Lemma Mem_split:
+forall A l (a: A),
+  Mem a l ->
+  exists hd, exists tl, l = hd & a ++ tl.
+induction l; intros.
+rewrite Mem_nil_eq in H; contradiction.
+rewrite Mem_cons_eq in H; destruct H.
+subst; exists nil; exists l; rew_app; auto.
+apply IHl in H; destruct H as (hd); destruct H as (tl); subst.
+exists (a::hd); exists tl; rew_app; auto.
+Qed.
+
+Lemma Mem_permut:
+forall A (l l' : list A) (x : A),
+  l *=* l' ->
+  Mem x l ->
+  Mem x l'.
+intros; induction H; auto;
+apply IHrtclosure;
+inversion H; subst;
+repeat rewrite Mem_app_or_eq in H0;
+repeat rewrite Mem_app_or_eq;
+repeat (destruct H0; auto).
+Qed.
+
 Lemma permut_split_head:
 forall A l1 l2 (a: A), (a::l1) *=* l2 ->
-  exists l3, exists l4, l2 = l3 & a ++ l4.
-intros; remember (a::l1) as l1';
-generalize dependent l1;
-generalize dependent a;
-induction H; intros; subst.
-exists nil; exists l1; rew_app; auto.
-Admitted. (* !!! *)
+  exists hd, exists tl, l2 = hd & a ++ tl.
+intros; apply Mem_split; eapply Mem_permut; eauto;
+apply Mem_here.
+Qed.
 
-Lemma permut_remove_cons:
+Lemma permut_cons_rew:
 forall A l1 l2 (a:A), (a::l1) *=* (a::l2) -> l1 *=* l2.
 Admitted. (* !!! *)
 
-Lemma Mem_permut:
-forall A L1 L2, permut L1 L2 ->
-  forall (x : A), Mem x L1 -> Mem x L2.
-induction L1; intros.
-rewrite Mem_nil_eq in H0; contradiction.
-rewrite Mem_cons_eq in H0; destruct H0;
-assert (a :: L1 *=* L2) as HP by auto;
-apply permut_split_head in H;
-destruct H as (HH, H); destruct H as (HT, H); subst.
-rewrite Mem_app_or_eq; left; apply Mem_last.
-apply IHL1 with (L2 := HH++HT) in H0.
-rewrite Mem_app_or_eq in *; destruct H0; [left | right];
-[apply Mem_app_or; left | ]; auto.
-apply permut_remove_cons with (a:=a); rewrite HP;
-permut_simpl.
+Lemma permut_neq_split:
+forall A l1 l2 (a:A) b,
+  a <> b ->
+  Mem a l1 ->
+  l1 *=* b :: l2 ->
+  exists gh, exists gt, l2 = gh & a ++ gt.
+intros; apply Mem_split;
+assert (Mem a (b::l2)) by (eapply Mem_permut; eauto);
+apply Mem_inv in H2; destruct H2; [ contradiction | destruct H2]; auto.
+Qed.
+
+Lemma permut_Mem_split_head:
+forall A l1 l2 (a: A),
+  l1 *=* l2 ->
+  Mem a l1 ->
+  exists gh, exists gt, l2 = gh & a ++ gt.
+intros; apply Mem_split; eapply Mem_permut; eauto.
 Qed.
 
 Lemma permut_dec:
@@ -127,7 +152,7 @@ assert (forall k k' : A, {k = k'} + {k <> k'}) as DecP by auto;
 specialize Dec with a a1; destruct Dec; subst.
 apply IHa with (a':=a') in DecP;
 destruct DecP; [left | right]; auto;
-intro; apply permut_remove_cons in H; contradiction.
+intro; apply permut_cons_rew in H; contradiction.
 Admitted. (* !!! #38 *)
 
 Close Scope permut_scope.
