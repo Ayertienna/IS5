@@ -14,34 +14,56 @@ match G with
 end.
 
 Add Morphism emptyEquiv : Permut_emptyEquiv.
-Admitted.
+intros.
+induction H; simpl in *; auto.
+transitivity (emptyEquiv G'); auto.
+Qed.
 
 Lemma emptyEquiv_last_change:
 forall G G' w C C',
   G  ~=~ G'& (w, C) ->
   emptyEquiv G ~=~ emptyEquiv (G' & (w, C')).
-Admitted.
+intros.
+assert (G ~=~ (w, C) :: G') by (transitivity (G' & (w,C)); PPermut_simpl).
+assert (G' & (w, C') ~=~ (w, C') :: G') by PPermut_simpl.
+rewrite H0; rewrite H1; simpl; auto.
+Qed.
 
 Lemma emptyEquiv_rewrite:
 forall G H,
   emptyEquiv (G++H) = emptyEquiv G ++ emptyEquiv H.
-Admitted.
+induction G; rew_app; intros; auto.
+rew_app; destruct a; simpl; rew_app; rewrite IHG; auto.
+Qed.
 
 Lemma emptyEquiv_rewrite_last:
 forall G C,
   emptyEquiv (G & C) = emptyEquiv G ++ emptyEquiv (C::nil).
-Admitted.
+intros; apply emptyEquiv_rewrite.
+Qed.
+
+Lemma emptyEquiv_Mem_nil:
+forall G w C,
+  Mem (w, C) (emptyEquiv G) -> C = nil.
+induction G; simpl; intros.
+rewrite Mem_nil_eq in H; contradiction.
+destruct a; simpl in *; rewrite Mem_cons_eq in H; destruct H.
+inversion H; subst; auto.
+apply IHG with (w:=w); auto.
+Qed.
 
 Lemma emptyEquiv_permut_empty:
 forall G G' w,
   G ~=~ emptyEquiv G' ->
   forall C, Mem (w, C) G -> C = nil.
-Admitted.
+Admitted. (* !!! *)
 
 Lemma double_emptyEquiv:
 forall G,
  emptyEquiv G = emptyEquiv( emptyEquiv G).
-Admitted.
+induction G; simpl; auto; destruct a;
+simpl; rewrite <- IHG; auto.
+Qed.
 
 Lemma emptyEquiv_permut_split_last:
 forall G C H,
@@ -49,8 +71,32 @@ forall G C H,
   emptyEquiv G = G.
 Admitted.
 
-Lemma emptyEquiv_ok:
+Lemma emptyEquiv_ok_list:
+forall G U,
+  ok G U ->
+  ok (emptyEquiv G) U.
+induction G; simpl; intros; auto; destruct a; case_if;
+simpl in *; case_if; apply IHG; auto.
+Qed.
+
+Lemma emptyEquiv_ok_var:
+forall G U,
+  ok (flat_map snd G) U ->
+  ok (flat_map snd (emptyEquiv G)) U.
+induction G; simpl; intros; auto; destruct a;
+simpl in *; apply IHG.
+eapply ok_split with (G1:=l); eauto.
+skip. (* should be: exact H *)
+Qed.
+
+Lemma emptyEquiv_ok_Bg:
 forall G,
   ok_Bg G ->
   ok_Bg (emptyEquiv G).
-Admitted.
+induction G; simpl; intros; auto; destruct a.
+unfold ok_Bg in *;
+destruct H; split; simpl in *; case_if.
+apply emptyEquiv_ok_list; auto.
+apply emptyEquiv_ok_var.
+skip. (* apply ok_split in H0; auto. *)
+Qed.

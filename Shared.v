@@ -130,8 +130,6 @@ Qed.
 
 (*** Shared definitions ***)
 
-(* FIXME: Removable once we have generic libraries *)
-
 (* Background and context for label-free language *)
 Definition Context_LF := prod var (list (prod var ty)).
 Definition Background_LF := list Context_LF.

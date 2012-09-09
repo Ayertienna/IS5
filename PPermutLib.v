@@ -265,6 +265,12 @@ Ltac PPermut_simpl :=
 
 (*** Other required lemmas - not covered by PPermut_simpl tactic ***)
 
+Lemma PPermut_Mem:
+forall G G' w X,
+  G ~=~ G' ->
+  Mem (w, X) G ->
+  exists X', X' *=* X /\ Mem (w, X') G'.
+Admitted.
 
 Lemma PPermut_nil_impl:
 forall L,
@@ -299,11 +305,14 @@ assert (G & (w, Gamma) ~=~ G' & (w, Gamma)) by eauto with ppermut_rew;
 apply PPermut_last_rev_simpl with (a:=(w, Gamma)); auto.
 Qed.
 
+(* FIXME: Check which variant is really required! *)
 Lemma PPermut_split_neq:
 forall G G' w w' Gamma Gamma',
   G & (w, Gamma) ~=~ G' & (w', Gamma') ->
   ~Gamma *=* Gamma' \/ w <> w' ->
-  exists GH, exists GT, G = GH & (w', Gamma') ++ GT.
+  exists Gamma0, exists GH, exists GT,
+    Gamma0 *=* Gamma' ->
+    G = GH & (w', Gamma0) ++ GT.
 Admitted. (* !!! *)
 
 Lemma PPermut_specialized_case:
