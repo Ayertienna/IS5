@@ -27,9 +27,7 @@ Notation "G ~=~ G'" := (PPermut G G') (at level 70) : permut_scope.
 Lemma PPermut_reflexive:
   Reflexive PPermut.
 unfold Reflexive; intros;
-induction x;
-  [ | destruct a];
-  eauto.
+induction x; [ | destruct a]; eauto.
 Qed.
 
 Lemma PPermut_symmetric:
@@ -59,29 +57,10 @@ Qed.
 
 Add Setoid (list Context_LF) PPermut PPermut'oid as PPermutoid.
 
-Lemma test1:
-  forall G, PPermut G G.
-auto.
-Qed.
-
 Add Morphism (@cons Context_LF) : PPermut_cons.
 intro y; destruct y; auto.
 Qed.
 Hint Resolve PPermut_cons.
-
-Lemma test2:
-  forall G G' w Gamma,
-  PPermut G G' -> PPermut ((w, Gamma)::G) ((w, Gamma) :: G').
-auto.
-Qed.
-
-Lemma test3:
-  forall G G' w Gamma,
-    PPermut G G' -> PPermut ((w, Gamma)::G') ((w, Gamma) :: G).
-intros;
-apply PPermutoid;
-auto.
-Qed.
 
 Lemma PPermut_app_tail:
 forall G G' G0,
@@ -106,14 +85,6 @@ transitivity (G' ++ y0); auto.
 Qed.
 Hint Resolve PPermut_app.
 
-Lemma test4:
-forall G G' G'' G0 G1 Ctx,
-  G ~=~ G' ->
-  G0 ~=~ G1 ->
-  G ++ Ctx :: G'' ++ G0 ~=~ G' ++ Ctx :: G'' ++ G1.
-auto.
-Qed.
-
 Theorem PPermut_app_comm:
 forall G1 G2,
   G1 ++ G2 ~=~ G2 ++ G1.
@@ -129,15 +100,6 @@ rew_app; constructor; auto;
 transitivity ((v,l) :: G1 ++ G2); auto.
 Qed.
 Hint Resolve PPermut_app_comm.
-
-Lemma test5:
-forall G G' G'' G0 G1,
-  G ~=~ G' ->
-  G0 ~=~ G1 ->
-  G0 ++ G ++ G'' ~=~ G' ++ G1 ++ G''.
-intros; transitivity (G ++ G0 ++ G'');
-repeat rewrite <- app_assoc; auto.
-Qed.
 
 
 (*** Automation **)
@@ -270,7 +232,27 @@ forall G G' w X,
   G ~=~ G' ->
   Mem (w, X) G ->
   exists X', X' *=* X /\ Mem (w, X') G'.
-Admitted.
+intros; generalize dependent X; induction H; intros.
+
+rewrite Mem_nil_eq in H0; contradiction.
+
+rewrite Mem_cons_eq in H1; destruct H1.
+inversion H1; subst; exists Gamma'; split; [ symmetry | apply Mem_here]; auto.
+apply IHPPermut in H1; destruct H1 as (Gamma''); exists Gamma'';
+destruct H1; split; auto; rewrite Mem_cons_eq; right; auto.
+
+repeat rewrite Mem_cons_eq in H1; destruct H1.
+inversion H1; subst; exists Gamma1; split; [ symmetry | rewrite Mem_cons_eq];
+auto; right; apply Mem_here.
+destruct H1.
+inversion H1; subst; exists Gamma1'; split; [ symmetry | rewrite Mem_cons_eq];
+auto.
+exists X; split; auto; repeat rewrite Mem_cons_eq; right; right; auto.
+
+apply IHPPermut1 in H1; destruct H1 as (X'); destruct H1.
+apply IHPPermut2 in H2; destruct H2 as (X''); destruct H2;
+exists X''; split; auto; transitivity X'; auto.
+Qed.
 
 Lemma PPermut_nil_impl:
 forall L,
@@ -289,6 +271,8 @@ Qed.
 
 Hint Resolve PPermut_nil_impl PPermut_nil_contr.
 
+(* FIXME: This will most likely require change in induction principle
+   as was in Sorting/Permutation + generalization into G & a ++ G' ~=~ etc *)
 Lemma PPermut_last_rev_simpl:
 forall G G' a,
   G & a ~=~ G' & a ->
@@ -303,6 +287,22 @@ forall G G' w Gamma Gamma',
 intros;
 assert (G & (w, Gamma) ~=~ G' & (w, Gamma)) by eauto with ppermut_rew;
 apply PPermut_last_rev_simpl with (a:=(w, Gamma)); auto.
+Qed.
+
+Lemma PPermut_split_head:
+forall G G' w Gamma,
+  (w, Gamma) :: G ~=~ G' ->
+  exists Gamma' hd tl,
+    Gamma *=* Gamma' /\ G' = hd & (w, Gamma') ++ tl.
+intros.
+apply PPermut_Mem with (w:=w) (X:=Gamma) in H.
+destruct H as (Gamma'); destruct H.
+exists Gamma'.
+assert (exists hd, exists tl, G' = hd & (w, Gamma') ++ tl) by
+  (eapply Mem_split; auto).
+destruct H1 as (hd, (tl, H1));
+exists hd; exists tl; split; [symmetry | ]; auto.
+apply Mem_here.
 Qed.
 
 (* FIXME: Check which variant is really required! *)

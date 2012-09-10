@@ -81,7 +81,7 @@ end.
 
 (*
 Decidability for var is not expressed in the library, so we need to
-add ana axiom for it.
+add an axiom for it.
 *)
 Axiom eq_var_dec:
   forall v1 v2: var, {v1 = v2} + {v1 <> v2}.
@@ -133,7 +133,6 @@ Qed.
 (* Background and context for label-free language *)
 Definition Context_LF := prod var (list (prod var ty)).
 Definition Background_LF := list Context_LF.
-
 
 (* Context for labeled language *)
 Definition Context_L := list (prod var (prod var ty)).

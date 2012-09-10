@@ -73,20 +73,19 @@ Admitted.
 
 Lemma emptyEquiv_ok_list:
 forall G U,
-  ok G U ->
-  ok (emptyEquiv G) U.
-induction G; simpl; intros; auto; destruct a; case_if;
-simpl in *; case_if; apply IHG; auto.
+  ok_LF G U ->
+  ok_LF (emptyEquiv G) U.
+induction G; simpl; intros; auto; destruct a.
+inversion H; subst; constructor; auto.
 Qed.
 
 Lemma emptyEquiv_ok_var:
 forall G U,
-  ok (flat_map snd G) U ->
-  ok (flat_map snd (emptyEquiv G)) U.
+  ok_LF (flat_map snd G) U ->
+  ok_LF (flat_map snd (emptyEquiv G)) U.
 induction G; simpl; intros; auto; destruct a;
 simpl in *; apply IHG.
-eapply ok_split with (G1:=l); eauto.
-skip. (* should be: exact H *)
+eapply ok_LF_split with (G1:=l); eauto.
 Qed.
 
 Lemma emptyEquiv_ok_Bg:
@@ -95,8 +94,10 @@ forall G,
   ok_Bg (emptyEquiv G).
 induction G; simpl; intros; auto; destruct a.
 unfold ok_Bg in *;
-destruct H; split; simpl in *; case_if.
+destruct H; split; simpl in *.
+inversion H; subst;
+constructor; auto;
 apply emptyEquiv_ok_list; auto.
 apply emptyEquiv_ok_var.
-skip. (* apply ok_split in H0; auto. *)
+apply ok_LF_split in H0; destruct H0; auto.
 Qed.

@@ -1,8 +1,8 @@
 Require Import Setoid.
-
 Require Export LibListSorted.
 Require Export LibList.
 Require Export LibRelation.
+
 
 Notation " Ctx *=* Ctx'" := (permut Ctx Ctx') (at level 70) : permut_scope.
 
@@ -32,31 +32,19 @@ Hint Resolve Permut_refl Permut_sym.
 
 Open Scope permut_scope.
 
-Lemma test1:
-forall A (G G' G'': list A), G *=* G' -> G'' *=* G' -> G *=* G''.
-intros; rewrite H0; auto.
-Qed.
-
 Add Parametric Morphism A (a:A) : (cons a)
   with signature @permut A ==> @permut A
   as Permut_cons.
 auto.
 Qed.
 
-Lemma Permut_last:
-forall (A: Type) (a:A) L L',
-  L *=* L' ->
-  L & a *=* L' & a.
-auto.
-Qed.
-Hint Resolve Permut_cons Permut_last.
-
 Add Parametric Morphism A : (@append A)
   with signature @permut A ==> @permut A ==> @permut A
   as Permut_append.
 auto.
 Qed.
-Hint Resolve Permut_append.
+
+Hint Resolve Permut_cons Permut_append.
 
 Lemma permut_nil_eq:
 forall A L, nil *=* L -> L = (@nil A).
@@ -89,11 +77,11 @@ Lemma Mem_split:
 forall A l (a: A),
   Mem a l ->
   exists hd, exists tl, l = hd & a ++ tl.
-induction l; intros.
-rewrite Mem_nil_eq in H; contradiction.
-rewrite Mem_cons_eq in H; destruct H.
-subst; exists nil; exists l; rew_app; auto.
-apply IHl in H; destruct H as (hd); destruct H as (tl); subst.
+induction l; intros;
+[rewrite Mem_nil_eq in H; contradiction |
+ rewrite Mem_cons_eq in H; destruct H]; subst;
+[exists nil; exists l; rew_app; auto | ];
+apply IHl in H; destruct H as (hd); destruct H as (tl); subst;
 exists (a::hd); exists tl; rew_app; auto.
 Qed.
 
@@ -117,9 +105,18 @@ intros; apply Mem_split; eapply Mem_permut; eauto;
 apply Mem_here.
 Qed.
 
-Lemma permut_cons_rew:
-forall A l1 l2 (a:A), (a::l1) *=* (a::l2) -> l1 *=* l2.
-Admitted. (* !!! *)
+Lemma permut_app_inv:
+forall A l1 l2 l3 l4 (a:A),
+  l1 & a ++ l2 *=* l3 & a ++ l4 ->
+  l1 ++ l2 *=* l3 ++ l4.
+Admitted. (* !!! Bug: #39 *)
+
+Lemma permut_cons_inv:
+forall A l1 l2 (a:A),
+  a::l1 *=* a::l2 ->
+  l1 *=* l2.
+intros; apply (permut_app_inv A nil l1 nil l2 a); rew_app; auto.
+Qed.
 
 Lemma permut_neq_split:
 forall A l1 l2 (a:A) b,
@@ -152,7 +149,8 @@ assert (forall k k' : A, {k = k'} + {k <> k'}) as DecP by auto;
 specialize Dec with a a1; destruct Dec; subst.
 apply IHa with (a':=a') in DecP;
 destruct DecP; [left | right]; auto;
-intro; apply permut_cons_rew in H; contradiction.
-Admitted. (* !!! #38 *)
+intro; apply permut_cons_inv in H; contradiction.
+(* now, if a <> a1 there's no simple way to use IHa with just a':=a *)
+Admitted. (* !!! Bug: #38 *)
 
 Close Scope permut_scope.
