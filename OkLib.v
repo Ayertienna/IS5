@@ -83,7 +83,17 @@ match G with
 | (w, Gamma) :: G => \{w} \u used_w_vars G
 end.
 
+
+
 (*** Lemmas ***)
+
+(* used_*_vars *)
+
+Add Morphism used_t_vars: PPermut_used_t.
+Admitted.
+
+Add Morphism used_w_vars: PPermut_used_w.
+Admitted.
 
 (* ok_LF for a generic type *)
 
@@ -358,18 +368,17 @@ rewrite H0; eapply ok_Bg_permut_no_last; rew_app; eauto.
 Qed.
 
 Lemma ok_Bg_no_last:
-forall G w C,
-  ok_Bg (G & (w,C)) ->
-  ok_Bg G.
-(*intros. assert (G & (w,C) ~=~ ((w, C) :: nil) ++ G) by PPermut_simpl;
-rewrite H0 in H;
+forall G C,
+  ok_Bg (G & C) -> ok_Bg G.
+(*
+intros;
+assert (G & C ~=~ (C :: nil) ++ G) by PPermut_simpl; rewrite H0 in H;
 destruct H; split.
-eapply ok_split in H; destruct H; auto.
-simpl in H1.
-assert (ok_LF C nil /\ ok_LF (flat_map snd_ G) nil) by skip. (* !!! *)
-  (* eapply ok_split with (A:= var) (G1:=C) (G2:=flat_map snd_ G) (U:=nil). *)
-destruct H2; auto.
-Qed.*) Admitted.
+eapply ok_LF_split with (G1:=C::nil) (G2:=G); eauto.
+simpl in *; destruct C. case_if.
+eapply ok_split with (G1:=snd_ (v,l)) (G2:=flat_map snd_  G); auto.
+skip. (* exact H1 *)
+Qed. *) Admitted.
 Hint Resolve ok_Bg_no_last.
 
 Lemma ok_Bg_permut_no_last_spec2:
@@ -611,20 +620,5 @@ Hint Resolve ok_Bg_permut_no_last ok_Bg_permut_no_last_spec2
   ok_Bg_permut_no_last_spec ok_Bg_first_last_neq
   ok_Bg_last_last2_neq : ok_bg_rew.
 Hint Resolve ok_Bg_swap_worlds.
-
-Lemma ok_Bg_skip_last:
-forall G C,
-  ok_Bg (G & C) -> ok_Bg G.
-(*
-intros;
-assert (G & C ~=~ (C :: nil) ++ G) by PPermut_simpl; rewrite H0 in H;
-destruct H; split.
-eapply ok_LF_split with (G1:=C::nil) (G2:=G); eauto.
-simpl in *; destruct C. case_if.
-eapply ok_split with (G1:=snd_ (v,l)) (G2:=flat_map snd_  G); auto.
-skip. (* exact H1 *)
-Qed. *) Admitted.
-
-Hint Resolve ok_Bg_skip_last: ok_bg_rew.
 
 Close Scope permut_scope.

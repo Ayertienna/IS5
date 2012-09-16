@@ -1,6 +1,5 @@
 Require Export Shared.
-Require Export LibList.
-
+Require Export PermutLib.
 
 (*** Definitions ***)
 
@@ -12,7 +11,8 @@ Terms in label-free IS5 system:
   * box expression
   * unpacking box (possibly in a different world)
   * diamond expression (possibly in a different world)
-  * using diamond expression (possibly diamond is from a different world)
+  * using diamond expression (possibly the diamond itself is from a
+  different world)
 *)
 Inductive te_LF :=
 | hyp_LF: vte -> te_LF
@@ -53,33 +53,62 @@ match M with
 | letdia_get_LF _ M N => free_vars_LF M \u free_vars_LF N
 end.
 
-(* Calculate list of bound worlds in the term *)
-Fixpoint bound_worlds (M: te_LF) :=
-match M with
-| hyp_LF n => nil
-| lam_LF t M => bound_worlds M
-| appl_LF M N => bound_worlds M ++ bound_worlds N
-| box_LF M => bound_worlds M
-| unbox_fetch_LF (bwo w) M => w :: bound_worlds M
-| unbox_fetch_LF (fwo w) M => bound_worlds M
-| get_here_LF (bwo w) M => w :: bound_worlds M
-| get_here_LF (fwo w) M => bound_worlds M
-| letdia_get_LF (bwo w) M N => w :: bound_worlds M ++ bound_worlds N
-| letdia_get_LF (fwo w) M N => bound_worlds M ++ bound_worlds N
-end.
 
-(* Calculate list of bound variables of level above n *)
-Fixpoint bound_vars (M: te_LF) :=
-match M with
-| hyp_LF (bte n) => n::nil
-| hyp_LF (fte n) => nil
-| lam_LF t M => bound_vars M
-| appl_LF M N => bound_vars M ++ bound_vars N
-| box_LF M => bound_vars M
-| unbox_fetch_LF _ M => bound_vars M
-| get_here_LF _ M => bound_vars M
-| letdia_get_LF _ M N => bound_vars M ++ bound_vars N
-end.
+(*
+Property: term is locally closed
+ This means that there are no bound variables.
+*)
+
+Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
+ | lct_hyp_LF: forall v n, lc_t_n_LF n (hyp_LF (fte v))
+ | lct_lam_LF: forall M t n,
+     lc_t_n_LF (S n) M ->
+     lc_t_n_LF n (lam_LF t M)
+ | lct_appl_LF: forall M N n,
+     lc_t_n_LF n M -> lc_t_n_LF n N ->
+     lc_t_n_LF n (appl_LF M N)
+ | lct_box_LF: forall M n,
+     lc_t_n_LF n M ->
+     lc_t_n_LF n (box_LF M)
+ | lct_unbox_fetch_LF: forall M w n,
+     lc_t_n_LF n M ->
+     lc_t_n_LF n (unbox_fetch_LF (fwo w) M)
+ | lct_get_here_LF: forall M w n,
+     lc_t_n_LF n M ->
+     lc_t_n_LF n (get_here_LF (fwo w) M)
+ | lct_letdia_get_LF: forall M N w n,
+     lc_t_n_LF (S n) N ->
+     lc_t_n_LF n M ->
+     lc_t_n_LF n (letdia_get_LF (fwo w) M N)
+.
+
+Definition lc_t_LF M := lc_t_n_LF 0 M.
+
+
+Inductive lc_w_n_LF: nat -> te_LF -> Prop :=
+| lcw_hyp_LF: forall v n, lc_w_n_LF n (hyp_LF (fte v))
+| lcw_lam_LF: forall t M n,
+    lc_w_n_LF n M ->
+    lc_w_n_LF n (lam_LF t M)
+| lcw_appl_LF: forall M N n,
+    lc_w_n_LF n M -> lc_w_n_LF n N ->
+    lc_w_n_LF n (appl_LF M N)
+| lcw_box_LF: forall M n,
+    lc_w_n_LF (S n) M ->
+    lc_w_n_LF n (box_LF M)
+| lcw_unbox_fetch_LF: forall M w n,
+    lc_w_n_LF n M ->
+    lc_w_n_LF n (unbox_fetch_LF (fwo w) M)
+| lcw_get_here_LF: forall M w n,
+    lc_w_n_LF n M ->
+    lc_w_n_LF n (get_here_LF (fwo w) M)
+| lcw_letdia_get_LF: forall M N w n,
+    lc_w_n_LF (S n) N ->
+    lc_w_n_LF n M ->
+    lc_w_n_LF n (letdia_get_LF (fwo w) M N)
+.
+
+Definition lc_w_LF M := lc_w_n_LF 0 M.
 
 
 (*** Properties ***)
@@ -92,6 +121,48 @@ forall (c1 c2: Context_LF),
   { ~permut (snd c1) (snd c2) \/ (fst c1) <> (fst c2)}.
 intros; destruct c1 as (w, a); destruct c2 as (w', a');
 destruct (eq_var_dec w w'); subst; simpl;
-destruct (permut_dec a a'); simpl;
-auto.
+destruct (permut_dec (var * ty) a a'); simpl;
+auto; intros;
+repeat decide equality;
+apply eq_var_dec.
+Qed.
+
+
+(* Propagation of lc_*_n_LF property *)
+
+Lemma closed_w_succ:
+forall M n,
+  lc_w_n_LF n M -> lc_w_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_w_n_LF.
+Qed.
+
+Lemma closed_t_succ:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
+Qed.
+
+
+Lemma closed_w_addition:
+forall M n m,
+  lc_w_n_LF n M -> lc_w_n_LF (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n+ S m) with (S (n+m)) by auto] ;
+try apply closed_w_succ;
+assumption.
+Qed.
+
+Lemma closed_t_addition:
+forall M n m,
+  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ;
+assumption.
 Qed.

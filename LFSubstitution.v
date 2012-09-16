@@ -1,5 +1,4 @@
 Require Export LFSyntax.
-Require Export LibLogic. (* If *)
 Require Export LibTactics. (* case_if *)
 
 (* Notation for term substitution *)
@@ -15,6 +14,8 @@ Global Reserved Notation " {{ w1 // w2 }} N " (at level 5).
 (*
 Term substitution
   Simple term substitution, very similar to the one in simple lambda calculus.
+  We assume here that the term M0 is locally closed, that is it does not
+  require any shifts.
 *)
 Fixpoint subst_t (M0: te_LF) (v0: vte) (N0: te_LF) :=
 match N0 with
@@ -37,104 +38,57 @@ where " [ M // v ] N " := (subst_t M v N) : label_free_is5_scope.
 
 
 (*
-Context substitution (or rather world substitution)
+World substitution
   Replaces one world with another. Since both of the worlds can be free or
   bound, we need to use shift operation on both sides for box and letdia cases.
 *)
-Fixpoint subst_ctx (M0 : te_LF) (ctx1: vwo) (ctx2: vwo) :=
+Fixpoint subst_w (w1: vwo) (w2: vwo) (M0: te_LF) :=
 match M0 with
 | hyp_LF n => hyp_LF n
-| lam_LF A M => lam_LF A ({{ctx1//ctx2}}M)
-| appl_LF M N => appl_LF ({{ctx1//ctx2}}M) ({{ctx1//ctx2}}N)
+| lam_LF A M => lam_LF A ({{w1//w2}}M)
+| appl_LF M N => appl_LF ({{w1//w2}}M) ({{w1//w2}}N)
 | box_LF M =>
-  box_LF ({{ shift_vwo ctx1 // shift_vwo ctx2 }} M)
+  box_LF ({{ shift_vwo w1 // shift_vwo w2 }} M)
 | unbox_fetch_LF w M =>
-  let w' := If w = ctx2 then ctx1 else w in
-    unbox_fetch_LF w' ({{ctx1//ctx2}} M)
+  let w' := if (eq_vwo_dec w w2) then w1 else w in
+    unbox_fetch_LF w' ({{w1//w2}} M)
 | get_here_LF w M =>
-  let w' := If w = ctx2 then ctx1 else w in
-    get_here_LF w' ({{ctx1//ctx2}}M)
+  let w' := if (eq_vwo_dec w w2) then w1 else w in
+    get_here_LF w' ({{w1//w2}}M)
 | letdia_get_LF w M N =>
-  let w' := If w = ctx2 then ctx1 else w in
-    letdia_get_LF w' ({{ctx1//ctx2}} M) ({{shift_vwo ctx1 // shift_vwo ctx2}} N)
+  let w' := if (eq_vwo_dec w w2) then w1 else w in
+    letdia_get_LF w' ({{w1//w2}} M) ({{shift_vwo w1 // shift_vwo w2}} N)
 end
-where " {{ w1 // w2 }} M " := (subst_ctx M w1 w2) : label_free_is5_scope.
+where " {{ w1 // w2 }} M " := (subst_w w1 w2 M) : label_free_is5_scope.
 
 
 (* Opening is defined in terms of substitution *)
 
-Definition open_var (M: te_LF) (t: te_LF) := subst_t t (bte 0) M.
+Definition open_t (M: te_LF) (t: te_LF) := subst_t t (bte 0) M.
 
-Definition open_ctx M ctx := subst_ctx M ctx (bwo 0).
+Definition open_w M w := subst_w w (bwo 0) M.
 
-Notation " M '^t^' t " := (open_var M t) (at level 5) : label_free_is5_scope.
-Notation " M ^w^ w  " := (open_ctx M w) (at level 10) : label_free_is5_scope.
+Notation " M '^t^' t " := (open_t M t) (at level 67) : label_free_is5_scope.
+Notation " M ^w^ w  " := (open_w M w) (at level 67) : label_free_is5_scope.
 
 Open Scope label_free_is5_scope.
 
+
 (*
-Property: term is locally closed
- This means that there are no bound variables.
+List substitution
+  Substituting a list of terms for bound variables in term, starting
+  from a given index.
 *)
+Fixpoint list_t_subst (L: list te_LF) (n: nat) (M: te_LF) :=
+match L with
+| nil => M
+| t :: L' => [t // bte n] (list_t_subst L' (S n) M)
+end.
 
-Inductive lc_w_LF : te_LF -> Prop :=
- | lcw_hyp_LF: forall v, lc_w_LF (hyp_LF v)
- | lcw_lam_LF: forall L t M,
-     forall x, x \notin L -> lc_w_LF (M ^t^ (hyp_LF x)) ->
-     lc_w_LF (lam_LF t M)
- | lcw_appl_LF: forall M N,
-     lc_w_LF M -> lc_w_LF N ->
-     lc_w_LF (appl_LF M N)
- | lcw_box_LF: forall M,
-     lc_w_LF M ->
-     lc_w_LF (box_LF M)
- | lcw_unbox_fetch_LF: forall M w,
-     lc_w_LF M ->
-     lc_w_LF (unbox_fetch_LF (fwo w) M)
- | lcw_get_here_LF: forall M w,
-     lc_w_LF M ->
-     lc_w_LF (get_here_LF (fwo w) M)
- | lcw_letdia_get_LF: forall L M N w,
-     forall x, x \notin L -> lc_w_LF (N ^t^ (hyp_LF x)) -> lc_w_LF M ->
-     lc_w_LF (letdia_get_LF (fwo w) M N)
-.
-
-Inductive lc_t_LF: te_LF -> Prop :=
-| lct_hyp_LF: forall v, lc_t_LF (hyp_LF (fte v))
-| lct_lam_LF: forall t M,
-    lc_t_LF M ->
-    lc_t_LF (lam_LF t M)
-| lct_appl_LF: forall M N,
-    lc_t_LF M -> lc_t_LF N ->
-    lc_t_LF (appl_LF M N)
- | lct_box_LF: forall L M,
-     forall w, w \notin L -> lc_t_LF (M ^w^ w) ->
-     lc_t_LF (box_LF M)
- | lct_unbox_fetch_LF: forall M w,
-     lc_t_LF M ->
-     lc_t_LF (unbox_fetch_LF (fwo w) M)
- | lct_get_here_LF: forall M w,
-     lc_t_LF M ->
-     lc_t_LF (get_here_LF (fwo w) M)
- | lct_letdia_get_LF: forall L M N w,
-     forall w', w' \notin L -> lc_t_LF (N ^w^ w') -> lc_t_LF M ->
-     lc_t_LF (letdia_get_LF (fwo w) M N)
-.
 
 
 (*** Properties ***)
 
-
-Lemma closed_var_subst_ctx:
-forall M w w',
-  lc_t_LF M = lc_t_LF ({{w //w'}} M).
-Admitted.
-
-Lemma closed_ctx_subst_var:
-forall M N k
-  (H: lc_w_LF N),
-  lc_w_LF M = lc_w_LF ([N // k] M).
-Admitted.
 
 (*
 Simplify substitution in special cases
@@ -143,8 +97,6 @@ Simplify substitution in special cases
   * when term is closed and we try to substitute for bound variable
 *)
 
-
-(* We effectively make identity substitution *)
 
 Lemma subst_w_id:
 forall M w,
@@ -167,73 +119,51 @@ assert (w <> w) as Neq by eauto; elim Neq; auto.
 Qed.
 
 
-(* There are no bound variables and we try to substitute for one *)
+(* Free variable for which we substitute does not occur in the term *)
 
-Lemma no_bound_vars_subst_t_id:
-forall N M n
-  (H_bound: bound_vars N = nil),
-  [M//bte n] N = N.
-induction N; intros; simpl in *;
-repeat case_if; auto;
-rewrite IHN || (rewrite IHN1; try rewrite IHN2); auto;
-apply app_eq_nil_inv in H_bound;
-destruct H_bound; auto.
-Qed.
-
-Lemma no_bound_worlds_subst_w_id:
-forall M n w
-  (H_bound: bound_worlds M = nil),
-  {{ w // bwo n }} M = M.
+Lemma closed_subst_w_free:
+forall M w0 w
+  (H_lc: w0 \notin free_worlds_LF M),
+  {{ w // fwo w0}} M  = M.
 induction M; intros; simpl in *;
 repeat case_if; auto;
 rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
-try (destruct v; subst);
-(apply app_eq_nil_inv in H_bound; destruct H_bound) || auto;
-discriminate || auto.
+(rewrite notin_union in H_lc; rewrite notin_singleton in H_lc;
+destruct H_lc as (Neq, H_lc); elim Neq) || destruct v; auto.
+Qed.
+
+Lemma closed_subst_t_free:
+forall M v0 N
+  (H_lc: v0 \notin free_vars_LF N),
+  [M // fte v0] N = N.
+induction N; intros; simpl in *;
+repeat case_if;
+try (rewrite IHN || (rewrite IHN1; try rewrite IHN2); auto);
+[ rewrite notin_singleton in H_lc; elim H_lc |
+  destruct v]; auto.
 Qed.
 
 
 (* Term is closed and we try to substitute for bound variable *)
 
-Lemma closed_subst_t_id:
-forall M n N
-  (H_lc: lc_t_LF N),
-  [ M // bte n ] N = N.
-intros; apply no_bound_vars_subst_t_id.
-induction N; simpl;
-try destruct v; inversion H_lc; subst; eauto.
-rewrite IHN1; try rewrite IHN2; simpl; auto.
-apply IHN; unfold open_ctx in *; simpl; erewrite closed_var_subst_ctx; eauto.
-rewrite IHN1; try rewrite IHN2; simpl; auto;
-erewrite closed_var_subst_ctx; eauto.
-Qed.
 
-Lemma closed_subst_w_id:
-forall M w n
-  (H_lc: lc_w_LF M),
-  {{w // bwo n}} M  = M.
-intros;
-apply no_bound_worlds_subst_w_id;
-induction M; simpl;
-try destruct v; inversion H_lc; subst; eauto.
-apply IHM; unfold open_var in *; erewrite closed_ctx_subst_var;
-eauto; constructor.
-rewrite IHM1; try rewrite IHM2; simpl; auto.
-rewrite IHM1; try rewrite IHM2; simpl; auto;
-erewrite closed_ctx_subst_var; eauto; constructor.
-Qed.
-
-
-(* Free variable for which we substitute does not occur in the term *)
-Lemma closed_subst_w_free:
-forall M w w'
-  (H_lc: w' \notin free_worlds_LF M),
-  {{w // fwo w'}} M  = M.
+Lemma closed_subst_w_bound:
+forall M w0 w n
+  (H_lc: lc_w_n_LF n M),
+  {{ w // bwo w0}} M  = M.
 induction M; intros; simpl in *;
 repeat case_if; auto;
-rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
-try (destruct v; subst); auto;
-assert (w' <> w') as Neq by eauto; elim Neq; auto.
+inversion H_lc; subst;
+erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
+Qed.
+
+Lemma closed_subst_t_bound:
+forall N M v0 n
+  (H_lc: lc_t_n_LF n N),
+  [M // bte v0] N = N.
+induction N; intros; simpl in *;
+repeat case_if; inversion H_lc; subst;
+try (erewrite IHN || (erewrite IHN1; try erewrite IHN2)); eauto.
 Qed.
 
 
@@ -257,9 +187,14 @@ forall M v v' n N
   [ N // fte v] ([ hyp_LF (fte v') // bte n] M) =
   [hyp_LF (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
-try (rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto);
-repeat (case_if; simpl); subst; simpl; auto;
-rewrite closed_subst_t_id; auto.
+try (rewrite IHM; auto);
+try (rewrite IHM1; try rewrite IHM2; auto);
+repeat (case_if; simpl); subst; simpl;
+auto;
+erewrite closed_subst_t_bound;
+eauto;
+replace n with (0+n) by omega;
+apply closed_t_addition; auto.
 Qed.
 
 
@@ -287,6 +222,7 @@ repeat (case_if; simpl); subst; auto;
 assert (v0 <> v0) as Neq by eauto; elim Neq; auto.
 Qed.
 
+(*
 Lemma subst_w_neutral_bound:
 forall M w w' n
   (HT: lc_w_LF M),
@@ -294,10 +230,9 @@ forall M w w' n
 induction M; intros; simpl in *; auto;
 inversion HT; repeat case_if; subst;
 rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
-unfold open_var;
-erewrite closed_ctx_subst_var; eauto; constructor.
+unfold open_t.
 Qed.
-
+*)
 
 (* With two different types of substitution, the order does not matter *)
 
@@ -311,7 +246,7 @@ repeat case_if; simpl;
 unfold shift_vte in *; unfold shift_vwo in *;
 try destruct v; try destruct w; auto;
 try rewrite IHN; try (rewrite IHN1; try rewrite IHN2);
-auto; rewrite closed_subst_w_id; auto.
+auto; erewrite closed_subst_w_bound; eauto.
 Qed.
 
 Lemma subst_order_irrelevant_free:

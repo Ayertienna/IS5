@@ -1,6 +1,5 @@
 Require Import Setoid.
-Require Import LibTactics.
-
+Require Export LibTactics.
 Require Export Shared.
 Require Export PermutLib.
 
@@ -225,7 +224,9 @@ Ltac PPermut_simpl :=
   auto.
 
 
-(*** Other required lemmas - not covered by PPermut_simpl tactic ***)
+(*** Other lemmas ***)
+(* Note:
+   Some are covered by PPermut_simpl tactic, but we want to use them in auto! *)
 
 Lemma PPermut_Mem:
 forall G G' w X,
@@ -311,26 +312,97 @@ forall G G' w w' Gamma Gamma',
   G & (w, Gamma) ~=~ G' & (w', Gamma') ->
   ~Gamma *=* Gamma' \/ w <> w' ->
   exists Gamma0, exists GH, exists GT,
-    Gamma0 *=* Gamma' ->
+    Gamma0 *=* Gamma' /\
     G = GH & (w', Gamma0) ++ GT.
 Admitted. (* !!! *)
 
-Lemma PPermut_specialized_case:
+Lemma PPermut_swap2:
+forall C C' G,
+  C :: G & C' ~=~ G & C & C'.
+intros; PPermut_simpl.
+Qed.
+Hint Resolve PPermut_swap2.
+
+Lemma PPermut_middle_last:
+forall G G' C,
+  G ++ G' & C ~=~ G ++ C :: G'.
+intros; PPermut_simpl.
+Qed.
+Hint Resolve PPermut_middle_last.
+
+Lemma PPermut_specialized1:
+forall G G' C C',
+  G ++ C :: G' & C' ~=~ G ++ G' ++ C' :: C :: nil.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_specialized2:
 forall GH GT G Gamma Gamma' Gamma'',
   GH ++ Gamma :: GT & Gamma' ~=~ G & Gamma ->
   GH ++ GT ++ Gamma'' :: Gamma' :: nil ~=~ G & Gamma''.
-intros; PPermut_simpl; apply PPermut_last_rev_simpl with (a:=Gamma);
-rew_app; rewrite <- H; PPermut_simpl.
+intros; PPermut_simpl;
+apply PPermut_last_rev_simpl with (a:=Gamma);
+rewrite <- H; PPermut_simpl.
 Qed.
 
-Lemma PPermut_specialized_case2:
+Lemma PPermut_specialized3:
+forall G G' C C',
+  G ++ G' ++ C :: C' :: nil ~=~ G ++ C :: G' & C'.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_specialized4:
 forall G GH GT Gamma Gamma0 Gamma'0,
   GH ++ Gamma :: GT & Gamma'0 ~=~ G & Gamma ->
   G ++ Gamma0 :: Gamma :: nil ~=~ GH ++ GT ++ Gamma0 :: Gamma'0 :: Gamma :: nil.
-intros; PPermut_simpl; apply PPermut_last_rev_simpl with (a:=Gamma);
-rew_app; rewrite <- H; PPermut_simpl.
+intros; PPermut_simpl;
+apply PPermut_last_rev_simpl with (a:=Gamma); rewrite <- H;
+PPermut_simpl.
 Qed.
 
-Hint Resolve PPermut_specialized_case PPermut_specialized_case2 : ppermut_rew.
+Lemma PPermut_specialized5:
+forall G G' C C' C'',
+  G ++ C :: G' ++ C' :: C'' :: nil ~=~ (G ++ G' ++ C' :: C'' :: nil) & C.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_specialized6:
+forall GH GT C0 C'' C'0,
+  GH ++ GT ++ C'0 :: C'' :: C0 :: nil ~=~ GH ++ GT ++ C0 :: C'0 :: C'' :: nil.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_swap_inner:
+forall G G' C C',
+  C :: G ++ C' :: G' ~=~ C' :: G ++ G' & C.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_swap_inner2:
+forall G G' C C',
+  C :: G ++ G' & C' ~=~ C' :: G ++ G' & C.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_swap3:
+forall C C' G,
+  C :: G & C' ~=~ C' :: G & C.
+intros; PPermut_simpl.
+Qed.
+
+Lemma PPermut_swap4:
+forall C G' G,
+  G ++ G' & C ~=~ G & C ++ G'.
+intros; PPermut_simpl.
+Qed.
+
+Hint Resolve PPermut_swap_inner.
+Hint Resolve PPermut_swap_inner2.
+Hint Resolve PPermut_swap3 PPermut_swap4.
+
+Hint Resolve PPermut_specialized2 : ppermut_rew.
+Hint Resolve PPermut_specialized1
+             PPermut_specialized3 PPermut_specialized4
+             PPermut_specialized5 PPermut_specialized6.
 
 Close Scope permut_scope.
