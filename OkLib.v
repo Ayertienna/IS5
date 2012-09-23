@@ -23,7 +23,7 @@ Definition flat_map (f:A -> list B) :=
   fix flat_map (l:list A) : list B :=
   match l with
     | nil => nil
-    | x :: t => (f x)++(flat_map t)
+    | x :: t => (f x) ++ (flat_map t)
   end.
 
 Section FlatMapProp.
@@ -40,15 +40,24 @@ Proof. auto. Qed.
 
 Lemma flat_map_app : forall l1 l2,
   flat_map f (l1 ++ l2) = flat_map f l1 ++ flat_map f l2.
-Admitted. (* !!! *)
+Proof.
+induction l1; intros; rew_app; simpl; auto;
+rewrite IHl1; rew_app; auto.
+Qed.
 
 Lemma flat_map_last : forall x l,
   flat_map f (l & x) = flat_map f l ++ f x.
-Proof. intros. rewrite flat_map_app; simpl; rew_app; auto. Qed.
+Proof. intros; rewrite flat_map_app; simpl; rew_app; auto. Qed.
 
 End FlatMapProp.
 
 End Definitions.
+
+Definition fst_ {A} {B} (p: A * B) :=
+  match p with
+  | (x, y) => x
+  end.
+
 
 Definition snd_ {A} {B} (p:A * B) :=
   match p with
@@ -74,7 +83,7 @@ ok_LF (flat_map snd_ G) nil.
 Fixpoint used_t_vars (G: Background_LF) :=
 match G with
 | nil => from_list nil
-| (w, Gamma) :: G => from_list (map fst Gamma) \u used_t_vars G
+| (w, Gamma) :: G => from_list (map fst_ Gamma) \u used_t_vars G
 end.
 
 Fixpoint used_w_vars (G: Background_LF) :=
@@ -89,11 +98,87 @@ end.
 
 (* used_*_vars *)
 
+Lemma used_t_vars_app:
+forall x y,
+  used_t_vars (x ++ y) = used_t_vars x \u used_t_vars y.
+induction x; intros.
+rew_app; simpl; rewrite from_list_nil; rewrite union_empty_l; auto.
+rew_app; destruct a; simpl; rewrite IHx; rewrite union_assoc; auto.
+Qed.
+
+Lemma used_w_vars_app:
+forall x y,
+  used_w_vars (x ++ y) = used_w_vars x \u used_w_vars y.
+induction x; intros.
+rew_app; simpl; rewrite from_list_nil; rewrite union_empty_l; auto.
+rew_app; destruct a; simpl; rewrite IHx; rewrite union_assoc; auto.
+Qed.
+
+Lemma from_list_app:
+forall A (l1: list A) l2,
+  from_list (l1++l2) = from_list l1 \u from_list l2.
+intro A; induction l1; intros.
+rewrite from_list_nil; rewrite union_empty_l; auto.
+rew_app; repeat rewrite from_list_cons; rewrite IHl1;
+rewrite union_assoc; auto.
+Qed.
+
+Lemma from_list_map:
+forall A B (l: list (A * B)) l',
+  l *=* l' ->
+  from_list (map fst_ l) = from_list (map fst_ l').
+intros A B; induction l; intros.
+apply permut_nil_eq in H; subst; auto.
+assert (a :: l *=* l') by auto;
+apply permut_split_head in H; destruct H as (hd', (tl', H)); subst.
+assert (from_list (map fst_ l) = from_list (map fst_ (hd' ++ tl'))).
+  apply IHl; apply permut_cons_inv with (a:=a); rewrite H0; permut_simpl.
+  destruct a; rew_map; simpl; rewrite from_list_cons; rewrite H.
+  rewrite map_app; repeat rewrite from_list_app; rewrite from_list_cons.
+  rewrite union_comm_assoc; auto.
+Qed.
+
 Add Morphism used_t_vars: PPermut_used_t.
-Admitted.
+induction x; intros.
+apply PPermut_nil_impl in H; subst; auto.
+destruct a; simpl.
+assert ((v, l) :: x ~=~ y) by auto.
+apply PPermut_split_head in H;
+destruct H as (l', (hd, (tl, (Ha, Hb)))).
+subst.
+assert (x & (v,l) ~=~  (hd ++ tl) & (v, l')).
+  transitivity ((v,l)::x); [ | rewrite H0];
+  PPermut_simpl.
+apply PPermut_last_rev in H; auto.
+rewrite IHx with (y:=hd ++ tl); auto.
+repeat rewrite used_t_vars_app.
+simpl; repeat rewrite <- union_assoc.
+rewrite from_list_nil; rewrite union_empty_l.
+assert (from_list (map fst_ l) = from_list (map fst_ l')).
+  apply from_list_map; auto.
+rewrite union_comm_assoc; rewrite H1; auto.
+Qed.
 
 Add Morphism used_w_vars: PPermut_used_w.
-Admitted.
+induction x; intros.
+apply PPermut_nil_impl in H; subst; auto.
+destruct a; simpl.
+assert ((v, l) :: x ~=~ y) by auto.
+apply PPermut_split_head in H;
+destruct H as (l', (hd, (tl, (Ha, Hb)))).
+subst.
+assert (x & (v,l) ~=~  (hd ++ tl) & (v, l')).
+  transitivity ((v,l)::x); [ | rewrite H0];
+  PPermut_simpl.
+apply PPermut_last_rev in H; auto.
+rewrite IHx with (y:=hd ++ tl); auto.
+repeat rewrite used_w_vars_app.
+simpl; repeat rewrite <- union_assoc.
+rewrite union_comm_assoc;
+rewrite from_list_nil; rewrite union_empty_l.
+auto.
+Qed.
+
 
 (* ok_LF for a generic type *)
 
@@ -102,34 +187,35 @@ forall A G U U',
   U *=* U' ->
   (@ok_LF A G U) ->
   (@ok_LF A G U').
-(*
-induction G; intros; simpl in *; auto.
-destruct a. repeat case_if.
-elim H2; apply Mem_permut with (l:=U'); [ symmetry | ]; auto.
-eapply IHG; eauto.
+induction G; intros; try constructor;
+destruct a; inversion H0; subst;
+constructor; [ intro | apply IHG with (U:=v::U)]; auto;
+apply Mem_permut with (l':=U) in H1; [ elim H5 | symmetry]; auto.
 Qed.
-*)Admitted.
 
 Lemma ok_LF_used_weakening:
 forall A G x U,
   (@ok_LF A G (x::U)) ->
   (@ok_LF A G U).
-(*induction G; simpl; intros; auto;
-destruct a; repeat case_if.
-elim H1; rewrite Mem_cons_eq; right; auto.
-apply IHG with (x:=x).
-apply ok_LF_used_permut with (U := (v::x::U));
-[ permut_simpl | auto].*) Admitted.
+induction G; intros; try constructor;
+destruct a; inversion H; subst;
+constructor.
+intro; apply Mem_permut with (l':=U) in H0; auto; elim H4;
+rewrite Mem_cons_eq; right; auto.
+apply ok_LF_used_permut with (U' := (x::v::U)) in H5;
+[ | permut_simpl]; apply IHG with (x:=x); auto.
+Qed.
 
 Lemma ok_LF_split:
 forall A G1 G2 U,
   (@ok_LF A (G1++G2) U) ->
   ok_LF G1 U /\ ok_LF G2 U.
-(*induction G1; intros; split; rew_app in *; simpl; auto;
-destruct a; simpl in *; case_if.
-apply IHG1 with (G2:=G2); eauto.
-apply IHG1 with (G2:=G2); apply ok_LF_used_weakening in H; eauto.
-Qed. *) Admitted.
+induction G1; intros; split; try destruct a; auto using ok_LF.
+rew_app in *; inversion H; subst; constructor; auto;
+eapply IHG1 with (G2:=G2); auto.
+rew_app in *; inversion H; subst; eapply IHG1 with (G2:=G2); auto;
+eapply ok_LF_used_weakening in H5; eauto.
+Qed.
 
 (* ok_LF for a specific type -- would be nice to make it more general btw *)
 
