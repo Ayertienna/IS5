@@ -234,14 +234,11 @@ forall G G' w X,
   Mem (w, X) G ->
   exists X', X' *=* X /\ Mem (w, X') G'.
 intros; generalize dependent X; induction H; intros.
-
 rewrite Mem_nil_eq in H0; contradiction.
-
 rewrite Mem_cons_eq in H1; destruct H1.
 inversion H1; subst; exists Gamma'; split; [ symmetry | apply Mem_here]; auto.
 apply IHPPermut in H1; destruct H1 as (Gamma''); exists Gamma'';
 destruct H1; split; auto; rewrite Mem_cons_eq; right; auto.
-
 repeat rewrite Mem_cons_eq in H1; destruct H1.
 inversion H1; subst; exists Gamma1; split; [ symmetry | rewrite Mem_cons_eq];
 auto; right; apply Mem_here.
@@ -249,7 +246,6 @@ destruct H1.
 inversion H1; subst; exists Gamma1'; split; [ symmetry | rewrite Mem_cons_eq];
 auto.
 exists X; split; auto; repeat rewrite Mem_cons_eq; right; right; auto.
-
 apply IHPPermut1 in H1; destruct H1 as (X'); destruct H1.
 apply IHPPermut2 in H2; destruct H2 as (X''); destruct H2;
 exists X''; split; auto; transitivity X'; auto.
@@ -272,13 +268,144 @@ Qed.
 
 Hint Resolve PPermut_nil_impl PPermut_nil_contr.
 
-(* FIXME: This will most likely require change in induction principle
-   as was in Sorting/Permutation + generalization into G & a ++ G' ~=~ etc *)
+(* Based on Sorting/Permutation/Permutation_ind_bis *)
+Theorem PPermut_ind_bis :
+ forall P : list Context_LF -> list Context_LF -> Prop,
+   P nil nil ->
+   (forall w x y l l', l ~=~ l' -> P l l' ->
+     x *=* y -> P ((w,x) :: l) ((w,y) :: l')) ->
+   (forall w w' x x' y y' l l', l ~=~ l' -> P l l' -> x *=* x' -> y *=* y' ->
+     P ((w', y) :: (w, x) :: l) ((w, x') :: (w', y') :: l')) ->
+   (forall l l' l'', l ~=~ l' -> P l l' -> l' ~=~ l'' -> P l' l'' -> P l l'') ->
+   forall l l', l ~=~ l' -> P l l'.
+Proof.
+  intros P Hnil Hskip Hswap Htrans;
+  intros; induction H; auto.
+  apply Htrans with ((w', Gamma0')::(w, Gamma0)::G); auto.
+    apply Hswap; auto; induction G; auto; destruct a; apply Hskip; auto.
+    apply Hskip; auto; apply Hskip; auto; induction G; auto;
+    destruct a; apply Hskip; auto.
+  eauto.
+Qed.
+
+Lemma PPermut_app_rev:
+forall G G' H H' w a a',
+  a *=* a' ->
+  G & (w, a) ++ G' ~=~ H & (w, a') ++ H' ->
+  G ++ G' ~=~ H ++ H'.
+Proof.
+  set (P l l' :=
+         forall w a a' l1 l2 l3 l4, a *=* a' ->
+         l=l1 & (w, a) ++ l2 -> l'=l3 & (w, a') ++l4 -> (l1++l2) ~=~ (l3++l4)).
+  cut (forall l l', l ~=~ l' -> P l l').
+  intros; apply (H _ _ H2 w a a'); auto.
+  intros; apply (PPermut_ind_bis P); unfold P; clear P;
+    try clear H l l'; simpl; auto.
+  (* nil *)
+  intros; destruct l1; simpl in *; discriminate.
+  (* skip *)
+  intros w x y l l' H IH; intros.
+  destruct l1; destruct l3; rew_app in *;
+  inversion H2; inversion H3; subst; auto.
+    rewrite H; PPermut_simpl; constructor; [transitivity a |] ; auto;
+      symmetry; auto.
+    rewrite <- H; PPermut_simpl; constructor; auto; transitivity a';
+      [ | symmetry]; auto.
+  constructor; auto.
+  apply (IH w0 a a' l1 l2 l3 l4); rew_app; auto.
+  (* swap *)
+  intros w w' x x' y y' l l' Hp IH; intros.
+  destruct l1; destruct l2; rew_app in *; subst;
+  inversion H2; subst; auto; try rewrite Hp; rew_app;
+  PPermut_simpl; destruct l3; destruct l4; rew_app in *; subst;
+  inversion H3; subst; auto.
+    constructor; auto; transitivity a'; auto; transitivity a; auto;
+    symmetry; auto.
+    constructor; auto; destruct l3; rew_app in *; inversion H6; subst; auto;
+      PPermut_simpl; constructor; auto; transitivity a; auto; symmetry; auto.
+    constructor; auto; destruct l3; rew_app in *; inversion H6; subst; auto;
+      PPermut_simpl; constructor; auto; transitivity a; auto; symmetry; auto.
+    constructor; auto; destruct l1; rew_app in *; inversion H6; subst; auto;
+      PPermut_simpl; rewrite <- Hp; PPermut_simpl; constructor; auto;
+      transitivity a'; auto; symmetry; auto.
+  destruct l1; destruct l3; rew_app in *; inversion H6; inversion H7; subst;
+    auto.
+      constructor; auto; transitivity a'; auto; transitivity a; auto;
+        symmetry; auto.
+       apply PPermut_nil_impl in Hp; destruct l3; rew_app in *; discriminate.
+       symmetry in Hp; apply PPermut_nil_impl in Hp; destruct l1; rew_app in *;
+         discriminate.
+       transitivity ((w', y') :: (w, x') :: l1).
+         constructor; [ | constructor]; auto.
+         PPermut_simpl.
+       replace l1 with (l1 ++ nil) by (rew_app; auto);
+       replace l3 with (l3 ++ nil) by (rew_app; auto);
+       apply IH with (w:=w0) (a0:=a) (a'0:=a'); auto;
+         rew_app; auto.
+  destruct l1; destruct l3; rew_app in *; inversion H6; inversion H7; subst;
+    auto.
+       apply PPermut_nil_impl in Hp; discriminate.
+       apply PPermut_nil_impl in Hp; destruct l3; rew_app in *; discriminate.
+       rewrite <- Hp; PPermut_simpl; transitivity ((w,x)::(w0,y)::nil);
+         PPermut_simpl; constructor; auto; constructor; auto; transitivity a';
+         auto; symmetry; auto.
+       transitivity ((w',y')::(w,x')::l1); auto; PPermut_simpl; rew_app;
+       replace l1 with (l1 ++ nil) by (rew_app; auto);
+       apply IH with (w:=w0) (a0:=a) (a'0:=a'); auto;
+         rew_app; auto.
+  constructor; auto; rewrite <- Hp; symmetry; destruct l1; rew_app in *;
+    inversion H6; subst; auto; PPermut_simpl; constructor; auto;
+    transitivity a'; auto; symmetry; auto.
+  destruct l3; rew_app in *; inversion H7; subst.
+    symmetry in Hp; apply PPermut_nil_impl in Hp; subst; inversion H6; subst;
+      destruct l1; rew_app in *; inversion H6; subst; destruct l1; rew_app in *;
+      discriminate.
+    transitivity ((w', y') ::l1 ++ p0 :: l2); PPermut_simpl; rew_app.
+    destruct l1; rew_app in *; inversion H6; subst.
+      rewrite Hp; PPermut_simpl; constructor; auto; transitivity a; auto;
+      symmetry; auto.
+      constructor; auto; replace l3 with (l3 ++ nil) by (rew_app; auto);
+      apply IH with (w:=w0) (a0:=a) (a'0:=a'); auto; rew_app; auto.
+  clear H2 H3. destruct l1; destruct l3; rew_app in *; inversion H6;
+  inversion H7; subst.
+    constructor; auto; transitivity a; auto; transitivity a'; auto;
+    symmetry; auto.
+    transitivity ((w', y'):: p0 :: l2).
+      constructor; auto.
+      PPermut_simpl. clear H6 H7. rew_app; rewrite Hp; PPermut_simpl;
+      constructor; auto; transitivity a; auto; symmetry; auto.
+    transitivity ((w, x)::p1::l4).
+      PPermut_simpl; rew_app; rewrite <- Hp; PPermut_simpl; constructor;
+        auto; transitivity a'; auto; symmetry; auto.
+      constructor; auto.
+    transitivity ((w', y') :: (w, x') :: l1 ++ p0 :: l2).
+      constructor; auto; constructor; auto.
+      PPermut_simpl. clear H7 H6. rew_app.
+    apply IH with (w:=w0) (a0:=a) (a'0:=a'); rew_app; auto.
+  (* trans *)
+  intros. destruct (PPermut_Mem l l' w a) as (a'', (H6a, H6b)); auto.
+    subst; rewrite Mem_app_or_eq; left; rewrite Mem_app_or_eq; right;
+      apply Mem_here.
+  destruct (Mem_split Context_LF l' (w, a'')) as (l'1, (l'2, H6)); auto.
+  transitivity (l'1 ++ l'2).
+    apply H0 with (w:=w) (a:=a) (a':=a''); [ symmetry | | ]; auto.
+    apply H2 with (w:=w) (a:=a'') (a':=a').
+      transitivity a; auto; symmetry; auto.
+      auto.
+      auto.
+Qed.
+
 Lemma PPermut_last_rev_simpl:
 forall G G' a,
   G & a ~=~ G' & a ->
   G ~=~ G'.
-Admitted. (* !!! *)
+intros. replace G with (G ++ nil);
+replace G' with (G'++nil).
+destruct a; eapply PPermut_app_rev; rew_app; eauto.
+rew_app; auto.
+rew_app; auto.
+rew_app; auto.
+Qed.
 
 Lemma PPermut_last_rev:
 forall G G' w Gamma Gamma',
@@ -306,7 +433,6 @@ exists hd; exists tl; split; [symmetry | ]; auto.
 apply Mem_here.
 Qed.
 
-(* FIXME: Check which variant is really required! *)
 Lemma PPermut_split_neq:
 forall G G' w w' Gamma Gamma',
   G & (w, Gamma) ~=~ G' & (w', Gamma') ->
@@ -314,7 +440,19 @@ forall G G' w w' Gamma Gamma',
   exists Gamma0, exists GH, exists GT,
     Gamma0 *=* Gamma' /\
     G = GH & (w', Gamma0) ++ GT.
-Admitted. (* !!! *)
+intros.
+assert ((w, Gamma) ::G  ~=~ (G' & (w', Gamma'))) by
+  (transitivity (G & (w,Gamma)); auto; PPermut_simpl).
+assert ((w, Gamma) :: G ~=~ (w', Gamma') :: G') by
+  (transitivity (G' & (w', Gamma')); auto; PPermut_simpl).
+symmetry in H2;
+apply PPermut_split_head in H2; destruct H2 as (Gamma'',(GH, (GT, (Ha, Hb)))).
+destruct GH; rew_app in *.
+inversion Hb; subst; destruct H0; elim H0; symmetry; auto.
+destruct p; inversion Hb; subst.
+exists Gamma''; exists GH; exists GT; split;
+[symmetry | rew_app]; auto.
+Qed.
 
 Lemma PPermut_swap2:
 forall C C' G,
