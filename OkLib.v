@@ -288,19 +288,10 @@ intros; inversion H; subst; constructor; auto.
 Qed.
 
 Lemma ok_LF_fresh_te_ty:
-forall G Gamma v A w U,
+forall U G Gamma v A w,
  ok_LF (flat_map snd_ ((w, Gamma) :: G)) U ->
  v \notin (used_t_vars ((w, Gamma)::G) \u from_list U) ->
  ok_LF (flat_map snd_ ((w, (v, A)::Gamma) :: G)) U.
-intros; inversion H; subst; simpl in *; rew_app in *.
-constructor; repeat rewrite notin_union in H0; destruct H0; destruct H0.
-  intro HQ; apply from_list_Mem in HQ; contradiction.
-  rewrite <- H2; constructor.
-rewrite <- H1 in *; constructor.
-  repeat rewrite notin_union in H0; destruct H0; destruct H0;
-  intro HQ; apply from_list_Mem in HQ; contradiction.
-  inversion H; subst; constructor.
-  rewrite Mem_cons_eq; intro Ha; destruct Ha; subst.
 Admitted. (* !!! *)
 
 Lemma ok_LF_fresh_wo_list:
@@ -308,16 +299,6 @@ forall G w U,
  ok_LF G U ->
  w \notin (used_w_vars G)  \u from_list U ->
  ok_LF ((w, nil) :: G) U.
-intros; inversion H; subst; simpl in *; constructor;
-repeat rewrite notin_union in H0; destruct H0.
-intro Hq; apply from_list_Mem in Hq; contradiction.
-constructor.
-intro Hq; apply from_list_Mem in Hq; contradiction.
-constructor.
-rewrite Mem_cons_eq; intro Hq; destruct Hq; subst; destruct H0.
-rewrite notin_singleton in H0; elim H0; auto.
-contradiction.
-inversion H; subst.
 Admitted.
 
 Lemma ok_LF_fresh_wo_ty:
@@ -329,31 +310,43 @@ intros; inversion H; subst; simpl in *; rew_app in *; auto.
 Qed.
 
 Lemma ok_LF_fresh_wo_te_list:
-forall G v A w,
- ok_LF G nil ->
- w \notin (used_w_vars G) ->
- ok_LF ((w, (v,A)::nil) :: G) nil.
-Admitted. (* !!! *)
+forall U G v A w,
+ ok_LF G U ->
+ w \notin (used_w_vars G) \u from_list U ->
+ v \notin (used_t_vars G) ->
+ ok_LF ((w, (v,A)::nil) :: G) U.
+intros; apply ok_LF_fresh_te_list;
+[ apply ok_LF_fresh_wo_list | ]; auto.
+simpl; rewrite map_nil; rewrite from_list_nil; rewrite union_empty_l; auto.
+Qed.
 
 Lemma ok_LF_fresh_wo_te_ty:
-forall G v A w,
- ok_LF (flat_map snd_ G) nil ->
- w \notin (used_w_vars G) ->
- ok_LF (flat_map snd_ ((w, (v,A)::nil) :: G)) nil.
-Admitted. (* !!! *)
+forall U G v A w,
+ ok_LF (flat_map snd_ G) U ->
+ w \notin (used_w_vars G) \u from_list U ->
+ v \notin (used_t_vars G) \u from_list U ->
+ ok_LF (flat_map snd_ ((w, (v,A) :: nil) :: G)) U.
+intros; apply ok_LF_fresh_te_ty.
+apply ok_LF_fresh_wo_ty; auto.
+simpl; rewrite map_nil; rewrite from_list_nil; rewrite union_empty_l; auto.
+Qed.
 
 Lemma ok_LF_empty_first_list:
-forall w G Gamma,
-  ok_LF ((w,Gamma) :: G) nil ->
-  ok_LF ((w, (@nil (prod var ty))) :: G) nil.
-Admitted. (* !!! *)
+forall w G Gamma U,
+  ok_LF ((w,Gamma) :: G) U ->
+  ok_LF ((w, (@nil (prod var ty))) :: G) U.
+intros; simpl in *; inversion H; subst; constructor; auto.
+Qed.
 
 Lemma ok_LF_empty_first_ty:
-forall (w: var) G Gamma,
-  (@ok_LF ty (flat_map snd_ ((w,Gamma) :: G)) nil) ->
-  (@ok_LF ty (flat_map snd_ ((w, nil) :: G)) nil).
-Admitted. (* !!! *)
-
+forall Gamma (w: var) G U,
+  (@ok_LF ty (flat_map snd_ ((w,Gamma) :: G)) U) ->
+  (@ok_LF ty (flat_map snd_ ((w, nil) :: G)) U).
+induction Gamma; intros; simpl in *; auto; destruct a;
+rew_app in H; inversion H; subst.
+apply IHGamma; auto.
+apply ok_LF_used_weakening with (x:=v); auto.
+Qed.
 
 (* ok_Bg *)
 
@@ -414,17 +407,20 @@ forall G w,
  ok_Bg ((w, nil) :: G).
 intros; unfold ok_Bg in *;  destruct H; split;
 [ eapply ok_LF_fresh_wo_list |
-  eapply ok_LF_fresh_wo_ty]; eauto.
+  eapply ok_LF_fresh_wo_ty]; eauto;
+rewrite from_list_nil; rewrite union_empty_r; auto.
 Qed.
 
 Lemma ok_Bg_fresh_wo_te:
 forall G w v A,
  ok_Bg G ->
  w \notin (used_w_vars G) ->
+ v \notin (used_t_vars G) ->
  ok_Bg ((w, (v, A) :: nil) :: G).
 intros; unfold ok_Bg in *;  destruct H; split;
 [ apply ok_LF_fresh_wo_te_list |
-  apply ok_LF_fresh_wo_te_ty]; eauto.
+  apply ok_LF_fresh_wo_te_ty]; eauto;
+rewrite from_list_nil; rewrite union_empty_r; auto.
 Qed.
 
 Lemma ok_Bg_cons_last:
@@ -498,7 +494,7 @@ forall A A' w w' v C C' G G',
  Mem (v, A) C ->
  G ~=~ G' & (w', (v, A') :: C') ->
  False.
-(*intros.
+intros.
 rewrite H1 in H.
 apply permut_Mem_split_head with (l2 := C) in H0; auto;
 destruct H0 as (gh); destruct H0 as (gt); subst.
@@ -507,14 +503,12 @@ assert ((w, gh & (v, A) ++ gt) :: G' & (w', (v, A') :: C') ~=~
 (PPermut_simpl; apply PPermut_skip; [permut_simpl | auto]).
 rewrite H0 in H; unfold ok_Bg in H; destruct H.
 rew_flat_map in *. simpl ok_LF in H2.
-simpl in *; repeat case_if.
+rew_app in *. inversion H2; subst.
 assert (ok_LF ((v, A') :: C' ++ flat_map snd_ G') (v :: nil)).
-  eapply ok_LF_split with (G1:=flat_map snd_ ((w, gh++gt)::nil)).
-simpl. simpl in H2. rew_flat_map in H2. simpl in H2.
-simpl; rew_app. simpl in H2; case_if.
-(* exact H2.  ?!? *) skip. (* !!! *)
-simpl in H6; case_if; elim H7; apply Mem_here.
-Qed.*) Admitted.
+  eapply ok_LF_split with (G1:=flat_map snd_ ((w, gh++gt)::nil)); simpl;
+  rew_app; auto.
+inversion H3; subst; elim H10; apply Mem_here.
+Qed.
 
 Lemma ok_Bg_permut_no_last:
 forall G w C v A,
@@ -534,15 +528,13 @@ Qed.
 Lemma ok_Bg_no_last:
 forall G C,
   ok_Bg (G & C) -> ok_Bg G.
-(*
 intros;
 assert (G & C ~=~ (C :: nil) ++ G) by PPermut_simpl; rewrite H0 in H;
 destruct H; split.
 eapply ok_LF_split with (G1:=C::nil) (G2:=G); eauto.
-simpl in *; destruct C. case_if.
-eapply ok_split with (G1:=snd_ (v,l)) (G2:=flat_map snd_  G); auto.
-skip. (* exact H1 *)
-Qed. *) Admitted.
+destruct C; rew_app in *; simpl in *.
+eapply ok_LF_split with (G1:=l) (G2:=flat_map snd_  G); auto.
+Qed.
 Hint Resolve ok_Bg_no_last.
 
 Lemma ok_Bg_permut_no_last_spec2:
@@ -584,18 +576,19 @@ Lemma ok_Bg_swap_worlds:
 forall G w w' C C',
   ok_Bg (G & (w, C) & (w', C')) ->
   ok_Bg (G & (w', C) & (w, C')).
-(*intros.
+intros.
 assert (G & (w, C) & (w', C') ~=~ (w, C) :: (w', C') :: G) by PPermut_simpl.
 rewrite H0 in H.
 assert (G & (w', C) & (w, C') ~=~ (w', C) :: (w, C') :: G) by PPermut_simpl.
 rewrite H1.
-destruct H; split; simpl in *; repeat case_if.
-rewrite Mem_nil_eq in H3; auto.
-rewrite Mem_cons_eq in H4; elim H6; destruct H4; subst;
-[ apply Mem_here | rewrite Mem_nil_eq in H4; contradiction].
-apply ok_used_permut with (U := w'::w::nil); [permut_simpl | ]; auto.
+destruct H; split; simpl in *.
+inversion H; subst; constructor. rewrite Mem_nil_eq; tauto.
+inversion H8; subst; constructor.
+rewrite Mem_cons_eq in *; intro; destruct H3; subst;
+[ elim H9; left | rewrite Mem_nil_eq in H3 ]; auto.
+apply ok_LF_used_permut with (U := w'::w::nil); [permut_simpl | ]; auto.
 auto.
-Qed. *) Admitted.
+Qed.
 
 Lemma ok_Bg_impl_ppermut:
 forall G G' w C C',
@@ -614,13 +607,13 @@ Lemma ok_Bg_split1:
 forall G w w' C C',
   ok_Bg ((w,C)::G & (w',C')) ->
   ok_Bg ((w, C ++ C') :: G).
-(*intros.
+intros.
 assert ((w, C) :: G & (w', C') ~=~ (w,C) :: (w', C')::G) by PPermut_simpl.
-rewrite H0 in H; destruct H; split; simpl in *;
-repeat case_if.
-apply ok_used_weakening with (x:=w'); auto.
-skip. (* this should be rew_app; auto *)
-Qed.*) Admitted.
+rewrite H0 in H; destruct H; split; simpl in *.
+inversion H; subst; inversion H7; subst; constructor; auto;
+apply ok_LF_used_weakening with (x:=w'); auto.
+rew_app; auto.
+Qed.
 
 Lemma ok_Bg_split2:
 forall G w w' C C',
