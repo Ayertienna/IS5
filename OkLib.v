@@ -273,9 +273,9 @@ split; intros.
 Qed.
 
 Lemma ok_LF_PPermut_ty:
-forall G G' U
+forall G G'
   (H: G ~=~ G'),
-  ok_LF (flat_map snd_ G) U <->
+  forall U, ok_LF (flat_map snd_ G) U <->
   ok_LF (flat_map snd_ G') U.
 Admitted.
 
@@ -288,7 +288,7 @@ intros; inversion H; subst; constructor; auto.
 Qed.
 
 Lemma ok_LF_fresh_te_ty:
-forall U G Gamma v A w,
+forall Gamma U G v A w,
  ok_LF (flat_map snd_ ((w, Gamma) :: G)) U ->
  v \notin (used_t_vars ((w, Gamma)::G) \u from_list U) ->
  ok_LF (flat_map snd_ ((w, (v, A)::Gamma) :: G)) U.
@@ -514,7 +514,17 @@ Lemma ok_Bg_permut_no_last:
 forall G w C v A,
   ok_Bg (G & (w, (v,A) :: C)) ->
   ok_Bg (G & (w, C)).
-Admitted. (* !!! *)
+intros;
+assert (G & (w, C) ~=~ (w,C) :: G) by PPermut_simpl;
+assert (G & (w, (v, A) :: C) ~=~ (w, (v,A) :: C) :: G) by PPermut_simpl;
+rewrite H1 in H; destruct H; simpl in *; split; rew_app in *.
+inversion H; subst; rewrite H0; constructor; auto.
+inversion H2; subst;
+apply ok_LF_PPermut_ty with (U:=nil) in H0;
+apply H0; simpl;
+apply ok_LF_used_weakening in H8;
+auto.
+Qed.
 
 Lemma ok_Bg_permut_no_last_spec:
 forall G w C C0 v A,
@@ -619,62 +629,67 @@ Lemma ok_Bg_split2:
 forall G w w' C C',
   ok_Bg ((w,C)::G & (w',C')) ->
   ok_Bg ((w', C' ++ C) :: G).
-(*intros.
+intros.
 assert ((w, C) :: G & (w', C') ~=~ (w', C') :: (w, C)::G) by PPermut_simpl.
-rewrite H0 in H; destruct H; split; simpl in *;
-repeat case_if.
-rewrite Mem_nil_eq in H2; auto.
-apply ok_used_weakening with (x:=w); auto.
-skip. (* this should be rew_app; auto *)
-Qed. *) Admitted.
+rewrite H0 in H; destruct H; split; simpl in *.
+inversion H; subst; inversion H7; subst;
+constructor; auto.
+apply ok_LF_used_weakening with (x:=w); auto.
+rew_app; auto.
+Qed.
 
 Lemma ok_Bg_split3:
 forall G w w' w'' C C' C'',
   ok_Bg ((w,C)::G & (w',C') & (w'',C'')) ->
   ok_Bg ((w, C) :: G & (w', C' ++ C'')).
-(*intros.
+intros.
 assert ((w, C) :: G & (w', C') & (w'',C'') ~=~
   (w, C) :: (w', C'):: (w'',C'') :: G) by PPermut_simpl.
 assert ((w,C) :: G & (w', C'++C'') ~=~ (w,C) :: (w', C'++C'') :: G)
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-apply ok_used_weakening with (x:=w''); auto.
-skip. (* this should be rew_app; auto *)
-Qed. *) Admitted.
+rewrite H0 in H; rewrite H1; destruct H; split; simpl in *.
+inversion H; subst; inversion H8; subst; inversion H10; subst;
+constructor; auto; constructor; auto.
+apply ok_LF_used_weakening with (x:=w''); auto.
+rew_app; auto.
+Qed.
 
 Lemma ok_Bg_split4:
 forall G w w' C C',
   ok_Bg (G & (w, C) & (w', C')) ->
   ok_Bg (G & (w', C' ++ C)).
-(*intros.
+intros.
 assert (G & (w, C) & (w', C') ~=~
   (w, C) :: (w', C') :: G) by PPermut_simpl.
 assert (G & (w', C'++C) ~=~ (w', C'++C) :: G)
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-rewrite Mem_nil_eq in H3; auto.
-apply ok_used_weakening with (x:=w);
-apply ok_used_permut with (U:= w'::w::nil).
-permut_simpl. auto.
-skip. (* this should be rew_app; auto *)
-Qed. *) Admitted.
+rewrite H0 in H; rewrite H1; destruct H; split.
+simpl in *; inversion H; subst; inversion H8; subst; constructor; auto.
+rewrite Mem_nil_eq; tauto.
+apply ok_LF_used_weakening with (x:=w);
+apply ok_LF_used_permut with (U:= w'::w::nil);
+try permut_simpl; auto.
+assert ((w', C'++C)::G ~=~ (w',C++C')::G) by PPermut_simpl.
+apply ok_LF_PPermut_ty with (U:=nil) in H3.
+simpl in *; rew_app in *.
+apply H3. auto.
+Qed.
 
 Lemma ok_Bg_split5:
 forall G w w' C C',
   ok_Bg (G & (w, C) & (w', C')) ->
   ok_Bg (G & (w, C ++ C')).
-(* intros.
+intros.
 assert (G & (w, C) & (w', C') ~=~
   (w, C) :: (w', C') :: G) by PPermut_simpl.
 assert (G & (w, C++C') ~=~ (w, C++C') :: G)
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-apply ok_used_weakening with (x:=w'); auto.
-skip. (* this should be rew_app; auto *)
-Qed. *) Admitted.
+rewrite H0 in H; rewrite H1; destruct H; split; simpl in *.
+inversion H; subst; inversion H8; subst.
+constructor; auto;
+apply ok_LF_used_weakening with (x:=w'); auto.
+rew_app; auto.
+Qed.
 
 Lemma ok_Bg_split6:
 forall G w C C' C'' w' w'',
