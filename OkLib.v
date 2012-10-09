@@ -695,22 +695,17 @@ Lemma ok_Bg_split6:
 forall G w C C' C'' w' w'',
   ok_Bg (G & (w, C) & (w', C') & (w'', C'')) ->
   ok_Bg (G & (w, C ++ C') & (w'', C'')).
-(*intros.
+intros.
 assert (G & (w,C) & (w', C') & (w'',C'') ~=~
   (w, C) :: (w', C'):: (w'',C'') :: G) by PPermut_simpl.
 assert (G & (w, C++C') & (w'', C'') ~=~ (w, C ++ C') :: (w'', C'') :: G)
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-rewrite Mem_cons_eq in H4;destruct H4; subst.
-elim H6; rewrite Mem_cons_eq; right; apply Mem_here.
-rewrite Mem_nil_eq in H4; auto.
-apply ok_used_weakening with (x:=w');
-apply ok_used_permut with (U:= w''::w'::w::nil).
-  permut_simpl.
-  auto.
-skip. (* this should be rew_app; auto *)
-Qed. *) Admitted.
+rewrite H0 in H; rewrite H1; destruct H; split; simpl in *.
+inversion H; subst; inversion H8; subst; inversion H10; subst.
+constructor; auto.
+apply ok_LF_used_weakening with (x:=w'); auto.
+rew_app; auto.
+Qed.
 
 (* This is actually false
 Lemma ok_Bg_split7:
@@ -723,67 +718,76 @@ Lemma ok_Bg_split8:
 forall G G' w w' w'' C C' C'',
   ok_Bg (G ++ G' ++ (w, C) :: (w', C') :: (w'', C'') :: nil) ->
   ok_Bg (G ++ G' ++ (w', C') :: (w'', C'' ++ C)::nil) .
-(*intros.
+intros.
 assert (G++G' ++ (w, C) :: (w', C') :: (w'',C'') :: nil ~=~
   (w, C) :: (w', C'):: (w'',C'') :: G ++ G') by PPermut_simpl.
 assert (G ++ G' ++ (w', C') :: (w'', C'' ++ C) :: nil ~=~
   (w', C') :: (w'', C''++C) :: G ++ G')
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
+rewrite H0 in H; rewrite H1; destruct H; split.
+simpl in *.
+inversion H; subst; inversion H8; subst; inversion H10; subst.
+constructor.
+intro; rewrite Mem_nil_eq in H3; auto.
+constructor.
+intro; elim H11; rewrite Mem_cons_eq in *; destruct H3.
+left; auto.
 rewrite Mem_nil_eq in H3; auto.
-rewrite Mem_cons_eq in H4; destruct H4; subst.
-elim H7; rewrite Mem_cons_eq; left; auto.
-rewrite Mem_nil_eq in H4; auto.
-apply ok_used_weakening with (x:=w);
-apply ok_used_permut with (U:=w'' :: w' :: w :: nil);
+contradiction.
+apply ok_LF_used_weakening with (x:=w);
+apply ok_LF_used_permut with (U:=w'' :: w' :: w :: nil);
 auto; permut_simpl.
-skip. (* this should be rew_app; permut; auto *)
-Qed. *) Admitted.
+apply ok_LF_PPermut_ty with (G':=(w',C') :: (w'', C'')::(w,C) :: G ++ G') in H2.
+simpl in *.
+rew_app. auto.
+PPermut_simpl.
+Qed.
 
 Lemma ok_Bg_split9:
 forall G w w' w'' C C' C'',
   ok_Bg ((w,C)::G & (w',C') & (w'',C'')) ->
   ok_Bg ((w, C++C') :: G & (w'', C'')).
-(*intros.
+intros.
 assert ((w, C) :: G & (w', C') & (w'',C'') ~=~
   (w, C) :: (w', C'):: (w'',C'') :: G) by PPermut_simpl.
 assert ((w, C++C') :: G & (w'', C'')  ~=~
   (w, C++C') :: (w'', C'') :: G)
   by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-rewrite Mem_cons_eq in H4; destruct H4; subst.
-elim H6; rewrite Mem_cons_eq; right; apply Mem_here.
-rewrite Mem_nil_eq in H4; auto.
-apply ok_used_weakening with (x:=w');
-apply ok_used_permut with (U:=w'' :: w' :: w :: nil);
+rewrite H0 in H; rewrite H1; destruct H; split; simpl in *.
+inversion H; subst; inversion H8; subst; inversion H10; subst.
+constructor; auto; constructor.
+intro; rewrite Mem_cons_eq in *. destruct H3; subst.
+elim H11;right; apply Mem_here.
+rewrite Mem_nil_eq in H3; auto.
+apply ok_LF_used_weakening with (x:=w');
+apply ok_LF_used_permut with (U:=w'' :: w' :: w :: nil);
 auto; permut_simpl.
-skip. (* this should be rew_app; permut; auto *)
-Qed. *) Admitted.
+rew_app. auto.
+Qed.
 
 Lemma ok_Bg_split10:
 forall G G' w1 w2 w3 w4 c1 c2 c3 c4,
   ok_Bg (G ++ (w1, c1)::G' ++ (w2, c2) :: (w3, c3) :: (w4, c4) :: nil) ->
   ok_Bg (G ++ (w1, c1)::G' ++ (w2, c2 ++ c3) :: (w4, c4) :: nil).
-(*intros.
+intros.
 assert (G ++ (w1,c1) :: G' ++ (w2, c2) :: (w3, c3) :: (w4,c4) :: nil ~=~
    (w1,c1) :: (w2, c2) :: (w3, c3) :: (w4,c4) :: G ++ G') by PPermut_simpl.
 assert (G ++ (w1, c1) :: G' ++ (w2, c2 ++ c3) :: (w4, c4) :: nil~=~
    (w1,c1) :: (w2, c2 ++ c3) :: (w4,c4) :: G ++ G') by PPermut_simpl.
-rewrite H0 in H; rewrite H1; destruct H; split; simpl in *;
-repeat case_if.
-rewrite Mem_cons_eq in H5. destruct H5; subst.
-elim H7; rewrite Mem_cons_eq; right; apply Mem_here.
-rewrite Mem_cons_eq in H5. destruct H5; subst.
-elim H7; rewrite Mem_cons_eq; right;
-rewrite Mem_cons_eq; right; apply Mem_here.
-rewrite Mem_nil_eq in H5; auto.
-apply ok_used_weakening with (x:=w3);
-apply ok_used_permut with (U:=w4 :: w3 :: w2 :: w1 :: nil);
+rewrite H0 in H; rewrite H1; destruct H; split; simpl in *.
+inversion H; subst; inversion H8; subst; inversion H10; subst;
+inversion H12; subst.
+constructor; auto; constructor; auto; constructor.
+intro; rewrite Mem_cons_eq in *. destruct H3; subst.
+elim H13; right; left; auto.
+rewrite Mem_cons_eq in H3; destruct H3; subst.
+elim H13; right; rewrite Mem_cons_eq; right; rewrite Mem_cons_eq; left; auto.
+rewrite Mem_nil_eq in H3; auto.
+apply ok_LF_used_weakening with (x:=w3);
+apply ok_LF_used_permut with (U:=w4 :: w3 :: w2 :: w1 :: nil);
 auto; permut_simpl.
-skip. (* this should be rew_app; permut; auto *)
-Qed. *) Admitted.
+rew_app; auto.
+Qed.
 
 Hint Resolve ok_Bg_split1 ok_Bg_split2 ok_Bg_split3 ok_Bg_split4
   ok_Bg_split5 ok_Bg_split6 ok_Bg_split8
