@@ -56,7 +56,13 @@ Lemma emptyEquiv_permut_empty:
 forall G G' w,
   G ~=~ emptyEquiv G' ->
   forall C, Mem (w, C) G -> C = nil.
-Admitted. (* !!! *)
+intros;
+assert (G ~=~ emptyEquiv G') by auto;
+apply PPermut_Mem with (w:=w) (X:=C) in H; auto;
+destruct H as (C', (Ha, Hb)).
+apply emptyEquiv_Mem_nil in Hb; subst.
+apply permut_nil_eq in Ha; auto.
+Qed.
 
 Lemma double_emptyEquiv:
 forall G,
@@ -69,6 +75,20 @@ Lemma emptyEquiv_permut_split_last:
 forall G C H,
   G & C ~=~ emptyEquiv H ->
   emptyEquiv G = G.
+induction G; intros; simpl; auto; destruct a.
+assert (((v, l) :: G) & C ~=~ emptyEquiv H) by auto.
+apply PPermut_split_head in H0; destruct H0 as (l', (hd, (tl, (Ha, Hb))));
+subst; assert (l' = nil).
+apply emptyEquiv_Mem_nil with (G:=H)(w:=v); rewrite Hb;
+repeat rewrite Mem_app_or_eq; left; right; apply Mem_here.
+subst; symmetry in Ha; apply permut_nil_eq in Ha; subst.
+rewrite Hb in H1; rew_app in H1.
+assert (G & C ~=~ hd ++ tl).
+  apply PPermut_last_rev_simpl with (a:=(v,nil)).
+  transitivity ((v,nil)::G & C).
+    PPermut_simpl.
+    rewrite H1; PPermut_simpl.
+rewrite IHG with (H:=hd++tl) (C:=C); auto.
 Admitted.
 
 Lemma emptyEquiv_ok_list:
@@ -99,5 +119,36 @@ inversion H; subst;
 constructor; auto;
 apply emptyEquiv_ok_list; auto.
 apply emptyEquiv_ok_var.
+apply ok_LF_split in H0; destruct H0; auto.
+Qed.
+
+Lemma emptyEquiv_ok_list_part:
+forall G G' U,
+  ok_LF (G ++ G')  U ->
+  ok_LF ((emptyEquiv G) ++ G') U.
+induction G; simpl; intros; auto; destruct a.
+inversion H; rew_app in *; subst; constructor; auto.
+Qed.
+
+Lemma emptyEquiv_ok_var_part:
+forall G G' U,
+  ok_LF (flat_map snd (G++G')) U ->
+  ok_LF (flat_map snd ((emptyEquiv G)++G')) U.
+induction G; simpl; intros; auto; destruct a;
+simpl in *; apply IHG.
+eapply ok_LF_split with (G1:=l); rew_app in *; eauto.
+Qed.
+
+Lemma emptyEquiv_ok_Bg_part:
+forall G G',
+  ok_Bg (G ++ G') ->
+  ok_Bg ((emptyEquiv G) ++ G').
+induction G; simpl; intros; auto; destruct a.
+unfold ok_Bg in *; rew_app in *;
+destruct H; split; simpl in *; rew_app.
+inversion H; subst;
+constructor; auto;
+apply emptyEquiv_ok_list_part; auto.
+apply emptyEquiv_ok_var_part.
 apply ok_LF_split in H0; destruct H0; auto.
 Qed.

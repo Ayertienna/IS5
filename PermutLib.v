@@ -1,6 +1,7 @@
 Require Import Setoid.
 Require Export LibListSorted.
 Require Export LibList.
+Require Export LibFset.
 Require Export LibRelation.
 
 
@@ -135,6 +136,31 @@ forall A l1 l2 (a: A),
   Mem a l1 ->
   exists gh, exists gt, l2 = gh & a ++ gt.
 intros; apply Mem_split; eapply Mem_permut; eauto.
+Qed.
+
+Lemma from_list_app:
+forall A (l1: list A) l2,
+  from_list (l1++l2) = from_list l1 \u from_list l2.
+intro A; induction l1; intros.
+rewrite from_list_nil; rewrite union_empty_l; auto.
+rew_app; repeat rewrite from_list_cons; rewrite IHl1;
+rewrite union_assoc; auto.
+Qed.
+
+Lemma permut_from_list:
+forall A (l l': list A),
+  l *=* l' ->
+  forall x, x \notin (from_list l) -> x \notin (from_list l').
+induction l; intros.
+apply permut_nil_eq in H; subst; rewrite from_list_nil; auto.
+assert (a::l *=* l') by auto;
+apply permut_split_head in H; destruct H as (hd, (tl, H)); subst; simpl;
+assert (l *=* hd ++ tl) by
+  (apply permut_cons_inv with (a:=a); rewrite H1; permut_simpl);
+apply IHl with (x:=x) in H;
+repeat rewrite from_list_app in *; rewrite from_list_cons in *;
+repeat rewrite notin_union in *; destruct H0; destruct H;
+repeat split; try (rewrite from_list_nil; apply notin_empty); auto.
 Qed.
 
 Lemma permut_dec:

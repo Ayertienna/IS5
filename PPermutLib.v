@@ -543,4 +543,11 @@ Hint Resolve PPermut_specialized1
              PPermut_specialized3 PPermut_specialized4
              PPermut_specialized5 PPermut_specialized6.
 
+Lemma permut_PPermut:
+forall G G', G *=* G' -> G ~=~ G'.
+intros. induction H; auto.
+transitivity y; auto.
+inversion H. PPermut_simpl.
+Qed.
+
 Close Scope permut_scope.

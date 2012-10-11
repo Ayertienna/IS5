@@ -129,15 +129,6 @@ rew_app; simpl; rewrite from_list_nil; rewrite union_empty_l; auto.
 rew_app; destruct a; simpl; rewrite IHx; rewrite union_assoc; auto.
 Qed.
 
-Lemma from_list_app:
-forall A (l1: list A) l2,
-  from_list (l1++l2) = from_list l1 \u from_list l2.
-intro A; induction l1; intros.
-rewrite from_list_nil; rewrite union_empty_l; auto.
-rew_app; repeat rewrite from_list_cons; rewrite IHl1;
-rewrite union_assoc; auto.
-Qed.
-
 Lemma from_list_map:
 forall A B (l: list (A * B)) l',
   l *=* l' ->
