@@ -216,18 +216,19 @@ apply IHHT; [exists GT | ]; auto; try PPermut_simpl;
   rewrite <- H0; rewrite <- H; rew_app; auto.
 rewrite <- H0; rewrite <- H; rew_app; auto.
 (* letdia *)
-apply t_letdia_LF with (A:=A) (L_t:=L_t)
+apply t_letdia_LF with (A:=A) (L_t:=L_t \u used_t_vars ((w, Gamma) :: G'))
   (L_w:=L_w \u used_w_vars ((w, Gamma)::G'));
 [  | | intros; apply H]; auto;
 destruct HSubst as [GT];
 [ exists GT; rew_app; auto |
-  rewrite notin_union in *; destruct H1];
+  rewrite notin_union in *; destruct H1; destruct H0];
 apply ok_Bg_ppermut with (G:= (w', (v', A) :: nil ) :: (w, Gamma) :: G');
-auto.
+[ | apply ok_Bg_fresh_wo_te]; auto.
 (* letdia_get *)
 destruct HSubst as [GT];
 apply t_letdia_get_LF with (A:=A) (Gamma:=Gamma) (G:=G++GT)
-                           (L_t:=L_t) (L_w:=L_w \u used_w_vars (Ctx'::G')).
+                           (L_t:=L_t \u used_t_vars (Ctx'::G'))
+                           (L_w:=L_w \u used_w_vars (Ctx'::G')).
 apply ok_Bg_ppermut with (G:=Ctx' :: G');
   [rewrite <- H1; rewrite <- H0; rew_app | ]; auto.
 apply IHHT.
@@ -553,8 +554,10 @@ apply ok_Bg_ppermut with
   (G:=(w', (v', A) :: nil ) :: (w0, Gamma0) :: G & (w, Gamma ++ Delta'));
 [ rew_app | rewrite H4]; auto;
 apply ok_Bg_fresh_wo_te;
-[ apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w, Delta ++ Delta')) | ];
+[ apply ok_Bg_ppermut with (G:=(w0, Gamma0) :: G' & (w, Delta ++ Delta')) | | ];
 auto.
+rewrite notin_union in *; destruct H5; auto;
+rewrite <- H4; auto.
 rewrite <- H4; auto.
 (* <> *)
 assert (exists Gamma', exists G0, exists G1,
@@ -596,6 +599,7 @@ apply ok_Bg_ppermut with
 [ transitivity (((w'0, (v', A) :: nil) ::(w0, Gamma0) :: GH ++GT & (w, Gamma))
   & (w', Delta ++ Delta')); rew_app |
  rew_app in *; apply ok_Bg_fresh_wo_te]; auto; try PPermut_simpl.
+rewrite H3; auto.
 rewrite H3; auto.
 rew_app; PPermut_simpl.
 (* letdia_get 2 *)
@@ -641,15 +645,28 @@ Qed.
 (*
    When we can prove something in empty context and background, then we
    can also do it in any "full" version of this context & background
-   Proof: ???
 *)
-(* FIXME Bug: #33 *)
 Lemma types_weakened:
-forall G w Gamma M A
-  (Ok: ok_Bg ((w, Gamma)::G))
-  (Ht: emptyEquiv G |= (w, nil) |- M ::: A),
-  G |= (w, Gamma) |- M ::: A.
-Admitted.
+forall G G' w Gamma M A
+  (Ok: ok_Bg ((w, Gamma)::G ++ G'))
+  (HT: emptyEquiv G ++ G' |= (w, nil) |- M ::: A),
+  G ++ G'|= (w, Gamma) |- M ::: A.
+induction G; intros; simpl in *; rew_app in *; auto.
+apply Weakening with (Gamma':=Gamma) in HT; rew_app in *; auto.
+destruct a; rew_app in *.
+assert ((v,l) :: G ++ G' ~=~ G ++ (v,l)::G') by PPermut_simpl;
+rewrite H; apply IHG.
+rewrite <- H; auto.
+assert (emptyEquiv G ++ (v, l) :: G' ~=~ emptyEquiv G & (v, nil ++ l) ++ G')
+  by PPermut_simpl; rewrite H0; eapply WeakeningBackgroundElem.
+rew_app.
+apply ok_Bg_empty_first in Ok.
+assert ((w, nil) :: (v, l) :: G ++ G' ~=~ ((w, nil) :: G) ++ (v, l) :: G') by
+  PPermut_simpl; rewrite H1 in Ok;
+eapply emptyEquiv_ok_Bg_part in Ok; simpl in *; rew_app in *; auto.
+assert (emptyEquiv G & (v, nil) ++ G' ~=~  (v, nil) :: emptyEquiv G ++ G') by
+  PPermut_simpl; rewrite H1; auto.
+Qed.
 
 
 (* Type preservation under various types of substitution *)

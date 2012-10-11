@@ -222,17 +222,19 @@ repeat (case_if; simpl); subst; auto;
 assert (v0 <> v0) as Neq by eauto; elim Neq; auto.
 Qed.
 
-(*
 Lemma subst_w_neutral_bound:
-forall M w w' n
-  (HT: lc_w_LF M),
-  {{w//bwo n}}({{bwo n// w'}}M) = {{w//w'}}M.
-induction M; intros; simpl in *; auto;
-inversion HT; repeat case_if; subst;
-rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
-unfold open_t.
+forall M n
+  (HT: lc_w_n_LF n M),
+  forall m w w',
+    m >= n -> {{w//bwo m}}({{bwo m// w'}}M) = {{w//w'}}M.
+intros M n HT; induction HT; intros; simpl in *; auto.
+rewrite IHHT; auto.
+rewrite IHHT1; try rewrite IHHT2; auto.
+destruct w; destruct w'; simpl; try rewrite IHHT; auto; omega.
+repeat case_if; rewrite IHHT; auto.
+repeat case_if; rewrite IHHT; auto.
+repeat case_if; rewrite IHHT1; try rewrite IHHT2; auto; omega.
 Qed.
-*)
 
 (* With two different types of substitution, the order does not matter *)
 
