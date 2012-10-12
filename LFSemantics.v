@@ -714,11 +714,12 @@ simpl in *.
 case_if.
 inversion H1; subst;
 assert (A = A0) by (eapply ok_Bg_Mem_eq; eauto);
-subst; apply types_weakened;
-[eapply ok_Bg_permut_first_tail | ]; eauto.
+subst; replace G with (G ++ nil) by (rew_app; auto);
+apply types_weakened;
+[eapply ok_Bg_permut_first_tail with (C:=Gamma0) | ]; rew_app; eauto.
 constructor;
 [ apply ok_Bg_permut_first_tail with (C:=Gamma0) (x:=v0) (A:=A0) |
-  apply Mem_permut with (l' := (v0, A0) :: Gamma1) in HT]; eauto;
+  apply Mem_permut with (l' := (v0, A0) :: Gamma1) in HT]; eauto.
 rewrite Mem_cons_eq in HT; destruct HT; auto;
 inversion H2; subst; elim H1; reflexivity.
 
