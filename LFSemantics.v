@@ -108,21 +108,21 @@ Global Reserved Notation " M |-> N " (at level 70).
 Inductive step_LF: (te_LF * vwo) -> (te_LF * vwo) -> Prop :=
 | red_appl_lam_LF: forall ctx M A N,
   lc_w_LF M ->
-  (* lc_t_n_LF 1 M -> or (forall x, x \notin L -> lc_t_LF (M ^t^ (fte x))) -> *)
+  lc_t_n_LF 1 M -> (* or (forall x, x \notin L -> lc_t_LF (M ^t^ (fte x))) -> *)
   lc_w_LF N -> lc_t_LF N ->
   (appl_LF (lam_LF A M) N, ctx) |-> ( M ^t^ N , ctx)
 
 | red_unbox_fetch_box_LF: forall ctx ctx' M,
-   (* lc_w_n_LF 1 M -> or
+   lc_w_n_LF 1 M -> (* or
      (forall x, x \notin L -> lc_w_LF (M ^w^ (fwo x))) -> *)
   lc_t_LF M ->
   (unbox_fetch_LF ctx' (box_LF M), ctx) |-> (M ^w^ ctx, ctx)
 
 | red_letdia_get_get_here_LF: forall ctx ctx' ctx'' M N,
   lc_w_LF M -> lc_t_LF M ->
-  (* lc_w_n_LF 1 N -> or
+  lc_w_n_LF 1 N -> (* or
      (forall x, x \notin L_w -> lc_w_LF (N ^w^ (fwo x))) -> *)
-  (* lc_t_n_LF 1 N -> or
+  lc_t_n_LF 1 N -> (* or
      (forall x, x \notin L_t -> lc_t_LF (N ^t^ (fte x))) -> *)
   (letdia_get_LF ctx' (get_here_LF ctx'' M) N, ctx) |->
     ((N ^w^ ctx'') ^t^ M, ctx)
@@ -146,9 +146,9 @@ Inductive step_LF: (te_LF * vwo) -> (te_LF * vwo) -> Prop :=
 | red_letdia_get_LF: forall ctx ctx' M N M'
   (HT: (M, ctx) |-> (M', ctx)),
   lc_w_LF M -> lc_t_LF M ->
-  (* lc_w_n_LF 1 N -> or
+  lc_w_n_LF 1 N -> (* or
      (forall x, x \notin L_w -> lc_w_LF (N ^w^ (fwo x))) -> *)
-  (* lc_t_n_LF 1 N -> or
+  lc_t_n_LF 1 N -> (* or
      (forall x, x \notin L_t -> lc_t_LF (N ^t^ (fte x))) -> *)
   (letdia_get_LF ctx M N, ctx') |-> (letdia_get_LF ctx M' N, ctx')
 
@@ -2003,21 +2003,20 @@ rewrite subst_t_neutral_free with (v:=v_fresh);
   constructor];
 [ eapply subst_t_preserv_types_outer with (A:=A) (G0:=G)
   (Gamma':=Gamma) (w':=w) |
-  apply subst_var_preserv_free_worlds]; auto.
+  apply subst_var_preserv_free_worlds]; auto;
 rew_app;
 assert ( emptyEquiv (G & (w0, nil)) = G & (w0, nil)) by
    ( repeat rewrite emptyEquiv_rewrite; simpl;
-     apply emptyEquiv_permut_split_last in H5; rewrite H5; reflexivity);
+     apply emptyEquiv_permut_split_last in H4; rewrite H4; reflexivity);
 assert (Gamma = nil) by
   ( apply emptyEquiv_permut_empty with (G:= (G & (w, Gamma)))
-    (G':=G0) (w:=w); auto; apply Mem_last);
-subst;
-rewrite <- H7 in HT0; auto.
+    (G':=G0) (w:=w); auto; apply Mem_last).
+subst; rew_app; rewrite <- H9 in HT0; auto.
 apply rename_w_preserv_types_outer with (G0:=G) (Gamma'':=(v_fresh,A) :: nil)
-      (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil)).
+      (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil));
 assert (G & (w, Gamma) & (w_fresh, (v_fresh, A) :: nil) ~=~
-  (w_fresh, (v_fresh, A) :: nil) :: emptyEquiv G0) by PPermut_simpl; rewrite H7;
-rewrite <- subst_order_irrelevant_bound;
+  (w_fresh, (v_fresh, A) :: nil) :: emptyEquiv G0) by PPermut_simpl.
+rewrite H11; rewrite <- subst_order_irrelevant_bound;
 [eapply HT2; auto | constructor].
 PPermut_simpl; auto.
 PPermut_simpl.
@@ -2044,7 +2043,7 @@ rew_app;
 assert ( emptyEquiv (G & (w0, nil)) = G & (w0, nil)) by
    ( repeat rewrite emptyEquiv_rewrite; simpl;
      apply emptyEquiv_permut_split_last in H0; rewrite H0; reflexivity);
-[ rewrite <- H6 in HT0 |
+[ rewrite <- H5 in HT0 |
   eapply rename_w_preserv_types_outer
     with (G:= (w_fresh, (v_fresh,A)::nil):: G & (w,nil))
          (Gamma'':=(v_fresh,A)::nil) (Gamma':=nil) (G0:=G)]; auto.
@@ -2061,7 +2060,7 @@ rewrite <- H0; rewrite notin_union in *; destruct H1; destruct H2;
 unfold open_t in *; unfold open_w in *; destruct (eq_var_dec w1 w0); subst.
 assert (G0  ~=~ G /\ Gamma0 *=* nil) by
   (apply ok_Bg_impl_ppermut with (w:=w0); eauto);
-destruct H10; symmetry in H11; apply permut_nil_eq in H11;
+destruct H12; symmetry in H13; apply permut_nil_eq in H13;
 rewrite subst_t_neutral_free with (v:=v_fresh);
 [ eapply subst_t_preserv_types_inner with (A:=A) |
   apply subst_world_preserv_free_vars]; eauto;
@@ -2070,28 +2069,28 @@ rewrite subst_t_neutral_free with (v:=v_fresh);
     ( repeat rewrite emptyEquiv_rewrite; simpl;
       apply emptyEquiv_permut_split_last in H0; rewrite H0; reflexivity)];
 [ rewrite <- subst_w_neutral_free with (w0:=w_fresh) |
-  constructor |
-  rewrite H12; rewrite <- H10; subst]; auto;
+  constructor | ]; auto;
 [ replace ((v_fresh,A)::nil) with (nil++(v_fresh,A)::nil) by auto |
-  apply subst_var_preserv_free_worlds]; auto;
+  apply subst_var_preserv_free_worlds | ]; auto.
 apply rename_w_preserv_types_new with
   (G:= (w_fresh, (v_fresh,A)::nil) :: G0 & (w, nil));
 [ rewrite <- subst_order_irrelevant_bound; try constructor; subst |
   rew_app; eauto].
-rewrite H10; eapply HT2; auto.
+rewrite H12; eapply HT2; auto.
 PPermut_simpl.
+rewrite H14; rewrite <- H12; subst; auto.
 assert (Gamma0 = nil) by
   ( apply emptyEquiv_permut_empty with (G:= (G0 & (w1, Gamma0)))
       (G':=G & (w0, nil)) (w:=w1); auto;
     assert (emptyEquiv G = G) by
       (apply emptyEquiv_permut_split_last with (C:=(w, nil)) (H:=G1); auto);
-    [ rewrite emptyEquiv_rewrite; simpl | apply Mem_last ]; rewrite H10; auto);
+    [ rewrite emptyEquiv_rewrite; simpl | apply Mem_last ]; rewrite H12; auto);
 subst; assert (exists Gamma'', exists GH, exists GT,
   Gamma'' *=* nil /\ G = GH & (w1, Gamma'') ++ GT) by
   ( apply PPermut_split_neq with (w:=w0) (G':=G0) (Gamma:=nil);
     [ symmetry | right; intro; subst; elim n]; auto);
-destruct H10 as (Gamma'', (GH, H10)); destruct H10 as (GT, H10).
-destruct H10; symmetry in H10; apply permut_nil_eq in H10; subst.
+destruct H12 as (Gamma'', (GH, (GT, (H12a, H12b))));
+symmetry in H12a; apply permut_nil_eq in H12a; subst;
 rewrite subst_t_neutral_free with (v:=v_fresh);
 [ apply subst_t_preserv_types_outer with (A:=A) (G0 :=GH ++ GT & (w, nil))
           (G := GH ++ GT & (w,nil) & (w1, (v_fresh, A) :: nil))
@@ -2104,7 +2103,7 @@ assert (G0 & (w, nil) ~=~ GH ++ GT & (w,nil) & (w0, nil)) by
     assert (G0 ~=~ GH ++ GT & (w0, nil)) by
       (apply PPermut_last_rev_simpl with (a:=(w1,nil)); rew_app in *; auto);
   try PPermut_simpl;
-  rewrite H11; rew_app; auto); rew_app in *; rewrite <- H10.
+  rewrite H13; rew_app; auto); rew_app in *; rewrite <- H12.
 assert (emptyEquiv G0 = G0) by
 ( assert (G0 ~=~ GH ++ GT & (w0, nil)) by
     ( apply PPermut_last_rev_simpl with (a:=(w, nil));
@@ -2115,9 +2114,9 @@ assert (emptyEquiv G0 = G0) by
     GH & (w1, nil) ++ GT)) by
   ( apply emptyEquiv_permut_split_last with (C:=(w, nil)) (H:= (w0,nil)::G1);
     simpl; rewrite <- H0; rew_app; symmetry; auto);
-  rewrite H11; rewrite H12; rew_app;
+  rewrite H13; rewrite H14; rew_app;
   transitivity (GH ++ (w0, nil) :: (w1, nil)::GT); auto; PPermut_simpl);
-rewrite emptyEquiv_rewrite; simpl; rewrite H11; auto.
+rewrite emptyEquiv_rewrite; simpl; rewrite H13; auto.
 rewrite subst_order_irrelevant_bound;
 [ rewrite <- subst_w_neutral_free with (w0:=w_fresh) | constructor];
 [ apply rename_w_preserv_types_outer
