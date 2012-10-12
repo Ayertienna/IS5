@@ -60,7 +60,8 @@ Property: term is locally closed
 *)
 
 Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
- | lct_hyp_LF: forall v n, lc_t_n_LF n (hyp_LF (fte v))
+ | lct_hyp_bte_LF: forall v n, n > v -> lc_t_n_LF n (hyp_LF (bte v))
+ | lct_hyp_fte_LF: forall v n, lc_t_n_LF n (hyp_LF (fte v))
  | lct_lam_LF: forall M t n,
      lc_t_n_LF (S n) M ->
      lc_t_n_LF n (lam_LF t M)
@@ -77,8 +78,7 @@ Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
      lc_t_n_LF n M ->
      lc_t_n_LF n (get_here_LF (fwo w) M)
  | lct_letdia_get_LF: forall M N w n,
-     lc_t_n_LF (S n) N ->
-     lc_t_n_LF n M ->
+     lc_t_n_LF (S n) N -> lc_t_n_LF n M ->
      lc_t_n_LF n (letdia_get_LF (fwo w) M N)
 .
 
@@ -86,7 +86,7 @@ Definition lc_t_LF M := lc_t_n_LF 0 M.
 
 
 Inductive lc_w_n_LF: nat -> te_LF -> Prop :=
-| lcw_hyp_LF: forall v n, lc_w_n_LF n (hyp_LF (fte v))
+| lcw_hyp_LF: forall v n, lc_w_n_LF n (hyp_LF v)
 | lcw_lam_LF: forall t M n,
     lc_w_n_LF n M ->
     lc_w_n_LF n (lam_LF t M)

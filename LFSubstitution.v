@@ -1,5 +1,7 @@
 Require Export LFSyntax.
 Require Export LibTactics. (* case_if *)
+Require Import Gt.
+
 
 (* Notation for term substitution *)
 Global Reserved Notation " [ M // v ] N " (at level 5).
@@ -160,10 +162,13 @@ Qed.
 Lemma closed_subst_t_bound:
 forall N M v0 n
   (H_lc: lc_t_n_LF n N),
-  [M // bte v0] N = N.
+  v0 >= n -> [M // bte v0] N = N.
 induction N; intros; simpl in *;
 repeat case_if; inversion H_lc; subst;
 try (erewrite IHN || (erewrite IHN1; try erewrite IHN2)); eauto.
+assert (~(n = v0)) by omega;
+apply gt_asym in H2; elim H2; omega.
+omega. omega.
 Qed.
 
 
@@ -187,6 +192,8 @@ forall M v v' n N
   [ N // fte v] ([ hyp_LF (fte v') // bte n] M) =
   [hyp_LF (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
+[ repeat (case_if; simpl); auto;
+  erewrite closed_subst_t_bound; eauto; omega | | | | | |];
 try (rewrite IHM; auto);
 try (rewrite IHM1; try rewrite IHM2; auto);
 repeat (case_if; simpl); subst; simpl;
