@@ -39,7 +39,7 @@ Inductive lc_t_n_L : nat -> te_L -> Prop :=
      lc_t_n_L n (here_L M)
  | lct_get_L: forall M w n,
      lc_t_n_L n M ->
-     lc_t_n_L n (get_L (fwo w) M)
+     lc_t_n_L n (get_L w M)
  | lct_letd_L: forall M N n,
      lc_t_n_L (S n) N -> lc_t_n_L n M ->
      lc_t_n_L n (letd_L M N)
@@ -72,3 +72,38 @@ Inductive lc_w_n_L: nat -> te_L -> Prop :=
     lc_w_n_L (S n) N -> lc_w_n_L n M ->
     lc_w_n_L n (letd_L M N)
 .
+
+Definition lc_w_L w := lc_w_n_L 0 w.
+Definition lc_t_L t := lc_t_n_L 0 t.
+
+Fixpoint used_vars_term_L (M: te_L) :=
+match M with
+| hyp_L (bte _) => \{}
+| hyp_L (fte w) => \{w}
+| lam_L A M => used_vars_term_L M
+| appl_L M N => used_vars_term_L M \u used_vars_term_L N
+| box_L M => used_vars_term_L M
+| unbox_L M => used_vars_term_L M
+| here_L M => used_vars_term_L M
+| letd_L M N => used_vars_term_L M \u used_vars_term_L N
+| get_L w M => used_vars_term_L M
+| fetch_L w M => used_vars_term_L M
+end.
+
+Fixpoint used_worlds_term_L (M: te_L) :=
+match M with
+| hyp_L _ => \{}
+| lam_L A M => used_worlds_term_L M
+| appl_L M N => used_worlds_term_L M \u used_worlds_term_L N
+| box_L M => used_worlds_term_L M
+| unbox_L M => used_worlds_term_L M
+| here_L M => used_worlds_term_L M
+| letd_L M N => used_worlds_term_L M \u used_worlds_term_L N
+| get_L (fwo w) M => \{w} \u used_worlds_term_L M
+| get_L (bwo _) M => used_worlds_term_L M
+| fetch_L (fwo w) M => \{w} \u used_worlds_term_L M
+| fetch_L (bwo _) M => used_worlds_term_L M
+end.
+
+Definition used_vars_context_L (Gamma: Context_L) : fset var :=
+  from_list (map (fun x => fst (snd x)) Gamma).
