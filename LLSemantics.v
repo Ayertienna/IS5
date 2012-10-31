@@ -234,14 +234,22 @@ forall Omega Gamma M A w Omega',
   Omega; Gamma |- M ::: A @ w ->
   Omega *=* Omega' ->
   Omega'; Gamma |- M ::: A @ w.
-Admitted.
+intros; generalize dependent Omega'; induction H; intros;
+econstructor;
+try (eapply ok_L_permut);
+try (eapply Mem_permut); eauto.
+Qed.
 
 Lemma PermutGamma:
 forall Omega Gamma M A w Gamma',
   Omega; Gamma |- M ::: A @ w ->
   Gamma *=* Gamma' ->
   Omega; Gamma' |- M ::: A @ w.
-Admitted.
+intros; generalize dependent Gamma'; induction H; intros;
+econstructor;
+try (eapply ok_L_permut);
+try (eapply Mem_permut); eauto.
+Qed.
 
 Lemma subst_t_types_preserv:
 forall Omega Gamma M A B w N x,
