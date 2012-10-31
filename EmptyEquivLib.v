@@ -19,6 +19,7 @@ induction H; simpl in *; auto.
 transitivity (emptyEquiv G'); auto.
 Qed.
 
+
 Lemma emptyEquiv_last_change:
 forall G G' w C C',
   G  ~=~ G'& (w, C) ->
@@ -75,21 +76,29 @@ Lemma emptyEquiv_permut_split_last:
 forall G C H,
   G & C ~=~ emptyEquiv H ->
   emptyEquiv G = G.
-induction G; intros; simpl; auto; destruct a.
-assert (((v, l) :: G) & C ~=~ emptyEquiv H) by auto.
-apply PPermut_split_head in H0; destruct H0 as (l', (hd, (tl, (Ha, Hb))));
-subst; assert (l' = nil).
-apply emptyEquiv_Mem_nil with (G:=H)(w:=v); rewrite Hb;
-repeat rewrite Mem_app_or_eq; left; right; apply Mem_here.
-subst; symmetry in Ha; apply permut_nil_eq in Ha; subst.
-rewrite Hb in H1; rew_app in H1.
-assert (G & C ~=~ hd ++ tl).
-  apply PPermut_last_rev_simpl with (a:=(v,nil)).
-  transitivity ((v,nil)::G & C).
-    PPermut_simpl.
-    rewrite H1; PPermut_simpl.
-rewrite IHG with (H:=hd++tl) (C:=C); auto.
-Admitted.
+induction G; intros; simpl in *; auto; destruct a; rew_app in *;
+assert (l = nil) by
+  (eapply emptyEquiv_permut_empty; eauto; eapply Mem_here);
+subst; assert (emptyEquiv G = G).
+  assert ((v, nil) :: G & C ~=~ emptyEquiv H) by auto;
+  apply PPermut_split_head in H0; destruct H0 as (l', (hd, (tl, (Ha, Hb))));
+  subst; apply permut_nil_eq in Ha; subst.
+  rewrite Hb in H1.
+  assert (G & C ~=~ hd ++ tl) by
+    ( apply PPermut_last_rev_simpl with (a:=(v,nil));
+      transitivity ((v,nil)::G & C); [ | rewrite H1]; PPermut_simpl).
+  apply IHG with (C:=C) (H:=hd++tl).
+  rewrite H0. apply PPermut_last_rev_simpl with (a:=(v,nil));
+  rew_app.
+  assert (hd & (v, nil) ++ tl ~=~ hd ++ tl & (v, nil)) by PPermut_simpl;
+  rewrite <- H2.
+  assert (emptyEquiv (hd ++ tl)&(v, nil) ~=~ emptyEquiv (hd & (v, nil) ++ tl))
+    by (repeat rewrite emptyEquiv_rewrite; PPermut_simpl).
+  rewrite H3.
+  rewrite <- Hb.
+  rewrite <- double_emptyEquiv; auto.
+rewrite H1; auto.
+Qed.
 
 Lemma emptyEquiv_ok_list:
 forall G U,

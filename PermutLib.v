@@ -179,4 +179,16 @@ intro; apply permut_cons_inv in H; contradiction.
 (* now, if a <> a1 there's no simple way to use IHa with just a':=a *)
 Admitted. (* !!! Bug: #38 *)
 
+Lemma notin_Mem:
+forall A (x: A) U,
+  x \notin from_list U ->
+  ~ Mem x U.
+induction U; intros.
+rewrite Mem_nil_eq; tauto.
+intro Ha; rewrite Mem_cons_eq in Ha; destruct Ha;
+rewrite from_list_cons in H; rewrite notin_union in H; destruct H as (H1, H2).
+  subst; apply notin_same in H1; contradiction.
+  apply IHU in H2; contradiction.
+Qed.
+
 Close Scope permut_scope.

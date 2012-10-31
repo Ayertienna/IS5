@@ -208,7 +208,8 @@ forall A G U U',
   U *=* U' ->
   (@ok_LF A G U) ->
   (@ok_LF A G U').
-induction G; intros; try constructor;
+induction G; intros.
+destruct U'; econstructor; eauto.
 destruct a; inversion H0; subst;
 constructor; [ intro | apply IHG with (U:=v::U)]; auto;
 apply Mem_permut with (l':=U) in H1; [ elim H5 | symmetry]; auto.
@@ -263,12 +264,22 @@ split; intros.
   apply IHPPermut1; apply IHPPermut2; auto.
 Qed.
 
+Lemma ok_LF_permut_any:
+forall X (G: list (var * X)) G',
+  G *=* G' ->
+  forall U, ok_LF G U <-> ok_LF G' U.
+(* FIXME: once ~=~ is defined simpler, we can show that *=* -> ~=~ and
+   from that and the above result get the final conclusion;
+   This will be therefore skipped for now *)
+Admitted. (* !!! Bug: #40 *)
+
 Lemma ok_LF_PPermut_ty:
 forall G G'
   (H: G ~=~ G'),
   forall U, ok_LF (flat_map snd_ G) U <->
   ok_LF (flat_map snd_ G') U.
-Admitted.
+intros; eapply ok_LF_permut_any; apply flat_map_ppermut; auto.
+Qed.
 
 Lemma ok_LF_fresh_te_list:
 forall G Gamma v A w U,
@@ -279,18 +290,39 @@ intros; inversion H; subst; constructor; auto.
 Qed.
 
 Lemma ok_LF_fresh_te_ty:
-forall Gamma U G v A w,
+forall U Gamma G v A w,
  ok_LF (flat_map snd_ ((w, Gamma) :: G)) U ->
  v \notin (used_t_vars ((w, Gamma)::G) \u from_list U) ->
  ok_LF (flat_map snd_ ((w, (v, A)::Gamma) :: G)) U.
-Admitted. (* !!! *)
+(* This proof should be somewhat similar to the one below *)
+Admitted. (*!!! Bug: #41 *)
 
 Lemma ok_LF_fresh_wo_list:
-forall G w U,
+forall G w U l,
  ok_LF G U ->
  w \notin (used_w_vars G)  \u from_list U ->
- ok_LF ((w, nil) :: G) U.
-Admitted.
+ ok_LF ((w, l) :: G) U.
+induction G; intros.
+constructor.
+  apply notin_Mem; auto.
+  constructor.
+destruct a; inversion H; subst; constructor.
+  apply notin_Mem;
+  rewrite notin_union in H0; destruct H0; auto.
+  constructor.
+  rewrite Mem_cons_eq; intro; destruct H1; subst.
+  simpl in H0; repeat rewrite notin_union in H0; destruct H0;
+  destruct H0; rewrite notin_singleton in H0; elim H0; auto.
+  contradiction.
+apply ok_LF_used_permut with (U:=w::v::U).
+permut_simpl.
+assert (ok_LF ((w, l) :: G) (v::U)).
+apply IHG; auto.
+simpl in *; repeat rewrite notin_union in H0;
+rewrite from_list_cons; repeat rewrite notin_union;
+destruct H0; destruct H0; split; auto; split; auto.
+inversion H1; subst; auto.
+Qed.
 
 Lemma ok_LF_fresh_wo_ty:
 forall G w U,
@@ -596,7 +628,7 @@ forall G G' w C C',
   ok_Bg ((w, C) :: G) ->
   G & (w, C) ~=~ G' & (w, C') ->
   G ~=~ G' /\ C *=* C'.
-Admitted.
+Admitted. (*!!! Bug: #42 *)
 
 
 (* FIXME: generalize all the ok_Bg_split* into :
