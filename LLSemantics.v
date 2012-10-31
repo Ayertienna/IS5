@@ -251,32 +251,122 @@ try (eapply ok_L_permut);
 try (eapply Mem_permut); eauto.
 Qed.
 
+Lemma ok_L_smaller_Gamma:
+forall O X w x a,
+  ok_L O ((w, (x, a)) :: X)  ->
+  ok_L O X.
+Admitted.
+
+Lemma ok_L_Mem_contr:
+forall X w x a U,
+  ok_Gamma ((w, (x, a)) :: X) U  ->
+  forall w' b, ~ Mem (w', (x, b)) X.
+Admitted.
+
+Lemma subst_t_comm:
+forall M v v' n N
+  (Neq: v <> v')
+  (Lc: lc_t_L N),
+  [ N // fte v] ([ hyp_L (fte v') // bte n] M) =
+  [hyp_L (fte v') // bte n] ([N // fte v] M).
+Admitted.
+
+
 Lemma subst_t_types_preserv:
-forall Omega Gamma M A B w N x,
+forall Omega Gamma Gamma0 M A B w w' N x,
   lc_w_L N -> lc_t_L N ->
-  Omega; (w, (x, B)) :: Gamma |- M ::: A @ w ->
-  Omega; nil |- N ::: B @ w ->
-  Omega; Gamma |- [ N // fte x ] M ::: A @ w.
+  Omega; Gamma |- M ::: A @ w ->
+  Gamma *=*  (w', (x, B)) :: Gamma0 ->
+  Omega; nil |- N ::: B @ w' ->
+  forall Gamma', Gamma' *=* Gamma0 ->
+  Omega; Gamma' |- [ N // fte x ] M ::: A @ w.
 intros.
-remember ((w, (x, B)):: Gamma) as Gamma'.
-induction H1; inversion HeqGamma'; subst; simpl in *.
+generalize dependent Gamma0; generalize dependent Gamma'.
+induction H1; intros; simpl in *.
 (* hyp *)
 case_if.
-inversion H3; subst.
-rewrite Mem_cons_eq in HT; destruct HT.
-  inversion H4; subst; replace Gamma with (nil ++ Gamma) by auto;
-  apply WeakeningGamma with (Gamma:=nil) (Gamma':=Gamma); rew_app; auto.
-  (*apply ok_L_smaller in Ok; auto.*) skip.
-  (*apply ok_L_Mem_contradiction. *) skip.
+inversion H1; subst.
+assert ((w', (x, B)) = (w, (x, A))).
+  eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto.
+  destruct Ok as (OkO, Ok);
+  apply ok_L_Mem_contr with (w':=w) (b:=A) in Ok.
+  apply Mem_permut with (l':=(w', (x, B)) :: Gamma0) in HT; auto.
+  rewrite Mem_cons_eq in HT; destruct HT.
+    symmetry; auto.
+    contradiction.
+inversion H5; subst; auto.
+replace Gamma' with (nil ++ Gamma') by auto;
+apply WeakeningGamma with (Gamma:=nil) (Gamma':=Gamma'); rew_app; auto;
+eapply ok_L_permut with (G:=Gamma0); [ | symmetry | ]; eauto;
+eapply ok_L_permut with (G':=(w, (x,A))::Gamma0) in Ok; eauto;
+eapply ok_L_smaller_Gamma; eauto.
 constructor.
-  (*apply ok_L_smaller in Ok; auto.*) skip.
-  rewrite Mem_cons_eq in HT; destruct HT;
-  [inversion H4; subst; elim H3 | ]; auto.
+eapply ok_L_permut with (G':=(w', (x, B)) :: Gamma') in Ok; eauto.
+apply ok_L_smaller_Gamma in Ok; auto. rewrite H4; auto.
+apply Mem_permut with (l':= (w', (x, B)) :: Gamma0) in HT; eauto;
+rewrite Mem_cons_eq in HT; destruct HT;
+[ inversion H5; subst; elim H1 |
+  symmetry in H4; apply Mem_permut with (l:=Gamma0) ]; auto.
 (* lam *)
-apply t_lam_L with (L:=L).
-  (*apply ok_L_smaller in Ok; auto.*) skip.
-  intros; unfold open_t_L in *.
-Admitted.
+apply t_lam_L with (L:=L \u \{x}).
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+intros; unfold open_t_L in *;
+rewrite <- subst_t_comm; auto; eapply H1; auto;
+rewrite H2; rewrite H4; permut_simpl.
+(* appl *)
+apply t_appl_L with (A:=A).
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+eapply IHtypes_L1; auto; rewrite H2; rewrite H4; permut_simpl.
+eapply IHtypes_L2; auto; rewrite H2; rewrite H4; permut_simpl.
+(* box *)
+apply t_box_L with (L:=L \u from_list Omega).
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+intros; unfold open_w_L in *.
+rewrite subst_order_irrelevant_bound; auto;
+eapply H1; eauto. eapply WeakeningOmega; eauto.
+destruct Ok; split; auto; constructor;
+[apply notin_Mem |]; auto.
+(* unbox *)
+constructor.
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+eapply IHtypes_L; eauto.
+(* fetch *)
+constructor; eauto.
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+(* here *)
+constructor; eauto.
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+(* get *)
+constructor; eauto.
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H4;
+eapply ok_L_permut with (G:=Gamma0); auto.
+(* letd *)
+apply t_letd_L with (A:=A) (Lt:=Lt \u \{x}) (Lw:=Lw \u from_list Omega).
+eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
+apply ok_L_smaller_Gamma in Ok; symmetry in H5;
+eapply ok_L_permut with (G:=Gamma0); auto.
+eapply IHtypes_L; eauto.
+intros; unfold open_t_L in *; unfold open_w_L in *.
+rewrite subst_order_irrelevant_bound; auto;
+rewrite <- subst_t_comm; auto; eapply H2; eauto.
+eapply WeakeningOmega; eauto.
+destruct Ok; split; simpl; auto; split; auto;
+apply notin_Mem; auto.
+rewrite H4; rewrite H5; permut_simpl.
+Qed.
 
 Lemma rename_w_types_preserv_in_old:
 forall Omega Gamma M A w0 w1,
