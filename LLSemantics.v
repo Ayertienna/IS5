@@ -13,6 +13,7 @@ Inductive types_L: worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
 
 | t_hyp_L: forall Omega Gamma v A w
   (Ok: ok_L Omega Gamma)
+  (World: Mem w Omega)
   (HT: Mem (w, (v, A)) Gamma),
   Omega; Gamma |- hyp_L (fte v) ::: A @ w
 
@@ -30,6 +31,7 @@ Inductive types_L: worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
 
 | t_box_L: forall L Omega Gamma w M A
   (Ok: ok_L Omega Gamma)
+  (World: Mem w Omega)
   (HT: forall x, x \notin L ->
     (x :: Omega); Gamma |- (M ^w^ (fwo x)) ::: A @ w),
   Omega; Gamma |- box_L M ::: [*]A @ w
@@ -126,7 +128,7 @@ intros; generalize dependent Gamma'; generalize dependent Delta;
 induction H; intros.
 (* hyp *)
 constructor;
-[ eapply ok_L_permut; [ | symmetry | ] |
+[ eapply ok_L_permut; [ | symmetry | ] | |
   eapply Mem_permut; [ symmetry | rewrite Mem_app_or_eq; left ]]; eauto.
 (* lam *)
 apply t_lam_L with (L:=L \u used_vars_context_L (Gamma++Gamma')).
@@ -141,6 +143,7 @@ apply t_appl_L with (A:=A).
 (* box *)
 apply t_box_L with (L:=L \u from_list Omega).
   eapply ok_L_permut; [ | symmetry | ]; eauto.
+  auto.
   intros; apply H with (Gamma':=Gamma'); auto.
   destruct Ok0; split; auto; simpl; split; [apply notin_Mem | ]; auto.
 (* unbox *)
@@ -180,8 +183,9 @@ forall Omega Gamma M A w w'
     Omega'; Gamma |- M ::: A @ w.
 intros Omega Gamma M A w w' H; generalize dependent w'; induction H; intros.
 (* hyp *)
-constructor; auto;
+constructor; auto.
 eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
+eapply Mem_permut; [ symmetry | ]; eauto; rewrite Mem_cons_eq; right; auto.
 (* lam *)
 apply t_lam_L with (L:=L \u used_vars_context_L Gamma).
 eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
@@ -192,13 +196,14 @@ apply t_appl_L with (A:=A); eauto.
 eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
 (* box *)
 apply t_box_L with (L:=L \u from_list (w'::Omega)).
-  eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
-  intros; apply H with (w':=w'); auto.
-  eapply ok_L_permut with (O:=(x::w'::Omega)); eauto.
-    permut_simpl.
-    destruct Ok0; split; auto; simpl. split; auto.
-    apply notin_Mem; eauto.
-    permut_simpl; auto.
+eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
+eapply Mem_permut; [ symmetry | ]; eauto; rewrite Mem_cons_eq; right; auto.
+intros; apply H with (w':=w'); auto.
+eapply ok_L_permut with (O:=(x::w'::Omega)); eauto.
+permut_simpl.
+destruct Ok0; split; auto; simpl. split; auto.
+apply notin_Mem; eauto.
+permut_simpl; auto.
 (* unbox *)
 constructor; eauto.
 eapply ok_L_permut with (O:=w'::Omega); [symmetry | | ]; eauto.
@@ -271,7 +276,6 @@ forall M v v' n N
   [hyp_L (fte v') // bte n] ([N // fte v] M).
 Admitted.
 
-
 Lemma subst_t_types_preserv:
 forall Omega Gamma Gamma0 M A B w w' N x,
   lc_w_L N -> lc_t_L N ->
@@ -300,7 +304,7 @@ apply WeakeningGamma with (Gamma:=nil) (Gamma':=Gamma'); rew_app; auto;
 eapply ok_L_permut with (G:=Gamma0); [ | symmetry | ]; eauto;
 eapply ok_L_permut with (G':=(w, (x,A))::Gamma0) in Ok; eauto;
 eapply ok_L_smaller_Gamma; eauto.
-constructor.
+constructor; auto.
 eapply ok_L_permut with (G':=(w', (x, B)) :: Gamma') in Ok; eauto.
 apply ok_L_smaller_Gamma in Ok; auto. rewrite H4; auto.
 apply Mem_permut with (l':= (w', (x, B)) :: Gamma0) in HT; eauto;
@@ -323,7 +327,7 @@ eapply ok_L_permut with (G:=Gamma0); auto.
 eapply IHtypes_L1; auto; rewrite H2; rewrite H4; permut_simpl.
 eapply IHtypes_L2; auto; rewrite H2; rewrite H4; permut_simpl.
 (* box *)
-apply t_box_L with (L:=L \u from_list Omega).
+apply t_box_L with (L:=L \u from_list Omega); auto.
 eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
 apply ok_L_smaller_Gamma in Ok; symmetry in H4;
 eapply ok_L_permut with (G:=Gamma0); auto.
@@ -368,17 +372,47 @@ apply notin_Mem; auto.
 rewrite H4; rewrite H5; permut_simpl.
 Qed.
 
-Lemma rename_w_types_preserv_in_old:
-forall Omega Gamma M A w0 w1,
-  Omega; Gamma |- M ::: A @ w1 ->
-  Omega; Gamma |- {{ fwo w0 // fwo w1 }} M ::: A @ w0.
+Fixpoint rename_context_L (w: var) (w': var) (C: Context_L) :=
+match C with
+| nil => nil
+| (w0, (x, A)) :: C'  =>
+  let w1 := if (eq_var_dec w0 w) then w' else w0 in
+    (w1, (x, A)) :: (rename_context_L w w' C')
+end.
+
+Lemma rename_w_types_preserv:
+forall Omega Gamma M A w w0 w1 w' Gamma',
+  (w0::Omega); Gamma |- M ::: A @ w -> Mem w1 Omega ->
+  w0 <> w1 ->
+  w' = (if eq_var_dec w w0 then w1 else w) ->
+  Gamma' = rename_context_L w0 w1 Gamma ->
+  Omega; Gamma' |- {{ fwo w1 // fwo w0 }} M ::: A @ w'.
 Admitted.
+
+Lemma rename_w_same:
+forall M w,
+  {{ fwo w // fwo w }} M = M.
+Admitted.
+
+Lemma types_w_in_Omega:
+forall Omega Gamma M A w,
+  Omega; Gamma |- M ::: A @ w ->
+  Mem w Omega.
+intros; induction H; auto.
+assert (exists x, x \notin L) by apply Fresh;
+destruct H0 as (x, H0); specialize H with x;
+apply H; auto.
+Qed.
 
 Lemma rename_w_types_preserv_in_new:
 forall Omega Gamma M A w0 w1,
-  w1::Omega; Gamma |- M ::: A @ w0 ->
-  Omega; Gamma |- {{ fwo w0 // fwo w1 }} M ::: A @ w0.
-Admitted.
+  w1::Omega; Gamma |- M ::: A @ w0 -> w0 <> w1 ->
+  Omega; (rename_context_L w1 w0 Gamma) |- {{ fwo w0 // fwo w1 }} M ::: A @ w0.
+intros; eapply rename_w_types_preserv with (w:=w0); eauto.
+apply types_w_in_Omega in H; rewrite Mem_cons_eq in H; destruct H; subst;
+[ elim H0 | ]; auto.
+case_if; auto.
+Qed.
 
 Lemma Progress:
 forall Omega M A w
@@ -445,41 +479,82 @@ generalize dependent N; generalize dependent w';
 induction HType; intros; inversion HStep; subst; eauto using types_L.
 (* red_appl_lam *)
 inversion HType1; subst; unfold open_t_L in *.
-assert (exists x, x \notin L \u used_vars_term_L M0) as HF by apply Fresh.
+assert (exists x, x \notin L \u used_vars_term_L M0 \u \{w'}) as HF
+  by apply Fresh.
 destruct HF as (v_f).
 replace ([N // bte 0] M0) with ([N // fte v_f] ([hyp_L (fte v_f) // bte 0] M0)).
-apply subst_t_types_preserv with (B:=A); auto.
+eapply subst_t_types_preserv with (B:=A); eauto.
 rewrite <- subst_t_neutral_free with (n:=0); auto.
 (* red_unbox_box *)
 inversion HType; subst; unfold open_w_L in *;
-assert (exists x, x \notin L \u used_worlds_term_L M0) as HF by apply Fresh;
+assert (exists x, x \notin L \u used_worlds_term_L M0 \u \{w'}) as HF
+  by apply Fresh;
 destruct HF as (w_f).
 replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//fwo w_f}}{{fwo w_f//bwo 0}}M0).
-apply rename_w_types_preserv_in_new.
-apply HT; auto.
+replace (@nil (prod var (prod var ty))) with (rename_context_L w_f w' nil) by
+  (simpl; auto).
+apply rename_w_types_preserv_in_new; auto.
 rewrite <- subst_w_neutral_free with (n:=0); auto.
 (* red_fetch_val *)
-apply rename_w_types_preserv_in_old; auto.
+destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
+replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
+  (simpl; auto).
+assert (Mem w Omega) by (eapply types_w_in_Omega; eauto);
+apply Mem_split in H; destruct H as (hd, (tl, H));
+apply PermutOmega with (Omega := w :: hd ++ tl); [ | permut_simpl];
+[ eapply WeakeningOmega | rewrite H ]; eauto; try permut_simpl.
+eapply rename_w_types_preserv with (w:=w); try case_if; eauto.
+apply PermutOmega with (Omega := Omega); auto; rewrite H; permut_simpl.
+rewrite Mem_app_or_eq;
+rewrite H in Hin; rewrite Mem_app_or_eq in Hin; destruct Hin.
+  rewrite Mem_app_or_eq in H0; destruct H0; [ left | rewrite Mem_cons_eq in H0];
+  auto; destruct H0; [ subst | rewrite Mem_nil_eq in H0; contradiction].
+  elim n; auto.
+  right; auto.
+simpl; destruct Ok; split; auto; apply ok_Omega_permut with (O1:=Omega); auto;
+rewrite H; permut_simpl.
 (* red_get_here *)
 inversion HType; subst; constructor; auto;
-apply rename_w_types_preserv_in_old; auto.
+replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
+  (simpl; auto).
+destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
+replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
+  (simpl; auto).
+assert (Mem w Omega) by (eapply types_w_in_Omega; eauto);
+apply Mem_split in H; destruct H as (hd, (tl, H));
+apply PermutOmega with (Omega := w :: hd ++ tl); [ | permut_simpl];
+[ eapply WeakeningOmega | rewrite H ]; eauto; try permut_simpl.
+eapply rename_w_types_preserv with (w:=w); try case_if; eauto.
+apply PermutOmega with (Omega := Omega); auto; rewrite H; permut_simpl.
+rewrite Mem_app_or_eq;
+rewrite H in Hin; rewrite Mem_app_or_eq in Hin; destruct Hin.
+  rewrite Mem_app_or_eq in H0; destruct H0; [ left | rewrite Mem_cons_eq in H0];
+  auto; destruct H0; [ subst | rewrite Mem_nil_eq in H0; contradiction].
+  elim n; auto.
+  right; auto.
+simpl; destruct Ok; split; auto; apply ok_Omega_permut with (O1:=Omega); auto;
+rewrite H; permut_simpl.
 (* red_letd_here *)
 clear H.
 inversion HType; subst; unfold open_w_L in *; unfold open_t_L in *;
 assert (exists x, x \notin Lt \u used_vars_term_L {{fwo w' // bwo 0}}N)
   as HF by apply Fresh;
 destruct HF as (v_f).
-assert (exists x, x \notin Lw \u used_worlds_term_L [hyp_L (fte v_f) // bte 0]N)
+assert (exists x, x \notin Lw \u used_worlds_term_L [hyp_L (fte v_f) // bte 0]N
+                           \u \{w'})
   as HF by apply Fresh;
 destruct HF as (w_f).
 replace ([M0 // bte 0] ({{fwo w' // bwo 0}}N)) with
   ([M0 // fte v_f] ([hyp_L (fte v_f) // bte 0] ({{fwo w'// bwo 0}} N)))
-  by (rewrite <- subst_t_neutral_free; auto);
-apply subst_t_types_preserv with (B:=A); auto.
+  by (rewrite <- subst_t_neutral_free; auto).
+eapply subst_t_types_preserv with (B:=A); eauto.
 rewrite <- subst_order_irrelevant_bound; [ | constructor];
 replace ( {{fwo w' // bwo 0}}([hyp_L (fte v_f) // bte 0]N)) with
   ({{fwo w' // fwo w_f}} ({{fwo w_f // bwo 0}} ([hyp_L (fte v_f) // bte 0] N)))
-  by (rewrite <- subst_w_neutral_free; auto);
-apply rename_w_types_preserv_in_new;
+  by (rewrite <- subst_w_neutral_free; auto).
+replace ((w', (v_f, A)) :: nil)
+  with (rename_context_L  w_f w' ((w', (v_f, A))::nil)).
+apply rename_w_types_preserv_in_new; auto.
 rewrite subst_order_irrelevant_bound; auto; constructor.
+simpl; case_if; auto.
 Qed.
