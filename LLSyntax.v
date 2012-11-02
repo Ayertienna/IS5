@@ -107,3 +107,41 @@ end.
 
 Definition used_vars_context_L (Gamma: Context_L) : fset var :=
   from_list (map (fun x => fst (snd x)) Gamma).
+
+
+Lemma closed_w_succ:
+forall M n,
+  lc_w_n_L n M -> lc_w_n_L (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_w_n_L.
+Qed.
+
+Lemma closed_t_succ:
+forall M n,
+  lc_t_n_L n M -> lc_t_n_L (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_L.
+Qed.
+
+
+Lemma closed_w_addition:
+forall M n m,
+  lc_w_n_L n M -> lc_w_n_L (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n+ S m) with (S (n+m)) by auto] ;
+try apply closed_w_succ;
+assumption.
+Qed.
+
+Lemma closed_t_addition:
+forall M n m,
+  lc_t_n_L n M -> lc_t_n_L (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ;
+assumption.
+Qed.

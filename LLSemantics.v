@@ -602,7 +602,7 @@ replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//fwo w_f}}{{fwo w_f//bwo 0}}M0).
 replace (@nil (prod var (prod var ty))) with (rename_context_L w_f w' nil) by
   (simpl; auto).
 apply rename_w_types_preserv_in_new; auto.
-rewrite <- subst_w_neutral_free with (n:=0); auto.
+rewrite <- subst_w_neutral_free; auto.
 (* red_fetch_val *)
 destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
 replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
