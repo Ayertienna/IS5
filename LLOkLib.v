@@ -40,13 +40,42 @@ forall O G x w A,
   ok_L O ((w, (x, A))::G).
 Admitted.
 
-Lemma ok_L_smaller:
-forall O G x w A,
-  ok O ((w, (x, A))::G) -> ok O G.
-Admitted.
-
 Lemma ok_L_Mem_contradiction:
+forall w x A Gamma Omega B,
   Mem (w, (x, A)) Gamma ->
   ok_L Omega ((w, (x, B)) :: Gamma) ->
   False.
+Admitted.
+
+Lemma ok_L_smaller_Gamma:
+forall O X w x a,
+  ok_L O ((w, (x, a)) :: X)  ->
+  ok_L O X.
+Admitted.
+
+Lemma ok_L_Mem_contr:
+forall X w x a U,
+  ok_Gamma ((w, (x, a)) :: X) U  ->
+  forall w' b, ~ Mem (w', (x, b)) X.
+Admitted.
+
+Fixpoint rename_context_L (w: var) (w': var) (C: Context_L) :=
+match C with
+| nil => nil
+| (w0, (x, A)) :: C'  =>
+  let w1 := if (eq_var_dec w0 w) then w' else w0 in
+    (w1, (x, A)) :: (rename_context_L w w' C')
+end.
+
+Lemma ok_L_rename:
+forall Omega Gamma w w',
+  ok_L Omega Gamma ->
+  ok_L Omega (rename_context_L w w' Gamma).
+Admitted.
+
+Lemma Mem_rename_context_L:
+forall Gamma x A w w' w0 w1,
+  Mem (w, (x, A)) Gamma ->
+  w' = (if (eq_var_dec w0 w) then w1 else w) ->
+  Mem (w', (x, A)) (rename_context_L w0 w1 Gamma).
 Admitted.

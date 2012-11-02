@@ -1,4 +1,5 @@
 Require Export LLSyntax.
+Require Import LLOkLib.
 
 (* Notation for term substitution *)
 Global Reserved Notation " [ M // v ] N " (at level 5).
@@ -71,7 +72,7 @@ Admitted.
 
 Lemma subst_order_irrelevant_free:
 forall M w0 w1 x N,
-  w1 \notin used_worlds_term_L M ->
+  w1 \notin used_worlds_term_L N ->
   {{ w0 // fwo w1 }} ([ N // x ] M) = [ N // x ] ({{ w0 // fwo w1 }} M).
 Admitted.
 
@@ -92,4 +93,24 @@ Lemma lc_w_subst:
 forall M w k,
   lc_w_n_L (S k) M ->
   lc_w_n_L k {{w // bwo k}} M.
+Admitted.
+
+Lemma subst_t_comm:
+forall M v v' n N
+  (Neq: v <> v')
+  (Lc: lc_t_L N),
+  [ N // fte v] ([ hyp_L (fte v') // bte n] M) =
+  [hyp_L (fte v') // bte n] ([N // fte v] M).
+Admitted.
+
+Lemma subst_w_comm:
+forall M w w' w'' n,
+  w'' <> w ->
+  {{fwo w' // fwo w''}} ({{fwo w // bwo n}} M) =
+  {{ fwo w // bwo n}} ( {{fwo w' // fwo w''}}M).
+Admitted.
+
+Lemma rename_w_same:
+forall M w,
+  {{ fwo w // fwo w }} M = M.
 Admitted.

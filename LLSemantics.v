@@ -256,33 +256,6 @@ try (eapply ok_L_permut);
 try (eapply Mem_permut); eauto.
 Qed.
 
-Lemma ok_L_smaller_Gamma:
-forall O X w x a,
-  ok_L O ((w, (x, a)) :: X)  ->
-  ok_L O X.
-Admitted.
-
-Lemma ok_L_Mem_contr:
-forall X w x a U,
-  ok_Gamma ((w, (x, a)) :: X) U  ->
-  forall w' b, ~ Mem (w', (x, b)) X.
-Admitted.
-
-Lemma subst_t_comm:
-forall M v v' n N
-  (Neq: v <> v')
-  (Lc: lc_t_L N),
-  [ N // fte v] ([ hyp_L (fte v') // bte n] M) =
-  [hyp_L (fte v') // bte n] ([N // fte v] M).
-Admitted.
-
-Lemma subst_w_comm:
-forall M w w' w'' n,
-  w'' <> w ->
-  {{fwo w' // fwo w''}} ({{fwo w // bwo n}} M) =
-  {{ fwo w // bwo n}} ( {{fwo w' // fwo w''}}M).
-Admitted.
-
 Lemma subst_t_types_preserv:
 forall Omega Gamma Gamma0 M A B w w' N x,
   lc_w_L N -> lc_t_L N ->
@@ -379,27 +352,6 @@ apply notin_Mem; auto.
 rewrite H4; rewrite H5; permut_simpl.
 Qed.
 
-Fixpoint rename_context_L (w: var) (w': var) (C: Context_L) :=
-match C with
-| nil => nil
-| (w0, (x, A)) :: C'  =>
-  let w1 := if (eq_var_dec w0 w) then w' else w0 in
-    (w1, (x, A)) :: (rename_context_L w w' C')
-end.
-
-Lemma ok_L_rename:
-forall Omega Gamma w w',
-  ok_L Omega Gamma ->
-  ok_L Omega (rename_context_L w w' Gamma).
-Admitted.
-
-Lemma types_rename_context_L:
-forall Gamma x A w w' w0 w1,
-  Mem (w, (x, A)) Gamma ->
-  w' = (if (eq_var_dec w0 w) then w1 else w) ->
-  Mem (w', (x, A)) (rename_context_L w0 w1 Gamma).
-Admitted.
-
 Lemma rename_w_types_preserv:
 forall Omega Omega' Gamma M A w w0 w1 w' Gamma',
   Omega'; Gamma |- M ::: A @ w -> Mem w1 Omega ->
@@ -421,7 +373,7 @@ constructor; [eapply ok_L_rename | | ]; eauto.
 apply ok_L_permut with (O':=w0::Omega0) (G':=Gamma) in Ok;
 [ | symmetry | ]; auto;
 destruct Ok; split; auto; simpl in *; destruct H; auto.
-eapply types_rename_context_L; repeat case_if; eauto; elim H; eauto.
+eapply Mem_rename_context_L; repeat case_if; eauto; elim H; eauto.
 constructor; [eapply ok_L_rename | | ]; eauto.
 apply ok_L_permut with (O':=w0::Omega0) (G':=Gamma) in Ok;
 [ | symmetry | ]; auto;
@@ -429,7 +381,7 @@ destruct Ok; split; auto; simpl in *; destruct H3; auto.
 apply Mem_permut with (l':=w0::Omega0) in World; [|symmetry]; auto;
 rewrite Mem_cons_eq in World; destruct World; subst.
   elim H; auto. auto.
-eapply types_rename_context_L; repeat case_if; eauto; elim H; eauto.
+eapply Mem_rename_context_L; repeat case_if; eauto; elim H; eauto.
 (* lam *)
 econstructor; eauto.
 subst.
@@ -549,11 +501,6 @@ rewrite <- subst_order_irrelevant_free; simpl; auto;
 eapply H0; try rewrite <- H2; try case_if; eauto; try permut_simpl;
 rewrite Mem_cons_eq; right; auto.
 Qed.
-
-Lemma rename_w_same:
-forall M w,
-  {{ fwo w // fwo w }} M = M.
-Admitted.
 
 Lemma types_w_in_Omega:
 forall Omega Gamma M A w,
