@@ -55,8 +55,8 @@ Definition open_t_L (M: te_L) (t: te_L) := subst_t_L t (bte 0) M.
 
 Definition open_w_L M w := subst_w_L M w (bwo 0).
 
-Notation " M '^t^' t " := (open_t_L M t) (at level 5) : labeled_is5_scope.
-Notation " M '^w^' w  " := (open_w_L M w) (at level 10) : labeled_is5_scope.
+Notation " M '^t^' t " := (open_t_L M t) (at level 67) : labeled_is5_scope.
+Notation " M '^w^' w  " := (open_w_L M w) (at level 67) : labeled_is5_scope.
 
 Open Scope labeled_is5_scope.
 

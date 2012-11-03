@@ -33,7 +33,7 @@ Inductive types_L: worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
   (Ok: ok_L Omega Gamma)
   (World: Mem w Omega)
   (HT: forall x, x \notin L ->
-    (x :: Omega); Gamma |- (M ^w^ (fwo x)) ::: A @ w),
+    (x :: Omega); Gamma |- (M ^w^ (fwo x)) ::: A @ x),
   Omega; Gamma |- box_L M ::: [*]A @ w
 
 | t_unbox_L: forall Omega Gamma w M A
@@ -417,6 +417,8 @@ rewrite <- subst_w_comm; eauto.
 eapply H; eauto. subst; permut_simpl.
 rew_app; auto.
 rewrite Mem_cons_eq; right; auto.
+repeat case_if; subst; auto; rewrite notin_union in H5; destruct H5;
+rewrite notin_singleton in H4; elim H4; auto.
 (* unbox *)
 constructor.
 subst; apply ok_L_rename;
@@ -601,7 +603,7 @@ destruct HF as (w_f).
 replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//fwo w_f}}{{fwo w_f//bwo 0}}M0).
 replace (@nil (prod var (prod var ty))) with (rename_context_L w_f w' nil) by
   (simpl; auto).
-apply rename_w_types_preserv_in_new; auto.
+eapply rename_w_types_preserv; auto. case_if; auto.
 rewrite <- subst_w_neutral_free; auto.
 (* red_fetch_val *)
 destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
