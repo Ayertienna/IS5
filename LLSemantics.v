@@ -47,7 +47,7 @@ Inductive types_L: worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
   (Hin: Mem w' Omega),
   Omega; Gamma |- fetch_L (fwo w) M ::: [*]A @ w'
 
-| t_here: forall Omega Gamma w M A
+| t_here_L: forall Omega Gamma w M A
   (Ok: ok_L Omega Gamma)
   (HT: Omega; Gamma |- M ::: A @ w),
   Omega; Gamma |- here_L M ::: <*> A @ w
@@ -62,7 +62,7 @@ Inductive types_L: worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
   (Ok: ok_L Omega Gamma)
   (HT1: Omega; Gamma |- M ::: <*>A @ w)
   (HT2: forall t, t \notin Lt -> forall w', w' \notin Lw ->
-    w' :: Omega; (w, (t, A)) :: Gamma |-
+    w' :: Omega; (w', (t, A)) :: Gamma |-
       ((N ^w^ (fwo w')) ^t^ (hyp_L (fte t)))  ::: B @ w),
   Omega; Gamma |-letd_L M N ::: B @ w
 
@@ -496,8 +496,10 @@ destruct OkA; auto.
 eapply IHtypes_L; eauto.
 unfold open_w_L in *; unfold open_t_L in *.
 case_if; subst; intros;
-replace ((w1, (t, A)) :: rename_context_L w0 w1 Gamma) with
-  (rename_context_L w0 w1 ((w0, (t, A)) :: Gamma)) by (simpl; case_if; auto);
+replace ((w', (t, A)) :: rename_context_L w0 w1 Gamma) with
+  (rename_context_L w0 w1 ((w', (t, A)) :: Gamma)) by
+( simpl; rewrite notin_union in H5; destruct H5 as (H5a, H5b);
+  rewrite notin_singleton in H5b; case_if; auto);
 rewrite <- subst_w_comm; auto;
 rewrite <- subst_order_irrelevant_free; simpl; auto;
 eapply H0; try rewrite <- H2; try case_if; eauto; try permut_simpl;
@@ -663,8 +665,10 @@ replace ( {{fwo w' // bwo 0}}([hyp_L (fte v_f) // bte 0]N)) with
   ({{fwo w' // fwo w_f}} ({{fwo w_f // bwo 0}} ([hyp_L (fte v_f) // bte 0] N)))
   by (rewrite <- subst_w_neutral_free; auto).
 replace ((w', (v_f, A)) :: nil)
-  with (rename_context_L  w_f w' ((w', (v_f, A))::nil)).
-apply rename_w_types_preserv_in_new; auto.
-rewrite subst_order_irrelevant_bound; auto; constructor.
-simpl; case_if; auto.
+  with (rename_context_L  w_f w' ((w_f, (v_f, A))::nil)) by
+( simpl; repeat rewrite notin_union in H0; rewrite notin_singleton in H0;
+  repeat destruct H0 as (H0a, (H0b, H0c)); case_if; auto).
+eapply rename_w_types_preserv_in_new; eauto;
+rewrite subst_order_irrelevant_bound; auto.
+constructor.
 Qed.
