@@ -62,47 +62,112 @@ Lemma PPermut_map_fst:
 forall G G',
   G ~=~ G' ->
   map fst_ G *=* map fst_ G'.
-Admitted.
+induction G; intros.
+apply PPermut_nil_impl in H; subst; auto.
+assert (a::G ~=~ G') by auto;
+destruct a; apply PPermut_split_head in H;
+destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
+rew_map; simpl; permut_simpl;
+replace (map fst_ hd ++ map fst_ tl) with (map fst_ (hd++tl))
+  by (rew_map; auto);
+apply IHG.
+apply PPermut_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
+auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_simpl.
+Qed.
+
+Lemma annotate_worlds_app:
+forall l1 l2 x,
+  annotate_worlds x (l1++l2) = annotate_worlds x l1 ++ annotate_worlds x l2.
+induction l1; intros; rew_app; simpl; auto; destruct a; simpl;
+rewrite IHl1; rew_app; auto.
+Qed.
+
+Lemma permut_annotate_worlds:
+forall l l' x,
+  l *=* l' -> annotate_worlds x l *=* annotate_worlds x l'.
+induction l; intros.
+apply permut_nil_eq in H; subst; auto.
+assert (a::l *=* l') by auto;
+apply permut_split_head in H; destruct H as (hd, (tl, H)); subst;
+destruct a; simpl; repeat rewrite annotate_worlds_app; simpl;
+permut_simpl; replace (annotate_worlds x hd ++ annotate_worlds x tl)
+with (annotate_worlds x (hd++tl)) by (apply annotate_worlds_app; auto);
+apply IHl; apply permut_cons_inv with (a:=(v,t)); rewrite H0; permut_simpl.
+Qed.
 
 Lemma PPermut_flat_map_annotate_worlds:
 forall G G',
   G ~=~ G' ->
   flat_map (fun x => annotate_worlds (fst_ x) (snd_ x)) G *=*
   flat_map (fun x => annotate_worlds (fst_ x) (snd_ x)) G'.
-Admitted.
-
-(* until here *)
+induction G; intros.
+remember (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
+  as g.
+apply PPermut_nil_impl in H; subst; auto.
+assert (a::G ~=~ G') by auto;
+destruct a; apply PPermut_split_head in H;
+destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
+rew_flat_map; simpl;
+assert (l *=* l') by auto;
+apply permut_annotate_worlds with (x:=v) in Ha;
+rewrite Ha; permut_simpl;
+rewrite IHG with (G':=hd++tl); rew_flat_map; auto;
+apply PPermut_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
+auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_simpl.
+Qed.
 
 Lemma ok_LF_impl_ok_Omega:
 forall G w Gamma Omega,
   ok_LF ((w, Gamma)::G) nil ->
   Omega *=* fst_ (fst_ (labeled_context G (w, Gamma))) ->
   ok_Omega Omega.
-(*
 induction G; intros; inversion H; subst;
-[simpl in *; eauto | destruct a].
-unfold labeled_context; rew_map; simpl; repeat split.
-rewrite Mem_cons_eq; intro; destruct H0; subst; inversion H6; subst;
-[elim H4; apply Mem_here | ].
-simpl. apply ok_LF_not_Mem_fst with (w:=w) in H8;
-[contradiction | repeat rewrite Mem_cons_eq]; right; left; auto.
+[simpl in *; eauto | destruct a];
+rew_map in *; simpl in *.
+apply ok_Omega_permut with (O1:=w::nil);
+  [symmetry | constructor]; auto; constructor.
+rew_map in *; simpl in *.
 inversion H6; subst;
-apply ok_LF_not_Mem_fst with (U:=v::w::nil); auto; apply Mem_here.
-assert (ok_Omega (map fst_ ((w, Gamma) :: G))).
+assert (v::w::map fst_ G *=* Omega) by (rewrite H0; permut_simpl).
+apply permut_split_head in H1; destruct H1 as (hd, (tl, H1)); subst.
+apply ok_Omega_permut with (O1:=v::hd++tl); [permut_simpl | constructor].
+apply ok_LF_not_Mem_fst with (w:=v) in H8; [ | apply Mem_here].
+intro. apply Mem_permut with (l':=w::map fst_ G) in H1.
+rewrite Mem_cons_eq in H1; destruct H1;
+[ subst; elim H7; apply Mem_here | contradiction].
+apply permut_cons_inv with (a:=v);
+transitivity (hd & v ++ tl); [ | rewrite H0]; permut_simpl.
   apply IHG with (w:=w) (Gamma:=Gamma).
   inversion H6; subst; constructor; auto.
-  apply ok_LF_used_weakening in H7; auto.
-  rew_map; simpl; symmetry; rew_map; simpl; auto.
-  rew_map in *; simpl in *; destruct H0; auto.
-*)
-Admitted.
+  apply ok_LF_used_weakening in H10; auto.
+  apply permut_cons_inv with (a:=v);
+    transitivity (hd & v ++ tl); [ | rewrite H0]; permut_simpl.
+Qed.
 
 Lemma ok_LF_impl_ok_Gamma:
-forall G w Gamma Delta U,
+forall G Gamma w Delta U,
   ok_LF (flat_map snd_ ((w, Gamma)::G)) U ->
   Delta *=* snd_ (fst_ (labeled_context G (w, Gamma))) ->
   ok_Gamma Delta U.
-Admitted.
+induction G; induction Gamma; intros; simpl in *; rew_app in *.
+symmetry in H0; apply permut_nil_eq in H0; subst; constructor.
+destruct a; simpl in *; inversion H; subst;
+apply ok_Gamma_permut with (G1:=(w, (v, t)) :: annotate_worlds w Gamma);
+[symmetry | constructor]; auto; apply IHGamma with (w:=w); rew_app; auto.
+destruct a; simpl in *;
+apply ok_Gamma_permut with (G1:=annotate_worlds v l ++ flat_map
+         (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
+         G); [symmetry |]; auto;
+apply IHG with (w:=v) (Gamma:=l); auto; permut_simpl.
+destruct a0; destruct a; simpl in *; inversion H; subst;
+apply ok_Gamma_permut with (G1:=((w, (v, t)) :: annotate_worlds w Gamma) ++
+       annotate_worlds v0 l ++
+       flat_map
+         (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
+         G); [symmetry |]; auto;
+rew_app; constructor; auto;
+apply IHGamma with (w:=w); auto; permut_simpl.
+Qed.
 
 Lemma ok_Bg_impl_ok_L:
 forall G w Gamma Omega Delta,
@@ -116,35 +181,93 @@ intros; destruct H; split;
 Qed.
 
 Lemma Mem_preserved_world_L:
-forall G w Gamma Omega Delta,
+forall G w Gamma Omega,
   Omega *=* fst_ (fst_ (labeled_context G (w, Gamma))) ->
-  Delta *=* snd_ (fst_ (labeled_context G (w, Gamma))) ->
   forall w0 Gamma0,
     Mem (w0, Gamma0) ((w, Gamma)::G) ->
     Mem w0 Omega.
-Admitted.
+induction G; intros; simpl in *.
+rewrite Mem_cons_eq in H0; destruct H0;
+[ | rewrite Mem_nil_eq in H0; contradiction];
+inversion H0; subst; apply Mem_permut with (l:=map fst_ ((w, Gamma)::nil));
+[symmetry; auto | rew_map; simpl; apply Mem_here].
+destruct a;
+eapply Mem_permut with (l:=map fst_ ((w, Gamma) :: (v, l) :: G));
+[symmetry; auto | ]; rewrite Mem_cons_eq in H0; destruct H0.
+inversion H0; subst; rew_map; simpl; apply Mem_here.
+destruct (eq_var_dec w0 v); subst.
+rew_map; simpl; repeat rewrite Mem_cons_eq; right; left; auto.
+rewrite Mem_cons_eq in H0; destruct H0.
+inversion H0; subst; repeat rewrite Mem_cons_eq; right; left; auto.
+rew_map; simpl. apply Mem_permut with (l:=v::w::map fst_ G);
+[permut_simpl | rewrite Mem_cons_eq; right];
+apply IHG with (w:=w) (Gamma:=Gamma) (Gamma0:=Gamma0).
+rew_map; simpl; auto.
+rewrite Mem_cons_eq; right; auto.
+Qed.
+
+Lemma Mem_annotate:
+forall Gamma w Delta x a,
+  Delta = annotate_worlds w Gamma ->
+  (Mem (x, a) Gamma <-> Mem (w, (x, a)) Delta).
+induction Gamma; intros; simpl in *; subst.
+repeat rewrite Mem_nil_eq; tauto.
+destruct a; repeat rewrite Mem_cons_eq; split; intros;
+destruct H; try inversion H; subst; simpl in *.
+left; auto.
+right; apply Mem_here.
+destruct y; right; apply IHGamma; auto.
+left; auto.
+right; eapply IHGamma; eauto; apply Mem_here.
+right; eapply IHGamma; eauto. rewrite H0; auto.
+Qed.
 
 Lemma Mem_preserved_term_L:
-forall G w Gamma Omega Delta,
-  Omega *=* fst_ (fst_ (labeled_context G (w, Gamma))) ->
+forall G w Gamma Delta,
   Delta *=* snd_ (fst_ (labeled_context G (w, Gamma))) ->
   forall w0 x0 a0 Gamma0,
     Mem (w0, Gamma0) ((w, Gamma)::G) ->
     Mem (x0, a0) Gamma0 ->
     Mem  (w0, (x0, a0)) Delta.
-Admitted.
+induction G; intros; simpl in *.
+rewrite Mem_cons_eq in H0; destruct H0.
+inversion H0; subst;
+apply Mem_permut with (l:=annotate_worlds w Gamma);
+[symmetry; rew_app in *; auto | rew_map; simpl];
+eapply Mem_annotate; auto.
+rewrite Mem_nil_eq in H0; contradiction.
+destruct a; simpl in *.
+apply Mem_permut with (l:=annotate_worlds w Gamma ++ annotate_worlds v l ++
+  flat_map
+        (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
+        G);
+[symmetry; rew_app in *; auto | rew_map; simpl].
+repeat rewrite Mem_cons_eq in H0; repeat rewrite Mem_app_or_eq; destruct H0.
+inversion H0; subst.
+left; eapply Mem_annotate; auto.
+destruct H0.
+inversion H0; subst; right; left; eapply Mem_annotate; auto.
+right; right; apply IHG with (w:=w) (Gamma:=nil) (Gamma0 := Gamma0);
+simpl; auto; rewrite Mem_cons_eq; right; auto.
+Qed.
 
 Lemma subst_t_rewrite_L:
 forall M N x,
   subst_t_L (labeled_term M) x (labeled_term N) =
   labeled_term (subst_t M x N).
-Admitted.
+induction N; intros; simpl in *;
+try rewrite IHN || (rewrite IHN1; rewrite IHN2); auto;
+case_if; simpl; auto.
+Qed.
 
 Lemma subst_w_rewrite_L:
 forall M w w',
   subst_w_L (labeled_term M) w w' =
   labeled_term (subst_w w w' M).
-Admitted.
+induction M; intros; simpl in *;
+try rewrite IHM || (rewrite IHM1; rewrite IHM2); auto;
+case_if; simpl; auto.
+Qed.
 
 Lemma labeled_typing:
 forall G w Gamma M A Omega Delta w' M'
