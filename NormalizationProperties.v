@@ -8,11 +8,11 @@ Open Scope labeled_is5_scope.
 
 Definition normal_form (M: te_L) := value_L M.
 
-Inductive neutral: te_L -> Prop := 
+Inductive neutral: te_L -> Prop :=
 | nHyp: forall n, neutral (hyp_L n)
 | nAppl: forall M N, neutral (appl_L M N)
 | nUnbox: forall M, neutral (unbox_L M)
-| nHere: forall M, neutral M -> neutral (here_L M) 
+| nHere: forall M, neutral M -> neutral (here_L M)
 | nLetd: forall M N, neutral (letd_L M N)
 | nFetch: forall w M, neutral (fetch_L w M)
 | nGet: forall w M, neutral (get_L w M)
@@ -21,7 +21,7 @@ Inductive neutral: te_L -> Prop :=
 Lemma neutral_or_value:
 forall M,
   neutral M \/ value_L M.
-induction M; intros; 
+induction M; intros;
 try (destruct IHM; [left | right]; constructor; auto);
 try (left; constructor);
 right;
@@ -32,7 +32,7 @@ Lemma neutral_not_value:
 forall M,
   neutral M -> ~value_L M.
 induction M; intros; intro;
-try inversion H0; 
+try inversion H0;
 try inversion H;
 auto;
 subst;
@@ -69,11 +69,12 @@ destruct H0;
 Qed.
 *)
 
-(* We want to have the property that term that has a type is strongly normalizing *)
+(* We want to have the property that term that has a type is
+   strongly normalizing *)
 Inductive strong_norm: te_L -> var -> Prop :=
 | val_SN: forall M, value_L M -> forall w, strong_norm M w
-| step_SN: forall M w, 
-             (forall N, (M, fwo w) |-> (N, fwo w) -> strong_norm N w) -> 
+| step_SN: forall M w,
+             (forall N, (M, fwo w) |-> (N, fwo w) -> strong_norm N w) ->
              strong_norm M w.
 
 Lemma alt_strong_norm:
@@ -177,15 +178,15 @@ constructor; auto.
 Qed.
 
 Fixpoint Reducible(M: te_L) (A: ty) (w: var):=
-match A with 
+match A with
 | tvar => strong_norm M w
 | tarrow A1 A2 =>
   forall N
     (H_lc_N: lc_w N)
     (HR: Reducible N A1 w),
     Reducible (appl_L M N) A2 w
-| tbox A1 => 
-  Reducible (unbox_L M) A1 w /\ 
+| tbox A1 =>
+  Reducible (unbox_L M) A1 w /\
   forall w', Reducible (unbox_L (fetch_L (fwo w) M)) A1 w'
 | tdia A1 => False
 end.
@@ -211,13 +212,13 @@ eapply IHA; eauto;
 constructor; auto.
 intros; apply IHA with (M:=unbox_L (fetch_L (fwo w) M)); eauto;
 repeat constructor; auto.
-(* dia type *)  
+(* dia type *)
 auto.
 Qed.
 
 (* CR1 + CR3 *)
 Theorem reducibility_props:
-forall A M w 
+forall A M w
   (H_lc: lc_w M),
   (Reducible M A w -> strong_norm M w)
   /\
@@ -261,9 +262,9 @@ intros;
 destruct H;
 apply strong_norm_box;
 [ constructor | ]; auto;
-apply IHA; [constructor | ]; auto. 
+apply IHA; [constructor | ]; auto.
 
-intros; split. 
+intros; split.
 
 apply IHA;
 try constructor; auto;
@@ -276,7 +277,7 @@ intros; apply IHA.
   constructor.
   intros;
   inversion H1; subst;
-  inversion HRed; subst. 
+  inversion HRed; subst.
     apply H0; auto.
     apply neutral_not_value in H; contradiction.
 (* dia type *)
@@ -294,8 +295,8 @@ Qed.
 Lemma property_3:
 forall A M w
   (H_lc: lc_w M),
-  neutral M -> 
-  (forall M', (M, fwo w) |-> (M', fwo w) -> 
+  neutral M ->
+  (forall M', (M, fwo w) |-> (M', fwo w) ->
     Reducible M' A w) ->
    Reducible M A w.
 intros; eapply reducibility_props; eauto.
@@ -311,7 +312,7 @@ end.
 Lemma reducible_abstraction:
 forall A w N B
   (lc_N: lc_w N)
-  (HT: forall M, 
+  (HT: forall M,
     lc_w M ->
     Reducible M A w ->
     Reducible ([M//0] N) B w),
@@ -392,7 +393,7 @@ forall D M k m,
   (forall N, In N D -> lc_w N) ->
   lc_w_n M m ->
   lc_w_n (subst_list D k M) m.
-Admitted.  
+Admitted.
 
 Lemma subst_list_subst_w:
 forall w k D l M,
@@ -411,7 +412,7 @@ intros.
 generalize dependent D.
 induction HT; intros.
 (* should be a lemma *)
-assert (exists M, nth_error D v_n = Some M /\ Reducible M A w_n) by skip; 
+assert (exists M, nth_error D v_n = Some M /\ Reducible M A w_n) by skip;
 destruct H as (M');
 destruct H.
 assert (subst_list D 0 (hyp_L v_n) = M').
@@ -438,15 +439,15 @@ inversion HRed0.
 (* appl *)
 inversion H_lc; subst.
 assert (Reducible (subst_list D 0 M) (A'--->A) w).
-  eapply IHHT2; eauto. 
+  eapply IHHT2; eauto.
 simpl in H.
 rewrite subst_list_appl.
 apply H.
-apply lc_w_subst_list; auto. 
+apply lc_w_subst_list; auto.
 eapply IHHT1; eauto.
 (* box *)
 inversion H_lc; subst.
-rewrite subst_list_box.  
+rewrite subst_list_box.
 simpl.
 (* This is possible *)
 assert (forall w', w' \notin L -> Reducible (unbox_L (box_L (subst_list D 0 M))) A w').
@@ -481,7 +482,7 @@ apply property_3.
 repeat constructor; apply lc_w_subst_list; auto.
 constructor.
 intros.
-inversion H2; subst. 
+inversion H2; subst.
 inversion HRed0; subst.
   inversion HRed1.
 
@@ -490,7 +491,7 @@ inversion HRed0; subst.
 (* unbox *)
 inversion H_lc; subst.
 assert (Reducible (subst_list D 0 M) ([*]A) w).
-  eapply IHHT; eauto. 
+  eapply IHHT; eauto.
 simpl in H.
 rewrite subst_list_unbox.
 apply H.
@@ -503,13 +504,13 @@ skip.
 (* fetch *)
 inversion H_lc; subst.
 rewrite subst_list_fetch.
-simpl. 
+simpl.
 assert (Reducible (subst_list D 0 M) ([*]A) w').
-  eapply IHHT; eauto. 
+  eapply IHHT; eauto.
 simpl in H.
-split. 
+split.
   apply H.
-  intros. 
+  intros.
   skip. (* double fetch? *)
 Qed.
 
@@ -518,7 +519,7 @@ forall Omega M A w,
   lc_w M ->
   Omega; nil |- M ::: A @ w ->
     Reducible M A w.
-intros; apply subst_types_reducible with (D:=nil) in H0; 
+intros; apply subst_types_reducible with (D:=nil) in H0;
 simpl in *; intros; eauto; contradiction.
 Qed.
 
