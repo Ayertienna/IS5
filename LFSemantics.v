@@ -154,6 +154,13 @@ Inductive step_LF: (te_LF * vwo) -> (te_LF * vwo) -> Prop :=
 
 where " M |-> N " := (step_LF M N ) : label_free_is5_scope.
 
+Inductive steps_LF : te_LF * vwo -> te_LF * vwo -> Prop :=
+| single_step_LF: forall M M' w, (M, w) |-> (M', w) -> steps_LF (M, w) (M', w)
+| multi_step_LF: forall M M' M'' w,
+  (M, w) |-> (M', w) -> steps_LF (M', w) (M'', w)
+  -> steps_LF (M, w) (M'', w)
+.
+
 
 (*** Properties ***)
 

@@ -187,8 +187,8 @@ Qed.
 
 Lemma subst_t_comm:
 forall M v v' n N
-  (Neq: v <> v')
   (Lc: lc_t_LF N),
+  v <> v' ->
   [ N // fte v] ([ hyp_LF (fte v') // bte n] M) =
   [hyp_LF (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
