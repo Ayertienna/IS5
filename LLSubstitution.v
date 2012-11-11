@@ -60,7 +60,7 @@ Notation " M '^w^' w  " := (open_w_L M w) (at level 67) : labeled_is5_scope.
 
 Open Scope labeled_is5_scope.
 
-Lemma subst_t_neutral_free:
+Lemma subst_t_neutral_free_L:
 forall M N n w,
   w \notin used_vars_term_L M ->
   [N // bte n] M = [N // fte w] ([hyp_L (fte w) // bte n] M).
@@ -70,7 +70,7 @@ repeat (case_if; simpl); subst; auto;
 rewrite notin_singleton in H; elim H; auto.
 Qed.
 
-Lemma subst_w_neutral_free:
+Lemma subst_w_neutral_free_L:
 forall M w w' w_f,
   w_f \notin used_worlds_term_L M ->
   {{w // w'}} M = {{w // fwo w_f}} ({{ fwo w_f // w'}}  M).
@@ -81,7 +81,7 @@ rewrite notin_union in H; destruct H; eauto;
 rewrite notin_singleton in H; elim H; auto.
 Qed.
 
-Lemma closed_subst_w_free:
+Lemma closed_subst_w_free_L:
 forall M w0 w,
   w0 \notin used_worlds_term_L M ->
   {{w // fwo w0}} M = M.
@@ -92,7 +92,7 @@ rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto;
 destruct H as (Neq, H); elim Neq; auto) || destruct v; auto.
 Qed.
 
-Lemma closed_subst_w_bound:
+Lemma closed_subst_w_bound_L:
 forall M w0 w n
   (H_lc: lc_w_n_L n M),
   {{ w // bwo w0}} M  = M.
@@ -102,7 +102,7 @@ inversion H_lc; subst;
 erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
 Qed.
 
-Lemma closed_subst_t_bound:
+Lemma closed_subst_t_bound_L:
 forall N M v0 n,
   lc_t_n_L n N ->
   v0 >= n -> [M // bte v0] N = N.
@@ -114,16 +114,16 @@ apply gt_asym in H3; elim H3; omega.
 omega. omega.
 Qed.
 
-Lemma subst_order_irrelevant_free:
+Lemma subst_order_irrelevant_free_L:
 forall M w0 w1 x N,
   w1 \notin used_worlds_term_L N ->
   {{ w0 // fwo w1 }} ([ N // x ] M) = [ N // x ] ({{ w0 // fwo w1 }} M).
 induction M; intros; simpl in *; repeat case_if; simpl; unfold shift_vwo in *;
 try (rewrite IHM || (rewrite IHM1; try rewrite IHM2; auto)); auto;
-rewrite closed_subst_w_free; auto.
+rewrite closed_subst_w_free_L; auto.
 Qed.
 
-Lemma subst_order_irrelevant_bound:
+Lemma subst_order_irrelevant_bound_L:
 forall M w0 w1 x N,
   lc_w_L N ->
   {{ w0 // bwo w1 }} ([ N // x ] M) = [ N // x ] ({{ w0 // bwo w1 }} M).
@@ -131,10 +131,10 @@ induction M; intros; simpl in *; repeat case_if; simpl;
 unfold shift_vte in *; unfold shift_vwo in *; auto;
 try destruct v; try destruct w; auto;
 try (rewrite IHM || (rewrite IHM1; try rewrite IHM2; auto));
-auto; erewrite closed_subst_w_bound; eauto.
+auto; erewrite closed_subst_w_bound_L; eauto.
 Qed.
 
-Lemma lc_t_subst:
+Lemma lc_t_subst_L:
 forall M N k,
   lc_t_n_L (S k) M ->
   lc_t_n_L 0 N ->
@@ -144,12 +144,12 @@ try (constructor;
   (eapply IHM || (try eapply IHM1; try eapply IHM2; eauto));
   inversion H; subst; eauto).
 replace k with (0+k) by omega;
-eapply closed_t_addition; auto.
+eapply closed_t_addition_L; auto.
 destruct v; constructor; inversion H; subst;
 eapply gt_S in H4; destruct H4; auto; subst; elim H1; auto.
 Qed.
 
-Lemma lc_w_subst:
+Lemma lc_w_subst_L:
 forall M w k,
   lc_w_n_L (S k) M ->
   lc_w_n_L k {{w // bwo k}} M.
@@ -161,7 +161,7 @@ try inversion H; subst;
 constructor; eapply IHM; auto.
 Qed.
 
-Lemma subst_t_comm:
+Lemma subst_t_comm_L:
 forall M v v' n N
   (Neq: v <> v')
   (Lc: lc_t_L N),
@@ -169,18 +169,14 @@ forall M v v' n N
   [hyp_L (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
 [ repeat (case_if; simpl); auto;
-  erewrite closed_subst_t_bound; eauto; omega | | | | | | | | ];
+  erewrite closed_subst_t_bound_L; eauto; omega | | | | | | | | ];
 try (rewrite IHM; auto);
 try (rewrite IHM1; try rewrite IHM2; auto);
 repeat (case_if; simpl); subst; simpl;
-auto;
-erewrite closed_subst_t_bound;
-eauto;
-replace n with (0+n) by omega;
-apply closed_t_addition; auto.
+auto.
 Qed.
 
-Lemma subst_w_comm:
+Lemma subst_w_comm_L:
 forall M w w' w'' n,
   w'' <> w ->
   {{fwo w' // fwo w''}} ({{fwo w // bwo n}} M) =
@@ -191,7 +187,7 @@ rewrite IHM || (rewrite IHM1; try rewrite IHM2);
 auto.
 Qed.
 
-Lemma rename_w_same:
+Lemma rename_w_same_L:
 forall M w,
   {{ fwo w // fwo w }} M = M.
 induction M; intros; simpl in *; repeat case_if;

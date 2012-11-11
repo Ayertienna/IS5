@@ -2,6 +2,7 @@ Require Import LLSubstitution.
 Require Import PermutLib.
 Require Import LibTactics.
 Require Import LLOkLib.
+Require Import Relations.
 
 Open Scope is5_scope.
 Open Scope labeled_is5_scope.
@@ -116,6 +117,13 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
    lc_t_L M -> lc_w_L M ->
    (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
 where " M |-> N " := (step_L M N ) : labeled_is5_scope.
+
+Inductive steps_L : te_L * vwo -> te_L * vwo -> Prop :=
+| single_step_L: forall M M' w, (M, w) |-> (M', w) -> steps_L (M, w) (M', w)
+| multi_step_L: forall M M' M'' w,
+  (M, w) |-> (M', w) -> steps_L (M', w) (M'', w)
+  -> steps_L (M, w) (M'', w)
+.
 
 Lemma WeakeningGamma:
 forall Omega Gamma M A w Gamma'
@@ -297,7 +305,7 @@ eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
 apply ok_L_smaller_Gamma in Ok; symmetry in H4;
 eapply ok_L_permut with (G:=Gamma0); auto.
 intros; unfold open_t_L in *;
-rewrite <- subst_t_comm; auto; eapply H1; auto;
+rewrite <- subst_t_comm_L; auto; eapply H1; auto;
 rewrite H2; rewrite H4; permut_simpl.
 (* appl *)
 apply t_appl_L with (A:=A).
@@ -312,7 +320,7 @@ eapply ok_L_permut with (G':=(w', (x, B))::Gamma0) in Ok; eauto;
 apply ok_L_smaller_Gamma in Ok; symmetry in H4;
 eapply ok_L_permut with (G:=Gamma0); auto.
 intros; unfold open_w_L in *.
-rewrite subst_order_irrelevant_bound; auto;
+rewrite subst_order_irrelevant_bound_L; auto;
 eapply H1; eauto. eapply WeakeningOmega; eauto.
 destruct Ok; split; auto; constructor;
 [apply notin_Mem |]; auto.
@@ -344,8 +352,8 @@ apply ok_L_smaller_Gamma in Ok; symmetry in H5;
 eapply ok_L_permut with (G:=Gamma0); auto.
 eapply IHtypes_L; eauto.
 intros; unfold open_t_L in *; unfold open_w_L in *.
-rewrite subst_order_irrelevant_bound; auto;
-rewrite <- subst_t_comm; auto; eapply H2; eauto.
+rewrite subst_order_irrelevant_bound_L; auto;
+rewrite <- subst_t_comm_L; auto; eapply H2; eauto.
 eapply WeakeningOmega; eauto.
 destruct Ok; split; simpl; auto; split; auto;
 apply notin_Mem; auto.
@@ -391,11 +399,11 @@ destruct Ok; split; simpl in *; destruct H3; auto.
 intros; unfold open_t_L in *; case_if; subst.
 replace ((w1, (x, A)) :: rename_context_L w0 w1 Gamma) with
   (rename_context_L w0 w1 ((w0, (x, A)) :: Gamma)) by (simpl; case_if; auto).
-rewrite <- subst_order_irrelevant_free; simpl; auto.
+rewrite <- subst_order_irrelevant_free_L; simpl; auto.
 eapply H; simpl; try case_if; eauto.
 replace ((w, (x, A)) :: rename_context_L w0 w1 Gamma) with
   (rename_context_L w0 w1 ((w, (x, A)) :: Gamma)) by (simpl; case_if; auto).
-rewrite <- subst_order_irrelevant_free; simpl; auto.
+rewrite <- subst_order_irrelevant_free_L; simpl; auto.
 eapply H; simpl; try case_if; eauto.
 (* appl *)
 econstructor; eauto; clear IHtypes_L1 IHtypes_L2.
@@ -413,7 +421,7 @@ case_if; subst; auto. apply Mem_permut with (l':=w0::Omega0) in World.
 rewrite Mem_cons_eq in World. destruct World; subst; [elim H5 | ]; auto.
 symmetry; auto.
 intros; unfold open_w_L in *.
-rewrite <- subst_w_comm; eauto.
+rewrite <- subst_w_comm_L; eauto.
 eapply H; eauto. subst; permut_simpl.
 rew_app; auto.
 rewrite Mem_cons_eq; right; auto.
@@ -500,8 +508,8 @@ replace ((w', (t, A)) :: rename_context_L w0 w1 Gamma) with
   (rename_context_L w0 w1 ((w', (t, A)) :: Gamma)) by
 ( simpl; rewrite notin_union in H5; destruct H5 as (H5a, H5b);
   rewrite notin_singleton in H5b; case_if; auto);
-rewrite <- subst_w_comm; auto;
-rewrite <- subst_order_irrelevant_free; simpl; auto;
+rewrite <- subst_w_comm_L; auto;
+rewrite <- subst_order_irrelevant_free_L; simpl; auto;
 eapply H0; try rewrite <- H2; try case_if; eauto; try permut_simpl;
 rewrite Mem_cons_eq; right; auto.
 Qed.
@@ -526,7 +534,7 @@ apply types_w_in_Omega in H; rewrite Mem_cons_eq in H; destruct H; subst;
 case_if; auto.
 Qed.
 
-Lemma Progress:
+Lemma ProgressL:
 forall Omega M A w
   (H_lc: lc_w_L M)
   (H_lc': lc_t_L M)
@@ -540,14 +548,14 @@ right; inversion H_lc; inversion H_lc'; subst;
 destruct (IHM1 (A0 ---> A) w H2 H7 HT1).
   inversion H; subst; inversion HT1; subst.
   inversion H2; inversion H7; subst;
-  eexists; constructor; eauto. apply lc_t_subst; auto.
+  eexists; constructor; eauto. apply lc_t_subst_L; auto.
   destruct H; eexists; constructor; eauto.
 (* unbox *)
 right; inversion H_lc; inversion H_lc'; subst.
 destruct (IHM ([*]A) w H1 H4 HT).
   inversion H; subst; inversion HT; subst.
   inversion H1; inversion H4; subst; eexists; constructor; eauto.
-  apply lc_w_subst; auto.
+  apply lc_w_subst_L; auto.
   destruct H; eexists; constructor; eauto.
 (* get *)
 right; inversion H_lc; inversion H_lc'; subst.
@@ -562,11 +570,11 @@ destruct (IHM1 (<*>A0) w H3 H8 HT1).
   inversion H; subst; inversion HT1; subst.
   inversion H3; inversion H8; subst;
   eexists; constructor; eauto.
-  apply lc_t_subst; auto.
-  apply lc_w_subst; auto.
+  apply lc_t_subst_L; auto.
+  apply lc_w_subst_L; auto.
   destruct H; eexists; constructor; eauto.
-  apply lc_t_subst; auto.
-  apply lc_w_subst; auto.
+  apply lc_t_subst_L; auto.
+  apply lc_w_subst_L; auto.
 (* here *)
 inversion H_lc; inversion H_lc'; subst.
 destruct (IHM A0 w H1 H4 HT).
@@ -581,7 +589,7 @@ destruct (IHM ([*]A0) w0 H1 H5 HT).
   destruct H; eexists; constructor; eauto.
 Qed.
 
-Lemma Preservation:
+Lemma PreservationL:
 forall Omega M N A w w'
   (HType: Omega; nil |- M ::: A@w)
   (HStep: (M, fwo w) |-> (N,fwo w')),
@@ -596,7 +604,7 @@ assert (exists x, x \notin L \u used_vars_term_L M0 \u \{w'}) as HF
 destruct HF as (v_f).
 replace ([N // bte 0] M0) with ([N // fte v_f] ([hyp_L (fte v_f) // bte 0] M0)).
 eapply subst_t_types_preserv with (B:=A); eauto.
-rewrite <- subst_t_neutral_free with (n:=0); auto.
+rewrite <- subst_t_neutral_free_L with (n:=0); auto.
 (* red_unbox_box *)
 inversion HType; subst; unfold open_w_L in *;
 assert (exists x, x \notin L \u used_worlds_term_L M0 \u \{w'}) as HF
@@ -606,9 +614,9 @@ replace ({{fwo w'//bwo 0}}M0) with ({{fwo w'//fwo w_f}}{{fwo w_f//bwo 0}}M0).
 replace (@nil (prod var (prod var ty))) with (rename_context_L w_f w' nil) by
   (simpl; auto).
 eapply rename_w_types_preserv; auto. case_if; auto.
-rewrite <- subst_w_neutral_free; auto.
+rewrite <- subst_w_neutral_free_L; auto.
 (* red_fetch_val *)
-destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
+destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same_L|]; auto;
 replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
   (simpl; auto).
 assert (Mem w Omega) by (eapply types_w_in_Omega; eauto);
@@ -629,7 +637,7 @@ rewrite H; permut_simpl.
 inversion HType; subst; constructor; auto;
 replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
   (simpl; auto).
-destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same|]; auto;
+destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same_L|]; auto;
 replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
   (simpl; auto).
 assert (Mem w Omega) by (eapply types_w_in_Omega; eauto);
@@ -658,17 +666,17 @@ assert (exists x, x \notin Lw \u used_worlds_term_L [hyp_L (fte v_f) // bte 0]N
 destruct HF as (w_f).
 replace ([M0 // bte 0] ({{fwo w' // bwo 0}}N)) with
   ([M0 // fte v_f] ([hyp_L (fte v_f) // bte 0] ({{fwo w'// bwo 0}} N)))
-  by (rewrite <- subst_t_neutral_free; auto).
+  by (rewrite <- subst_t_neutral_free_L; auto).
 eapply subst_t_types_preserv with (B:=A); eauto.
-rewrite <- subst_order_irrelevant_bound; [ | constructor];
+rewrite <- subst_order_irrelevant_bound_L; [ | constructor];
 replace ( {{fwo w' // bwo 0}}([hyp_L (fte v_f) // bte 0]N)) with
   ({{fwo w' // fwo w_f}} ({{fwo w_f // bwo 0}} ([hyp_L (fte v_f) // bte 0] N)))
-  by (rewrite <- subst_w_neutral_free; auto).
+  by (rewrite <- subst_w_neutral_free_L; auto).
 replace ((w', (v_f, A)) :: nil)
   with (rename_context_L  w_f w' ((w_f, (v_f, A))::nil)) by
 ( simpl; repeat rewrite notin_union in H0; rewrite notin_singleton in H0;
   repeat destruct H0 as (H0a, (H0b, H0c)); case_if; auto).
 eapply rename_w_types_preserv_in_new; eauto;
-rewrite subst_order_irrelevant_bound; auto.
+rewrite subst_order_irrelevant_bound_L; auto.
 constructor.
 Qed.
