@@ -18,7 +18,7 @@ Inductive types_L : worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
    (Old: w_n \in Omega)
    (H_hyp: nth_error Gamma v_n = Some (A, fwo w_n)),
      Omega; Gamma |- hyp_L v_n ::: A@w_n
- | t_lam_L: forall A A' w Gamma Omega M 
+ | t_lam_L: forall A A' w Gamma Omega M
    (H_lam: Omega; (A, fwo w)::Gamma |- M:::A'@w),
      Omega; Gamma |- lam_L A M ::: A ---> A' @ w
  | t_appl_L: forall A A' w Gamma Omega M N
@@ -33,20 +33,20 @@ Inductive types_L : worlds_L -> Context_L -> te_L -> ty -> var -> Prop :=
    (H_unbox: Omega; Gamma |- M ::: [*]A@w),
      Omega; Gamma |- unbox_L M ::: A @ w
  | t_get_L: forall A w w' Gamma Omega M
-   (New: w \in Omega) 
+   (New: w \in Omega)
    (H_get: Omega; Gamma |- M ::: <*>A@w'),
      Omega; Gamma |- get_L (fwo w') M ::: <*>A@w
  | t_letd_L: forall L A w B Gamma Omega M N
    (Old: w \in Omega)
    (H_letd: Omega; Gamma |- M ::: <*>A@w)
-   (HT: forall w', w' \notin L -> 
+   (HT: forall w', w' \notin L ->
      \{w'} \u Omega; (A, fwo w')::Gamma |- N^(fwo w'):::B@w),
      Omega; Gamma |- letd_L M N ::: B@w
  | t_here_L: forall A w Gamma Omega M
    (H_here: Omega; Gamma |- M ::: A@w),
      Omega; Gamma |- here_L M ::: <*>A@w
  | t_fetch_L: forall A w w' Gamma Omega M
-   (New: w \in Omega) 
+   (New: w \in Omega)
    (H_fetch: Omega; Gamma |- M ::: [*]A@w'),
      Omega; Gamma |- fetch_L (fwo w') M ::: [*]A@w
  where " Omega ';' Gamma '|-' M ':::' A '@' w " := (types_L Omega Gamma M A w) : labeled_is5_scope.
@@ -122,7 +122,7 @@ forall M N k l,
   lc_w_n M l ->
   lc_w_n N l ->
   lc_w_n  [N // k] M l.
-induction M; intros; simpl in *; 
+induction M; intros; simpl in *;
 repeat case_if; auto;
 try constructor;
 inversion H; subst;
@@ -171,7 +171,7 @@ apply closed_step_renaming_world; auto.
 Qed.
 
 Lemma Weakening:
-forall Omega Gamma Delta M A w 
+forall Omega Gamma Delta M A w
   (HT: Omega; Gamma |- M ::: A@w),
   Omega; Gamma ++ Delta |- M ::: A@w.
 intros; induction HT; eauto using types_L.
@@ -191,7 +191,7 @@ try (constructor; [rewrite in_union; right | ]; assumption).
 apply t_box_L with (L:=L).
   rewrite in_union; right; assumption.
   intros; rewrite union_comm_assoc; apply H; assumption.
-apply t_letd_L with (L:=L) (A:=A). 
+apply t_letd_L with (L:=L) (A:=A).
   rewrite in_union; right; assumption.
   assumption.
   intros; rewrite union_comm_assoc; apply H; assumption.
@@ -216,7 +216,7 @@ assert ((A, w') = (A0, w_n)).
 induction Delta.
   (* nil *)
   simpl in *;
-  inversion H_hyp; inversion H_hyp; subst; reflexivity. 
+  inversion H_hyp; inversion H_hyp; subst; reflexivity.
   (* a:: Delta *)
   simpl in *.
   apply IHDelta.
@@ -299,7 +299,7 @@ generalize dependent n;
 induction Gamma; intros.
 destruct n; simpl in *; discriminate.
 destruct a; simpl in *; induction n; simpl in *.
-inversion HT; subst; 
+inversion HT; subst;
 destruct (eq_vwo_dec w w);
 [ | elim n]; reflexivity.
 apply IHGamma;
@@ -311,9 +311,9 @@ forall Gamma n A w w' w''
   (HT: nth_error Gamma n = Some (A, w''))
   (Neq: w <> w''),
   nth_error (rename_world_context w' w Gamma) n = Some (A, w'').
-intros; generalize dependent n; induction Gamma; intros.  
+intros; generalize dependent n; induction Gamma; intros.
 destruct n; simpl in *; discriminate.
-destruct a; induction n; 
+destruct a; induction n;
 simpl in *; inversion HT.
   subst; destruct (eq_vwo_dec w'' w).
     elim Neq; symmetry; assumption.
@@ -328,7 +328,7 @@ forall Omega Gamma M A w w' w'' w'''
   (New: w''' = if eq_var_dec w'' w then w' else w'')
   (HT: \{w} \u Omega; Gamma |- M ::: A @ w''),
   Omega; (rename_world_context (fwo w') (fwo w) Gamma) |- {{fwo w'//fwo w}}M ::: A @ w'''.
-intros; 
+intros;
 remember (\{w} \u Omega) as Omega';
 generalize dependent Omega;
 generalize dependent w''';
@@ -342,7 +342,7 @@ apply typing_renaming; assumption.
 rewrite in_union in Old; destruct Old.
   apply notin_singleton in n; contradiction.
   assumption.
-apply typing_no_renaming. 
+apply typing_no_renaming.
   assumption.
   intro.
   inversion H; subst; elim n; reflexivity.
@@ -350,17 +350,17 @@ apply typing_no_renaming.
 constructor;
 destruct (eq_var_dec w0 w); subst.
 (* w0 = w *)
-replace ((A, fwo w') :: rename_world_context (fwo w') (fwo w) Gamma) 
-   with (rename_world_context (fwo w') (fwo w) ((A, fwo w) :: Gamma)). 
+replace ((A, fwo w') :: rename_world_context (fwo w') (fwo w) Gamma)
+   with (rename_world_context (fwo w') (fwo w) ((A, fwo w) :: Gamma)).
 apply IHHT; auto.
 simpl; destruct (eq_vwo_dec (fwo w) (fwo w)); [|elim n]; reflexivity.
 (* w0 <> w *)
-replace ((A, fwo w0) :: rename_world_context (fwo w') (fwo w) Gamma) 
-   with (rename_world_context (fwo w') (fwo w) ((A, fwo w0) :: Gamma)). 
+replace ((A, fwo w0) :: rename_world_context (fwo w') (fwo w) Gamma)
+   with (rename_world_context (fwo w') (fwo w) ((A, fwo w0) :: Gamma)).
 apply IHHT; auto.
 simpl; destruct (eq_vwo_dec (fwo w0) (fwo w)).
   inversion e; elim n; assumption.
-  reflexivity.  
+  reflexivity.
 (* appl *)
 apply t_appl_L with (A':=A');
 [apply IHHT1 | apply IHHT2]; assumption.
@@ -373,14 +373,14 @@ destruct (eq_var_dec w0 w); subst.
     assumption.
 intros; apply notin_union_r in H0;
 destruct H0; unfold open_w in *;
-replace ({{fwo w'0//bwo 0}}({{fwo w'//fwo w}}M)) 
+replace ({{fwo w'0//bwo 0}}({{fwo w'//fwo w}}M))
    with ({{fwo w'//fwo w}}({{fwo w'0//bwo 0}}M)).
 apply H.
   assumption.
   assert (w'0 <> w).
     intro; subst; elim H0; apply in_singleton_self.
   destruct (eq_var_dec w'0 w).
-    elim H2; assumption. 
+    elim H2; assumption.
     reflexivity.
   rewrite in_union; right; assumption.
   subst; rewrite union_comm_assoc; reflexivity.
@@ -441,7 +441,7 @@ apply IHHT.
   intros.
   apply notin_union in H0; destruct H0.
   replace ({{fwo w' // fwo w}}N ^ fwo w'0) with ({{fwo w' // fwo w}}(N ^ fwo w'0)).
-  replace ((A, fwo w'0) :: rename_world_context (fwo w') (fwo w) Gamma) with (rename_world_context (fwo w') (fwo w) ((A, fwo w'0) :: Gamma)). 
+  replace ((A, fwo w'0) :: rename_world_context (fwo w') (fwo w) Gamma) with (rename_world_context (fwo w') (fwo w) ((A, fwo w'0) :: Gamma)).
   subst.
   apply H.
   assumption.
@@ -502,7 +502,7 @@ Qed.
 
 
 Lemma Progress:
-forall Omega M A w 
+forall Omega M A w
   (H_lc: lc_w M)
   (HProgress: Omega; nil |- M ::: A@w),
   value_L M \/ exists N, (M, fwo w) |-> (N, fwo w).
@@ -569,7 +569,7 @@ destruct (IHM ([*]A0) w' H2 H_fetch).
   destruct H as [M']; exists (fetch_L (fwo w') M'); apply red_fetch_L; auto.
 Qed.
 
-Lemma Fresh: 
+Lemma Fresh:
   forall (L:fset var), exists w0, w0 \notin L.
 intro;
 exists (var_gen L);
@@ -605,7 +605,7 @@ rewrite subst_neutral.
 replace (@nil (ty*vwo)) with (rename_world_context (fwo w') (fwo x) (@nil (ty*vwo))).
 apply rename_w_type_preserv with (w'':=x).
 assumption.
-destruct (eq_var_dec x x). 
+destruct (eq_var_dec x x).
   reflexivity.
   elim n; reflexivity.
 apply HT.
@@ -618,7 +618,7 @@ replace (here_L {{fwo w'0//fwo w'}}M0) with ({{fwo w'0//fwo w'}}(here_L M0)) by 
 replace (@nil (ty*vwo)) with (rename_world_context (fwo w'0) (fwo w') nil) by auto.
 apply rename_w_type_preserv with (w'':=w').
   assumption.
-  destruct (eq_var_dec w' w'). 
+  destruct (eq_var_dec w' w').
     reflexivity.
     elim n; reflexivity.
   apply WorldWeakening; assumption.

@@ -450,6 +450,152 @@ apply t_letd_L with (A:=A) (Lt:=L_t) (Lw:=L_w).
     simpl; auto.
 Qed.
 
+Lemma lc_w_rewrite_L:
+forall M n,
+  lc_w_n_LF n M -> lc_w_n_L n (labeled_term M).
+induction M; intros; inversion H; subst; simpl in *;
+try destruct v; repeat constructor; eauto.
+Qed.
+
+Lemma lc_t_rewrite_L:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_L n (labeled_term M).
+induction M; intros; inversion H; subst; simpl in *;
+repeat constructor; eauto.
+Qed.
+
+Lemma lc_t_subst_w:
+forall M w w' n,
+  lc_t_n_L n M ->
+  lc_t_n_L n (subst_w_L M w w').
+induction M; intros; simpl in *; auto;
+constructor; inversion H; subst; eauto.
+Qed.
+
+Lemma lc_w_subst_t:
+forall M N x n,
+  lc_w_n_L n M -> lc_w_L N ->
+  lc_w_n_L n (subst_t_L N x M).
+induction M; intros; simpl in *; auto; repeat case_if; simpl;
+unfold shift_vte in *; unfold shift_vwo in *;
+try destruct x; simpl in *; auto;
+try (inversion H; econstructor; eauto).
+replace n with (0+n) by omega; apply closed_w_addition_L; auto.
+replace n with (0+n) by omega; apply closed_w_addition_L; auto.
+Qed.
+
+Lemma lc_t_step_preserv:
+forall M N w,
+  lc_t_L M ->
+  step_L (M, w) (N, w) ->
+  lc_t_L N.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_L in *; unfold open_w_L in *.
+constructor; [eapply IHM1 |]; eauto.
+apply lc_t_subst_w; auto.
+constructor; eapply IHM; eauto.
+constructor; eapply IHM; eauto.
+inversion H; subst; constructor.
+apply lc_t_subst_w; auto.
+rewrite <- subst_order_irrelevant_bound_L; auto;
+apply lc_t_subst_w; auto.
+inversion H; subst; constructor; auto; eapply IHM1; eauto.
+constructor; eapply IHM; eauto.
+constructor; eapply IHM; eauto.
+apply lc_t_subst_w; auto.
+Qed.
+
+Lemma lc_w_step_preserv:
+forall M N w,
+  lc_w_L M ->
+  step_L (M, w) (N, w) ->
+  lc_w_L N.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_L in *; unfold open_w_L in *; simpl in *.
+constructor; [eapply IHM1 |]; eauto.
+apply lc_t_subst_w; auto.
+constructor; eapply IHM; eauto.
+constructor; eapply IHM; eauto.
+inversion H; subst; constructor.
+apply lc_t_subst_w; auto.
+rewrite <- subst_order_irrelevant_bound_L; auto;
+apply lc_t_subst_w; auto.
+inversion H; subst; constructor; auto; eapply IHM1; eauto.
+constructor; eapply IHM; eauto.
+constructor; eapply IHM; eauto.
+apply lc_t_subst_w; auto.
+Qed.
+
+Lemma appl_steps:
+forall M M' N w,
+  lc_t_L M -> lc_t_L N -> lc_w_L M -> lc_w_L N ->
+  steps_L (M, w) (M', w) ->
+  steps_L (appl_L M N, w) (appl_L M' N, w).
+intros; remember (M, w) as S0; remember (M', w) as S1;
+generalize dependent N;
+generalize dependent M; generalize dependent M';
+generalize dependent w.
+induction H3; intros; inversion HeqS1; inversion HeqS0; subst.
+constructor; constructor; auto.
+apply multi_step_L with (M':=appl_L M' N).
+  constructor; auto.
+  apply IHsteps_L; auto.
+  apply lc_t_step_preserv with (M:=M0) (w:=w0); eauto.
+  apply lc_w_step_preserv with (M:=M0) (w:=w0); eauto.
+
+inversion H; subst;
+  unfold open_t_L; unfold open_w_L; auto.
+  app
+
+
+
+
+Lemma labeled_step:
+forall M M' w,
+  step_LF (M, w) (M', w) ->
+  steps_L (labeled_term M, w) (labeled_term M', w).
+induction M; intros;
+inversion H; subst; simpl in *;
+unfold open_t in *; unfold open_w in *; simpl in *.
+(* appl_lam *)
+constructor;
+rewrite <- subst_t_rewrite_L; constructor;
+unfold open_t_L;
+repeat rewrite <- subst_w_rewrite_L;
+apply lc_t_subst || apply lc_w_subst || simpl;
+apply lc_w_rewrite_L ||
+apply lc_t_rewrite_L || eauto; auto.
+(* appl *)
+apply IHM1 in HT.
+inversion HT; subst.
+  constructor; constructor; auto;
+  apply lc_w_rewrite_L ||
+  apply lc_t_rewrite_L; eauto.
+  apply multi_step_L with (M':=appl_L M' (labeled_term M2)).
+    constructor; auto;
+    apply lc_w_rewrite_L ||
+    apply lc_t_rewrite_L; eauto.
+
+inversion H3; subst;
+[inversion HT | ].
+constructor. constructor.
+inversion H.
+eapply IHM1 in HT0; eauto.
+
+constructor;
+try (apply lc_t_subst);
+try (apply lc_w_subst);
+apply lc_w_rewrite_L ||
+apply lc_t_rewrite_L || eauto; eauto.
+inversion H3; subst.
+  inversion HT. apply single_step_LF in HT0.
+eapply IHM1 in HT0; eauto.
+eapply HT in IHM1. eauto; inversion HT; subst; auto.
+
+
+
+
+
 End LF_to_L.
 
 Section L_to_LF.
@@ -518,4 +664,6 @@ forall Omega Gamma M A w G Delta M' A'
   (H_G: label_free_context Omega Gamma w = (G, (w, Delta)))
   (H_M: M' = label_free_term M (fwo w)),
   G |= (w, Delta) |- M' ::: A'.
+intros. (* ... *)
+induction HT.
 Admitted.
