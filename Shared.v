@@ -136,3 +136,6 @@ Definition Background_LF := list Context_LF.
 
 (* Context for labeled language *)
 Definition Context_L := list (prod var (prod var ty)).
+
+Definition ctx_LF := list (var * ty).
+Definition bg_LF := list ctx_LF.
