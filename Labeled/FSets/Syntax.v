@@ -1,3 +1,4 @@
+Add LoadPath "../..".
 Require Export Shared.
 Require Import Arith.
 Require Import List.
@@ -12,7 +13,7 @@ Inductive te_L :=
 | box_L: te_L -> te_L
 | unbox_L: te_L -> te_L
 | get_L: vwo -> te_L -> te_L
-| letd_L: te_L -> te_L -> te_L
+| letdia_L: te_L -> te_L -> te_L
 | here_L: te_L -> te_L
 | fetch_L: vwo -> te_L -> te_L
 .
@@ -26,7 +27,7 @@ match M with
 | box_L M => free_worlds M
 | unbox_L M => free_worlds M
 | here_L M => free_worlds M
-| letd_L M N => free_worlds M \u free_worlds N
+| letdia_L M N => free_worlds M \u free_worlds N
 | fetch_L (fwo w) M => \{w} \u free_worlds M
 | fetch_L _ M => free_worlds M
 | get_L (fwo w) M => \{w} \u free_worlds M
@@ -43,7 +44,8 @@ Inductive lc_w_n : te_L -> nat -> Prop :=
  | lcw_box: forall M n, lc_w_n M (S n) -> lc_w_n (box_L M) n
  | lcw_unbox: forall M n, lc_w_n M n -> lc_w_n (unbox_L M) n
  | lcw_get: forall w M n, lc_w_n M n -> lc_w_n (get_L (fwo w) M) n
- | lcw_letd: forall M N n, lc_w_n N (S n) -> lc_w_n M n -> lc_w_n (letd_L M N) n
+ | lcw_letdia: forall M N n, lc_w_n N (S n) -> lc_w_n M n ->
+   lc_w_n (letdia_L M N) n
  | lcw_here: forall M n, lc_w_n M n -> lc_w_n (here_L M) n
  | lcw_fetch: forall w M n, lc_w_n M n -> lc_w_n (fetch_L (fwo w) M) n
 .
@@ -57,7 +59,7 @@ match M with
 | box_L M => unbound_worlds (S n) M
 | unbox_L M => unbound_worlds n M
 | here_L M => unbound_worlds n M
-| letd_L M N => unbound_worlds n M ++ unbound_worlds (S n) N
+| letdia_L M N => unbound_worlds n M ++ unbound_worlds (S n) N
 | fetch_L (bwo w) M => w :: unbound_worlds n M
 | fetch_L (fwo w) M => unbound_worlds n M
 | get_L (bwo w) M => w :: unbound_worlds n M
@@ -84,7 +86,6 @@ replace (n+0) with n by auto; assumption.
 replace (n+ S m) with (S (n+m)) by auto;
 apply closed_w_succ; assumption.
 Qed.
-
 
 Lemma closed_no_unbound_worlds:
 forall M n,
