@@ -512,6 +512,7 @@ forall M N w,
   lc_w_L N.
 induction M; intros; inversion H0; subst; auto;
 unfold open_t_L in *; unfold open_w_L in *; simpl in *.
+eapply lc_w_subst_L.
 constructor; [eapply IHM1 |]; eauto.
 apply lc_t_subst_w; auto.
 constructor; eapply IHM; eauto.
