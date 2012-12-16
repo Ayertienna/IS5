@@ -1,4 +1,4 @@
-Require Import LLSyntax.
+Require Import L_Syntax.
 Require Import PermutLib.
 
 Open Scope permut_scope.

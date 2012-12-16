@@ -1,7 +1,7 @@
-Require Import LLSubstitution.
+Require Import L_Substitution.
+Require Import L_OkLib.
 Require Import PermutLib.
 Require Import LibTactics.
-Require Import LLOkLib.
 Require Import Relations.
 
 Open Scope is5_scope.

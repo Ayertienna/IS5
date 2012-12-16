@@ -1,5 +1,5 @@
-Require Export LLSyntax.
-Require Import LLOkLib.
+Require Export L_Syntax.
+Require Import L_OkLib.
 Require Import LibTactics.
 Require Import Arith.
 
