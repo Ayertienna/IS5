@@ -124,9 +124,6 @@ Inductive steps_LF : te_LF -> te_LF -> Prop :=
 
 (* Move it! *)
 
-Definition used_vars_ctx_LF (L: bg_LF) :=
-  map fst (concat L).
-
 Fixpoint used_vars_te_LF (M: te_LF) : fset var :=
 match M with
 | hyp_LF (fte v) => \{v}
@@ -139,38 +136,21 @@ match M with
 | letdia_LF M N => used_vars_te_LF M \u used_vars_te_LF N
 end.
 
-
 Fixpoint emptyEquiv (G: list (list (var * ty))) :=
 match G with
 | nil => nil
 | a::G' => (@nil (var * ty)) :: emptyEquiv G'
 end.
 
-
-Lemma ok_Bg_PPermut:
-forall G G',
-  ok_Bg G -> G ~=~ G' -> ok_Bg G'.
-Admitted.
-
-Lemma ok_Bg_fresh:
-forall G Gamma x A,
-  ok_Bg (Gamma::G) ->
-  ~ Mem x (used_vars_ctx_LF (Gamma::G)) ->
-  ok_Bg (((x, A) :: Gamma)::G).
-Admitted.
-
-Lemma ok_Bg_nil:
-forall G,
-  ok_Bg G ->
-  ok_Bg (nil::G).
-Admitted.
-
-Hint Resolve ok_Bg_nil.
-
 Lemma emptyEquiv_permut_empty:
 forall G G',
   G ~=~ emptyEquiv G' ->
   forall C, Mem C G -> C = nil.
+Admitted.
+
+Lemma double_emptyEquiv:
+forall G,
+ emptyEquiv G = emptyEquiv (emptyEquiv G).
 Admitted.
 (* /end *)
 
@@ -267,7 +247,6 @@ apply t_letdia_get_LF with (A:=A) (L:=L) (G:=G) (Gamma:=Gamma);
 skip.
 apply PPermutationG with (G:=G & Gamma'); auto. skip.
 Qed.
-
 
 Lemma WeakeningG:
 forall G Gamma M A Delta,
@@ -484,16 +463,150 @@ forall G Gamma M A
     G ~=~ Gamma0::Delta0::G0 ->
     G1 ~=~ (Gamma0++Delta0) :: G0 ->
     G1 |= Gamma |- M ::: A) /\
-  (* new *)
+  (* new or old - by PermutationGamma *)
   (forall G0 Delta0,
     G ~=~ Delta0 :: G0 ->
-    G0 |= Gamma ++ Delta0 |- M ::: A) /\
-  (* old *)
-  (forall G0 Gamma0,
-    G ~=~ Gamma0 :: G0 ->
-    G0 |= Gamma0 ++ Gamma |- M ::: A).
-intros; induction H; repeat split; intros.
-Admitted.
+    G0 |= Gamma ++ Delta0 |- M ::: A).
+intros. induction H; repeat split; intros.
+(* hyp *)
+constructor. skip. auto.
+constructor. skip. rewrite Mem_app_or_eq; left; auto.
+(* lam *)
+apply t_lam_LF with (L:=L). skip. intros. eapply H0; eauto.
+apply t_lam_LF with (L:=L). skip. intros. eapply H0; eauto.
+(* appl *)
+apply t_appl_LF with (A:=A). skip. eapply IHtypes_LF1; eauto.
+eapply IHtypes_LF2; eauto.
+apply t_appl_LF with (A:=A). skip. eapply IHtypes_LF1; eauto.
+eapply IHtypes_LF2; eauto.
+(* box *)
+constructor. skip. eapply IHtypes_LF with (G0:=G0 & Gamma)
+(Gamma0:=Gamma0) (Delta0:=Delta0); eauto. skip. skip.
+constructor. skip. eapply IHtypes_LF with (G0:=G0) (Gamma0:=Gamma)
+  (Delta0:=Delta0); eauto. skip. skip.
+(* unbox *)
+constructor. skip. eapply IHtypes_LF; eauto.
+constructor. skip. eapply IHtypes_LF; eauto.
+(* Gamma *=* Gamma0 \/ Gamma *=* Gamma1 \/ neither *)
+assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G0) by skip.
+assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
+        (Gamma *=* Delta0 /\ G ~=~ Gamma0::G0) \/
+        (exists hd, exists tl, G0 = hd & Gamma ++ tl)) by skip.
+destruct H4.
+destruct H4. assert (Gamma = Gamma0) by skip. (* permut, really *)
+apply t_unbox_fetch_LF with (G:=G0) (Gamma:=Gamma0++Delta0).
+skip. subst. eapply IHtypes_LF. skip. skip.
+destruct H4.
+destruct H4. assert (Gamma = Delta0) by skip. (* permut, really *)
+apply t_unbox_fetch_LF with (G:=G0) (Gamma:=Delta0++Gamma0).
+skip. subst. eapply IHtypes_LF. skip. skip.
+destruct H4 as (hd, (tl, H4)).
+apply t_unbox_fetch_LF with (G:=Gamma0::Delta0::hd++tl) (Gamma:=Gamma).
+skip. subst. assert (G ~=~ Gamma0::Delta0::hd ++ tl) by skip. skip. (* H *)
+subst. skip.
+assert (G & Gamma ~=~ Delta0 :: G0) by skip.
+assert ((Gamma *=* Delta0 /\ G ~=~ G0) \/
+        (exists hd, exists tl, G0 = hd & Gamma ++ tl)) by skip.
+destruct H3.
+destruct H3. assert (Gamma = Delta0) by skip. (* permut, really *)
+subst; constructor. skip.
+replace (Gamma'++Delta0) with (Delta0++Gamma') by skip.
+eapply IHtypes_LF. assert (G ~=~ G0) by skip. (* H2 *) skip.
+destruct H3 as (hd, (tl, H3)); subst.
+apply t_unbox_fetch_LF with (G:=hd++tl) (Gamma:=Gamma).
+skip.
+assert (G ~=~ Delta0::hd ++ tl) by skip. skip. (* H *)
+skip.
+(* here *)
+constructor. skip. eapply IHtypes_LF; eauto.
+constructor. skip. eapply IHtypes_LF; eauto.
+(* Gamma *=* Gamma0 \/ Gamma *=* Gamma1 \/ neither *)
+assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G0) by skip.
+assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
+        (Gamma *=* Delta0 /\ G ~=~ Gamma0::G0) \/
+        (exists hd, exists tl, G0 = hd & Gamma ++ tl)) by skip.
+destruct H4.
+destruct H4. assert (Gamma = Gamma0) by skip. (* permut, really *)
+apply t_get_here_LF with (G:=G0) (Gamma:=Gamma0++Delta0).
+skip. subst. eapply IHtypes_LF. skip. skip.
+destruct H4.
+destruct H4. assert (Gamma = Delta0) by skip. (* permut, really *)
+apply t_get_here_LF with (G:=G0) (Gamma:=Delta0++Gamma0).
+skip. subst. eapply IHtypes_LF. skip. skip.
+destruct H4 as (hd, (tl, H4)).
+apply t_get_here_LF with (G:=Gamma0::Delta0::hd++tl) (Gamma:=Gamma).
+skip. subst. assert (G ~=~ Gamma0::Delta0::hd ++ tl) by skip. skip. (* H *)
+subst. skip.
+assert (G & Gamma ~=~ Delta0 :: G0) by skip.
+assert ((Gamma *=* Delta0 /\ G ~=~ G0) \/
+        (exists hd, exists tl, G0 = hd & Gamma ++ tl)) by skip.
+destruct H3.
+destruct H3. assert (Gamma = Delta0) by skip. (* permut, really *)
+subst; constructor. skip.
+replace (Gamma'++Delta0) with (Delta0++Gamma') by skip.
+eapply IHtypes_LF. assert (G ~=~ G0) by skip. (* H2 *) skip.
+destruct H3 as (hd, (tl, H3)); subst.
+apply t_get_here_LF with (G:=hd++tl) (Gamma:=Gamma).
+skip.
+assert (G ~=~ Delta0::hd ++ tl) by skip. skip. (* H *)
+skip.
+(* letdia *)
+apply t_letdia_LF with (L:=L) (A:=A). skip.
+  eapply IHtypes_LF; eauto. intros.
+  replace G' with (((v, A) :: nil) :: G1) by skip.
+  replace G1 with ((Gamma0 ++ Delta0) :: G0) by skip.
+  eapply H0 with (G':=((v,A)::nil)::G) (G0:= ((v,A)::nil)::G0)
+    (Delta0:=Delta0)(Gamma0:=Gamma0); eauto. skip. skip. skip.
+apply t_letdia_LF with (L:=L) (A:=A). skip.
+  eapply IHtypes_LF; eauto. intros.
+  replace G' with (((v, A) :: nil) :: G0) by skip.
+  eapply H0 with (G':=((v,A)::nil)::G); eauto. skip. skip.
+assert (G & Gamma ~=~  Gamma0 :: Delta0 :: G1) by skip.
+assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G1) \/
+        (Gamma *=* Delta0 /\ G ~=~ Gamma0::G1) \/
+        (exists hd, exists tl, G1 = hd & Gamma ++ tl)) by skip.
+destruct H5.
+destruct H5. assert (Gamma = Gamma0) by skip. (* permut, really *)
+apply t_letdia_get_LF with (G:=G1) (Gamma:=Gamma0++Delta0) (L:=L) (A:=A).
+skip. subst. eapply IHtypes_LF. skip.
+intros. eapply H0 with (G0:=((v,A)::nil)::G1) (Gamma0:=Gamma0)(Delta0:=Delta0);
+eauto. subst. skip. skip. skip.
+destruct H5. destruct H5. assert (Gamma = Delta0) by skip. (* permut, really *)
+apply t_letdia_get_LF with (G:=G1) (Gamma:=Delta0++Gamma0) (A:=A) (L:=L).
+skip. subst. eapply IHtypes_LF. skip. intros.
+eapply H0 with (G0:=((v,A)::nil)::G1) (Gamma0:=Gamma0)(Delta0:=Delta0);
+eauto. subst. skip. skip. skip.
+destruct H5 as (hd, (tl, H5)).
+apply t_letdia_get_LF with
+  (G:=(Gamma0++Delta0)::hd++tl)(Gamma:=Gamma) (L:=L)(A:=A).
+skip. subst. rew_app.
+eapply IHtypes_LF with (G0:=hd++tl & Gamma') (Gamma0:=Gamma0)(Delta0:=Delta0);
+eauto. skip. skip.
+intros.
+rew_app.
+eapply H0 with (G0:=((v,A)::nil)::G1) (Gamma0:=Gamma0) (Delta0:=Delta0);
+eauto. skip. skip. skip.
+assert (G & Gamma ~=~  Delta0 :: G1) by skip.
+assert ((Gamma *=* Delta0 /\ G ~=~ G1) \/
+        (exists hd, exists tl, G1 = hd & Gamma ++ tl)) by skip.
+destruct H4.
+destruct H4. assert (Gamma = Delta0) by skip. (* permut, really *)
+apply t_letdia_LF with (A:=A)(L:=L). skip.
+subst; replace (Gamma'++Delta0) with (Delta0++Gamma') by skip.
+eapply IHtypes_LF; eauto. skip.
+intros; subst.
+eapply H0; eauto.
+skip.
+destruct H4 as (hd, (tl, H4)).
+apply t_letdia_get_LF with
+  (G:=hd++tl)(Gamma:=Gamma) (L:=L)(A:=A).
+skip. subst. rew_app.
+eapply IHtypes_LF with (G0:=hd++tl) (Gamma0:=Gamma')(Delta0:=Delta0);
+eauto. skip. skip.
+intros; subst; rew_app.
+eapply H0; eauto.
+skip. rew_app. skip.
+Qed.
 
 Lemma merge_preserv_types_outer:
 forall G G0 G1 Gamma Gamma0 Delta0 M A,
@@ -517,7 +630,8 @@ forall G G0 Gamma Delta M A,
   G |= Delta |- M ::: A ->
   G ~=~ Gamma::G0 ->
   G0 |= Gamma++Delta |- M ::: A.
-intros; eapply merge_preserv_types; eauto.
+intros; replace (Gamma++Delta) with (Delta++Gamma) by skip;
+eapply merge_preserv_types; eauto.
 Qed.
 
 Lemma Progress:
@@ -610,10 +724,6 @@ eexists; econstructor; eauto.
 Admitted. (* Existential variables *)
 
 (* this is also to be moved *)
-Lemma double_emptyEquiv:
-forall G,
- emptyEquiv G = emptyEquiv (emptyEquiv G).
-Admitted.
 (* end *)
 
 Lemma Preservation:
