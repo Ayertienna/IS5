@@ -1,1 +1,2 @@
-Require Export L_Syntax L_OkLib L_Substitution L_Semantics.
+Add LoadPath "Labeled/Lists".
+Require Export Shared Syntax OkLib Substitution Semantics.
