@@ -102,3 +102,15 @@ intros; unfold ok_Bg; rew_concat; rew_app; auto.
 Qed.
 
 Hint Resolve ok_Bg_nil.
+
+Lemma ok_Bg_concat:
+forall c1 c2 G0 G1 G2,
+  c1::c2::G0 ~=~ G1 ->
+  (c1++c2)::G0 ~=~ G2 ->
+  ok_Bg G1 <-> ok_Bg G2.
+Admitted.
+
+Lemma ok_Bg_empty:
+forall G,
+  ok_Bg (emptyEquiv G).
+Admitted.

@@ -16,3 +16,14 @@ Lemma double_emptyEquiv:
 forall G,
  emptyEquiv G = emptyEquiv (emptyEquiv G).
 Admitted.
+
+Lemma emptyEquiv_last:
+forall G,
+  emptyEquiv G & nil = (emptyEquiv G) & nil.
+Admitted.
+
+Lemma emptyEquiv_PPermut:
+forall G Gamma G',
+  G & Gamma ~=~ emptyEquiv G' ->
+  Gamma = nil.
+Admitted.
