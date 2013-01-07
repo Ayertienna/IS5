@@ -552,4 +552,20 @@ transitivity y; auto.
 inversion H. PPermut_LF_simpl.
 Qed.
 
+Lemma PPermut_concat_permut:
+forall G G',
+  G ~=~ G' -> concat G *=* concat G'.
+induction G; intros.
+apply PPermut_LF_nil_impl in H; subst; auto.
+assert (a::G ~=~ G') by auto;
+apply PPermut_LF_split_head in H;
+destruct H as (a', (hd, (tl, (H, H1))));
+subst; rew_concat.
+assert (G ~=~ hd ++ tl).
+  apply PPermut_LF_last_rev with (Gamma:=a) (Gamma':=a'); auto;
+    transitivity (a::G); [ | rewrite H0]; PPermut_LF_simpl.
+specialize IHG with (G':=hd++tl); apply IHG in H1.
+rew_concat in *. rewrite H1; rewrite H; permut_simpl.
+Qed.
+
 Close Scope permut_scope.
