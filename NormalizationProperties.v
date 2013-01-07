@@ -1,3 +1,4 @@
+Add LoadPath "Labeled/Lists".
 Require Import Labeled.
 Require Import LibTactics.
 Require Import List.

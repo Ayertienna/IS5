@@ -1,3 +1,4 @@
+Add LoadPath "../..".
 Require Export Shared.
 
 Inductive vctx :=
@@ -39,3 +40,15 @@ Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
 .
 
 Definition lc_t_LF := lc_t_n_LF 0.
+
+Fixpoint used_vars_te_LF (M: te_LF) : fset var :=
+match M with
+| hyp_LF (fte v) => \{v}
+| hyp_LF (bte _) => \{}
+| lam_LF _ M => used_vars_te_LF M
+| appl_LF M N => used_vars_te_LF M \u used_vars_te_LF N
+| box_LF M => used_vars_te_LF M
+| unbox_LF M => used_vars_te_LF M
+| here_LF M => used_vars_te_LF M
+| letdia_LF M N => used_vars_te_LF M \u used_vars_te_LF N
+end.
