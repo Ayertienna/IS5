@@ -1,3 +1,4 @@
+Add LoadPath "..".
 Require Export Shared.
 Require Export PermutLib.
 

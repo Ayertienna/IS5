@@ -1,4 +1,5 @@
-Require Export LFSyntax.
+Add LoadPath "..".
+Require Export Syntax.
 Require Export LibTactics. (* case_if *)
 Require Import Gt.
 

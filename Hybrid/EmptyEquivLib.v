@@ -1,3 +1,4 @@
+Add LoadPath "..".
 Require Import Shared.
 Require Import LibList.
 Require Import OkLib.

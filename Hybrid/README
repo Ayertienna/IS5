@@ -1,0 +1,9 @@
+Formalization of hybrid IS5 - syntax similar to label-free version, but with
+worlds as known in labeled version. It uses lists and permutations. This (only)
+version of hybrid language is used in the main project directory and is imported
+by Hybrid.v
+
+Note
+----
+It requires Shared.v, PermutLib.v and FSetLib.v from the main directory to be
+compiled.

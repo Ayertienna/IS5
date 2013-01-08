@@ -1,3 +1,4 @@
+Add LoadPath "..".
 Require Import Setoid.
 Require Export Shared.
 Require Export PermutLib.

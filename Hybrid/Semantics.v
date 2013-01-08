@@ -1,4 +1,5 @@
-Require Import LFSubstitution.
+Add LoadPath "..".
+Require Import Substitution.
 Require Import Setoid.
 Require Import LibList.
 Require Import PermutLib.
