@@ -190,3 +190,7 @@ forall G,
   ok_Bg_LF (emptyEquiv_LF G).
 unfold ok_Bg_LF; induction G; simpl in *; rew_concat. constructor. auto.
 Qed.
+
+Add Morphism ok_Bg_LF: PPermut_ok_Bg_LF.
+split; intros; eapply ok_Bg_LF_PPermut; eauto.
+Qed.
