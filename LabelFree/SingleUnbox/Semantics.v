@@ -520,23 +520,9 @@ assert (emptyEquiv_LF G ++ a :: G' ~=~
 apply PPermutationG_LF with (G:=(emptyEquiv_LF G  ++ G') & (nil ++ a)); auto.
 eapply WeakeningWithinG.
 rew_app.
-
-Lemma ok_Bg_LF_empty_first:
-forall G Gamma,
-  ok_Bg_LF (Gamma :: G) ->
-  ok_Bg_LF (nil :: G).
-Admitted.
-
 apply ok_Bg_LF_empty_first in Ok.
 assert (nil :: a :: G ++ G' ~=~ (nil :: G) ++ a :: G') by
   PPermut_LF_simpl.
-
-Lemma emptyEquiv_LF_ok_Bg_part:
-forall G G',
-  ok_Bg_LF (G ++ G') ->
-  ok_Bg_LF ((emptyEquiv_LF G) ++ G').
-Admitted.
-
 apply ok_Bg_LF_PPermut with (G':=(nil::G)++ a::G') in Ok; auto.
 eapply emptyEquiv_LF_ok_Bg_part in Ok; simpl in *; rew_app in *; auto.
 assert (emptyEquiv_LF G & nil ++ G' ~=~  nil :: emptyEquiv_LF G ++ G') by
@@ -546,12 +532,6 @@ PPermut_LF_simpl.
 apply ok_Bg_LF_nil. rew_app. apply emptyEquiv_LF_ok_Bg_part.
 apply ok_Bg_LF_PPermut with (a::G ++ G');
 try PPermut_LF_simpl.
-
-Lemma ok_Bg_LF_weakening:
-forall G Gamma,
-  ok_Bg_LF (Gamma::G) -> ok_Bg_LF G.
-Admitted.
-
 eapply ok_Bg_LF_weakening; eauto.
 Qed.
 
@@ -582,26 +562,9 @@ simpl in *.
 (* hyp *)
 case_if.
 inversion H2; subst.
-
-Lemma ok_Bg_LF_Mem_eq:
-forall C C' v A A0 G,
-  ok_Bg_LF (C :: G) ->
-  C *=* (v, A) :: C' ->
-  Mem (v, A0) C ->
-  A0 = A.
-Admitted.
-
 assert (A = A0) by (eapply ok_Bg_LF_Mem_eq; eauto);
 subst; replace G with (G ++ nil) by (rew_app; auto).
 apply types_weakened.
-
-Lemma ok_Bg_LF_permut_first_tail:
-forall G C C' x A,
-  ok_Bg_LF (C :: G) ->
-  C *=* (x, A)::C' ->
-  ok_Bg_LF (C' :: G).
-Admitted.
-
 apply ok_Bg_LF_permut_first_tail with (C':=Gamma0)(x:=v)(A:=A0) in Ok;
 auto; rew_app; auto. rew_app; auto.
 
@@ -612,14 +575,6 @@ rewrite Mem_cons_eq in H; destruct H; auto.
 inversion H; subst; elim H2; reflexivity.
 
 
-Lemma ok_Bg_LF_Mem_contradict:
-forall A A' v C C' G G',
- ok_Bg_LF (C :: G) ->
- Mem (v, A) C ->
- G ~=~ G' & ((v, A') :: C') ->
- False.
-Admitted.
-
 case_if.
 inversion H4; subst.
 apply ok_Bg_LF_Mem_contradict with (v:=v) (A:=A) (A':=A0) (G':=G0) (C':=Gamma')
@@ -628,13 +583,6 @@ contradiction || eauto.
 constructor; auto.
 apply ok_Bg_LF_PPermut with (G:=(Gamma::G0) & Gamma').
 apply ok_Bg_LF_PPermut with (G':=(Gamma::G0 & ((v0, A0)::Gamma'))) in Ok.
-
-Lemma ok_Bg_LF_permut_no_last:
-forall G C v A,
-  ok_Bg_LF (G & ((v,A) :: C)) ->
-  ok_Bg_LF (G & C).
-Admitted.
-
 apply ok_Bg_LF_permut_no_last with (v:=v0)(A:=A0); auto.
 rewrite H0; PPermut_LF_simpl.
 rewrite H2; PPermut_LF_simpl.
@@ -662,12 +610,6 @@ eapply H0 with (G0:=G0); eauto;
 assert (emptyEquiv_LF G' ~=~
   emptyEquiv_LF (G0 ++ nil & ((v0, A) :: Gamma))).
 
-Lemma emptyEquiv_LF_last_change:
-forall G G' C C',
-  G  ~=~ G'& C ->
-  emptyEquiv_LF G ~=~ emptyEquiv_LF (G' & C').
-Admitted.
-
  (rewrite H2; rew_app; eapply emptyEquiv_LF_last_change; auto).
 rew_app in *.
 apply PPermutationG_LF with (G:=emptyEquiv_LF G'); auto.
@@ -679,12 +621,6 @@ apply ok_Bg_LF_permut_first_tail with (C':=Gamma0) (x:=v) (A:=A0) in Ok; eauto.
 econstructor.
 apply ok_Bg_LF_PPermut with (G:=Gamma:: G0 & Gamma'); auto.
 apply ok_Bg_LF_PPermut with (G':=Gamma :: G0 & ((v,A0)::Gamma')) in Ok; auto.
-
-Lemma ok_Bg_LF_permut_no_last_spec:
-forall G C C0 v A,
-  ok_Bg_LF (C0::G & ((v,A) :: C)) ->
-  ok_Bg_LF (C0::G & (C)).
-Admitted.
 
 apply ok_Bg_LF_permut_no_last_spec in Ok; rew_app; auto.
 eapply IHHT1; eauto.
@@ -698,11 +634,6 @@ eapply IHHT; eauto.
 rewrite emptyEquiv_LF_rewrite; rewrite emptyEquiv_LF_rewrite_last;
 simpl; rew_app. apply PPermutationG_LF with (nil :: emptyEquiv_LF G).
 apply WeakeningG; auto.
-
-Lemma ok_Bg_LF_emptyEquiv:
-forall G,
-  ok_Bg_LF (emptyEquiv_LF G).
-Admitted.
 
 repeat apply ok_Bg_LF_nil. apply ok_Bg_LF_emptyEquiv.
 PPermut_LF_simpl.
@@ -1493,11 +1424,6 @@ destruct IHM with (A := [*]A)
                   (G := G0 & nil);
 eauto.
 
-Lemma emptyEquiv_LF_PPermut_eq:
-forall G G',
-  G ~=~ emptyEquiv_LF G' -> emptyEquiv_LF G = G.
-Admitted.
-
 assert (emptyEquiv_LF (G0 & nil) = G0 & nil).
   eapply emptyEquiv_LF_PPermut_eq; eauto.
 rewrite H0; auto.
@@ -1583,11 +1509,6 @@ transitivity (emptyEquiv_LF (G0&nil)).
   rewrite emptyEquiv_LF_rewrite; auto.
   transitivity (emptyEquiv_LF (nil :: G0)); auto.
 
-Lemma PPermut_emptyEquiv_LF:
-forall G G',
-  G ~=~ G' -> emptyEquiv_LF G ~=~ emptyEquiv_LF G'.
-Admitted.
-
 apply PPermut_emptyEquiv_LF; PPermut_LF_simpl.
 
 inversion HT; subst;
@@ -1600,12 +1521,6 @@ assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in H; auto.
 subst. replace (emptyEquiv_LF G0) with (G & nil).
 apply IHHT with (G0:=G0); auto.
-
-Lemma emptyEquiv_LF_PPermut_equal:
-forall G G',
-  G ~=~ emptyEquiv_LF G' -> G = emptyEquiv_LF G'.
-Admitted.
-
 apply emptyEquiv_LF_PPermut_equal; auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
 
@@ -1640,11 +1555,6 @@ rewrite H3.
 apply WeakeningG; auto.
 symmetry;
 remember (emptyEquiv_LF G0) as G'.
-
-Lemma PPermut_LF_first_last:
-forall c G,
-  c::G ~=~ G & c.
-Admitted.
 
 apply PPermut_LF_first_last.
 eauto.

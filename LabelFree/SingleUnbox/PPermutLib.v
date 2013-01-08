@@ -568,4 +568,10 @@ specialize IHG with (G':=hd++tl); apply IHG in H1.
 rew_concat in *. rewrite H1; rewrite H; permut_simpl.
 Qed.
 
+Lemma PPermut_LF_first_last:
+forall c G,
+  c::G ~=~ G & c.
+intros; PPermut_LF_simpl.
+Qed.
+
 Close Scope permut_scope.
