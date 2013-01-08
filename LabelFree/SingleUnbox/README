@@ -1,0 +1,7 @@
+Formalization of label-free IS5 using lists and permutations. This
+implementation uses a single term to represent unbox and unbox_fetch and it is
+the one used in the main project. It is imported by LabelFree.v.
+
+Note
+----
+It requires Shared.v and PermutLib.v from the main directory to be compiled.

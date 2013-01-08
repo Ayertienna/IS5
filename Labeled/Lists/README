@@ -1,8 +1,7 @@
 Formalization of labeled IS5 using lists and permutations. It is compatible with
 the implementation of hybrid language and label-free language in the sense of
 context rewriting. This version of labeled language is used in the main project
-directory with the prefix L (so, LSyntax, LSubstitution, LSemantics and a
-library LOkLib).
+directory and is imported by Labeled.v
 
 Note
 ----

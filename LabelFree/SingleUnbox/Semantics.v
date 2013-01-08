@@ -2,7 +2,7 @@ Add LoadPath "../..".
 Require Import Syntax.
 Require Import Substitution.
 Require Import OkLib.
-Require Import EmptyEquiv.
+Require Import EmptyEquivLib.
 
 Open Scope permut_scope.
 Open Scope is5_scope.

@@ -1,7 +1,7 @@
 Add LoadPath "../..".
 Require Export PPermutLib.
 Require Export FSetLib.
-Require Export EmptyEquiv.
+Require Export EmptyEquivLib.
 
 Inductive ok_LF {A}: list (prod var A) -> list var -> Prop :=
 | Ok_nil: forall U, ok_LF nil U
