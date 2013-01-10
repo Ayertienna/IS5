@@ -105,7 +105,6 @@ forall v1 v2: vte, {v1 = v2} + {v1 <> v2}.
     apply eq_var_dec].
 Qed.
 
-
 (* Generating new variable produces fresh variable *)
 Lemma generate_fresh:
 forall L w
@@ -116,7 +115,6 @@ intro; subst;
 absurd (var_gen L \in L);
 [apply var_gen_spec | assumption].
 Qed.
-
 
 (* For every set of variables, we can generate a variable that is
    not within that set *)
@@ -130,12 +128,13 @@ Qed.
 
 (*** Shared definitions ***)
 
-(* Background and context for label-free language *)
-Definition Context_LF := prod var (list (prod var ty)).
-Definition Background_LF := list Context_LF.
+(* Background and context for hybrid language *)
+Definition ctx_Hyb := prod var (list (prod var ty)).
+Definition bg_Hyb := list ctx_Hyb.
 
 (* Context for labeled language *)
-Definition Context_L := list (prod var (prod var ty)).
+Definition ctx_L := list (prod var (prod var ty)).
 
+(* Background and context for label-free language *)
 Definition ctx_LF := list (var * ty).
 Definition bg_LF := list ctx_LF.

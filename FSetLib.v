@@ -1,4 +1,5 @@
 (* Rename to fsetpermut or move to permutlib *)
+(* FlatMap should be moved to ListLib *)
 Require Export PermutLib.
 
 Open Scope permut_scope.
@@ -12,6 +13,50 @@ Definition snd_ {A} {B} (p:A * B) :=
   match p with
   | (x, y) => y
   end.
+
+(* Copied from standard list, but this one uses List from LibList *)
+Definition flat_map {A}{B}(f:A -> list B) :=
+  fix flat_map (l:list A) : list B :=
+  match l with
+    | nil => nil
+    | x :: t => (f x) ++ (flat_map t)
+  end.
+
+Section FlatMapProp.
+
+Variables A B: Type.
+Variable f : A -> list B.
+
+Lemma flat_map_nil :
+  flat_map f nil = nil.
+Proof. auto. Qed.
+
+Lemma flat_map_cons : forall x l,
+  flat_map f (x::l) = f x ++ flat_map f l.
+Proof. auto. Qed.
+
+Lemma flat_map_app : forall l1 l2,
+  flat_map f (l1 ++ l2) = flat_map f l1 ++ flat_map f l2.
+Proof.
+induction l1; intros; rew_app; simpl; auto;
+rewrite IHl1; rew_app; auto.
+Qed.
+
+Lemma flat_map_last : forall x l,
+  flat_map f (l & x) = flat_map f l ++ f x.
+Proof. intros; rewrite flat_map_app; simpl; rew_app; auto. Qed.
+
+End FlatMapProp.
+
+Hint Rewrite flat_map_nil flat_map_cons flat_map_app flat_map_last :
+  rew_flat_map.
+
+Tactic Notation "rew_flat_map" :=
+  autorewrite with rew_flat_map rew_app.
+Tactic Notation "rew_flat_map" "in" hyp(H) :=
+  autorewrite with rew_flat_map rew_app in H.
+Tactic Notation "rew_flat_map" "in" "*" :=
+  autorewrite with rew_flat_map rew_app in *.
 
 Lemma from_list_map:
 forall A B (l: list (A * B)) l',
