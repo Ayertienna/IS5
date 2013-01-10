@@ -4,4 +4,5 @@ the one used in the main project. It is imported by LabelFree.v.
 
 Note
 ----
-It requires Shared.v and PermutLib.v from the main directory to be compiled.
+It requires Shared.v, ListLib.v and PermutLib.v from the main directory to be
+compiled.

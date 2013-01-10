@@ -316,8 +316,8 @@ constructor; eauto; eapply IHtypes_LF; eauto.
 constructor; eauto; eapply IHtypes_LF; eauto.
 assert (Delta::G'0 ~=~ G & Gamma).
   transitivity G'; auto; rewrite <- H1; PPermut_LF_simpl.
-assert ({Gamma *=* Delta} + {~ Gamma *=* Delta}).
-  eapply permut_dec; intros; destruct k; destruct k'; repeat decide equality.
+assert (Gamma *=* Delta \/ ~ Gamma *=* Delta).
+  eapply permut_Dec; intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
 destruct H4.
 (* Gamma *=* Delta *)
@@ -331,11 +331,11 @@ apply PPermutationG_LF with (G:=G & Gamma'); auto.
 apply PermutationGamma with (Gamma:=Gamma++Delta'); auto.
 eapply IHtypes_LF.
 apply ok_Bg_LF_PPermut with (G:=Gamma'::G'0&(Delta++Delta')); auto.
-rewrite H4; PPermut_LF_simpl.
+rewrite H5; PPermut_LF_simpl.
 (* ~ Gamma *=* Delta *)
 assert (G'0 & Delta ~=~ G & Gamma) by (rewrite <- H3; PPermut_LF_simpl).
-apply PPermut_LF_split_neq in H4; [ | intro; elim n; symmetry; auto];
-destruct H4 as (Gamma0, (hd, (tl, (H4, H5)))).
+apply PPermut_LF_split_neq in H5; [ | intro; elim H4; symmetry; auto];
+destruct H5 as (Gamma0, (hd, (tl, (H5, H6)))).
 subst.
 apply t_unbox_fetch_LF with (G:=hd++tl & (Delta++Delta')) (Gamma:=Gamma).
 apply ok_Bg_LF_PPermut
@@ -359,8 +359,8 @@ rewrite <- H0; PPermut_LF_simpl.
 constructor; eauto; eapply IHtypes_LF; eauto.
 constructor; eauto; eapply IHtypes_LF; eauto.
 assert (G & Gamma ~=~ G'0 & Delta) by (rewrite  H1; auto).
-assert ({Gamma *=* Delta} + {~ Gamma *=* Delta}).
-  eapply permut_dec; intros; destruct k; destruct k'; repeat decide equality;
+assert (Gamma *=* Delta \/ ~ Gamma *=* Delta).
+  eapply permut_Dec; intros; destruct k; destruct k'; repeat decide equality;
   apply eq_var_dec.
 destruct H4.
 (* Gamma *=* Delta *)
@@ -374,11 +374,11 @@ apply PPermutationG_LF with (G:=G & Gamma'); auto.
 apply PermutationGamma with (Gamma:=Gamma++Delta'); auto.
 eapply IHtypes_LF.
 apply ok_Bg_LF_PPermut with (G:=Gamma'::G'0&(Delta++Delta')); auto.
-rewrite H4; PPermut_LF_simpl.
+rewrite H5; PPermut_LF_simpl.
 (* ~ Gamma *=* Delta *)
 assert (G'0 & Delta ~=~ G & Gamma) by (rewrite <- H3; PPermut_LF_simpl).
-apply PPermut_LF_split_neq in H4; [ | intro; elim n; symmetry; auto];
-destruct H4 as (Gamma0, (hd, (tl, (H4, H5)))).
+apply PPermut_LF_split_neq in H5; [ | intro; elim H4; symmetry; auto];
+destruct H5 as (Gamma0, (hd, (tl, (H5, H6)))).
 subst.
 apply t_get_here_LF with (G:=hd++tl & (Delta++Delta')) (Gamma:=Gamma).
 apply ok_Bg_LF_PPermut
@@ -421,8 +421,8 @@ unfold used_vars_ctx_LF in *; rew_concat in *; eauto.
 rewrite <- H3; PPermut_LF_simpl.
 assert (Gamma::G ~=~ G' & Delta).
   transitivity G0; auto; rewrite <- H1; PPermut_LF_simpl.
-assert ({Gamma *=* Delta} + {~ Gamma *=* Delta}).
-  eapply permut_dec; intros; destruct k; destruct k'; repeat decide equality.
+assert (Gamma *=* Delta \/ ~ Gamma *=* Delta).
+  eapply permut_Dec; intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
 destruct H5.
 (* Gamma *=* Delta *)
@@ -438,17 +438,17 @@ apply PPermutationG_LF with (G:=G & Gamma'); auto.
 apply PermutationGamma with (Gamma:=Gamma++Delta'); auto.
 eapply IHtypes_LF.
 apply ok_Bg_LF_PPermut with (G:=Gamma'::G'&(Delta++Delta')); auto.
-rewrite H5; PPermut_LF_simpl.
+rewrite H6; PPermut_LF_simpl.
 intros; destruct H0 with (v:=v); auto.
 apply PPermutationG_LF with (G:=((((v, A) :: nil) :: G') & (Delta ++ Delta'))).
-eapply H7. rewrite H5; PPermut_LF_simpl.
+eapply H8. rewrite H6; PPermut_LF_simpl.
 apply ok_Bg_LF_PPermut with (G:=((v,A)::nil)::Gamma' :: G' & (Delta ++ Delta')).
-apply ok_Bg_LF_fresh. auto. rewrite notin_union in H6; destruct H6. auto.
+apply ok_Bg_LF_fresh. auto. rewrite notin_union in H7; destruct H7. auto.
 PPermut_LF_simpl. PPermut_LF_simpl.
 (* ~ Gamma *=* Delta *)
 assert (G' & Delta ~=~ G & Gamma) by (rewrite <- H4; PPermut_LF_simpl).
-apply PPermut_LF_split_neq in H5; [ | intro; elim n; symmetry; auto];
-destruct H5 as (Gamma0, (hd, (tl, (H5, H6)))).
+apply PPermut_LF_split_neq in H6; [ | intro; elim H5; symmetry; auto];
+destruct H6 as (Gamma0, (hd, (tl, (H6, H7)))).
 subst.
 apply t_letdia_get_LF with (G:=hd++tl & (Delta++Delta')) (Gamma:=Gamma)
  (L:=L \u used_vars_ctx_LF
@@ -467,11 +467,11 @@ rew_app; PPermut_LF_simpl.
 intros; destruct H0 with (v:=v); auto.
 apply PPermutationG_LF with (G:=((((v, A) :: nil) :: Gamma0:: hd++tl) &
   (Delta ++ Delta'))).
-eapply H7. PPermut_LF_simpl; transitivity (Gamma::G); auto.
+eapply H8. PPermut_LF_simpl; transitivity (Gamma::G); auto.
 rewrite H4; PPermut_LF_simpl. PPermut_LF_simpl.
 apply ok_Bg_LF_PPermut with (G:=((v,A)::nil)::Gamma' ::
   (hd & Gamma0 ++ tl) & (Delta ++ Delta')).
-apply ok_Bg_LF_fresh. auto. rewrite notin_union in H6; destruct H6. auto.
+apply ok_Bg_LF_fresh. auto. rewrite notin_union in H7; destruct H7. auto.
 rew_app; PPermut_LF_simpl. rew_app; PPermut_LF_simpl.
 rew_app; PPermut_LF_simpl.
 apply t_letdia_get_LF with (A:=A) (G:=G) (Gamma:=Gamma)
@@ -677,7 +677,7 @@ rewrite emptyEquiv_LF_rewrite; simpl.
 apply PPermutationG_LF with (emptyEquiv_LF G'); auto.
 rewrite <- H; rewrite emptyEquiv_LF_rewrite; simpl; auto.
 
-destruct (permut_dec (var * ty) Gamma ((v,A0)::Gamma'0)).
+destruct (permut_Dec (var * ty) Gamma ((v,A0)::Gamma'0)).
   intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
 (* = *)
@@ -695,9 +695,9 @@ PPermut_LF_simpl; auto. transitivity (Gamma'0 :: Gamma' :: G);
 rew_app; PPermut_LF_simpl; auto. rew_app. constructor; auto.
 PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:=v); auto.
-apply H5; auto. apply PPermutationG_LF with (G:=emptyEquiv_LF G'0);
-auto. rewrite H1; rewrite H4; auto.
-symmetry; rewrite H4; auto.
+apply H6; auto. apply PPermutationG_LF with (G:=emptyEquiv_LF G'0);
+auto. rewrite H1; rewrite H5; auto.
+symmetry; rewrite H5; auto.
 (* <> *)
 assert (exists Gamma'', exists GH, exists GT,
   Gamma'' *=* (v, A0)::Gamma'0 /\ G = GH & Gamma'' ++ GT) as HP.
@@ -716,7 +716,7 @@ apply ok_Bg_LF_PPermut with
 constructor; auto. PPermut_LF_simpl.
 PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:= v); auto.
-eapply H6 with (Gamma'0:=Gamma'0) (G0:=GH ++ GT & Gamma')
+eapply H7 with (Gamma'0:=Gamma'0) (G0:=GH ++ GT & Gamma')
   (G':=GH ++ GT & Gamma' & Gamma);subst; try PPermut_LF_simpl.
 clear H5 H6 IHHT.
 assert (GH ++ Gamma'' :: GT & Gamma ~=~ G0 & Gamma'').
@@ -753,7 +753,7 @@ rewrite emptyEquiv_LF_rewrite; simpl.
 apply PPermutationG_LF with (emptyEquiv_LF G'); auto.
 rewrite <- H; rewrite emptyEquiv_LF_rewrite; simpl; auto.
 
-destruct (permut_dec (var * ty) Gamma ((v,A0)::Gamma'0)).
+destruct (permut_Dec (var * ty) Gamma ((v,A0)::Gamma'0)).
   intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
 (* = *)
@@ -771,9 +771,9 @@ PPermut_LF_simpl; auto. transitivity (Gamma'0 :: Gamma' :: G);
 rew_app; PPermut_LF_simpl; auto. rew_app. constructor; auto.
 PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:=v); auto.
-apply H5; auto. apply PPermutationG_LF with (G:=emptyEquiv_LF G'0);
-auto. rewrite H1; rewrite H4; auto.
-symmetry; rewrite H4; auto.
+apply H6; auto. apply PPermutationG_LF with (G:=emptyEquiv_LF G'0);
+auto. rewrite H1; rewrite H5; auto.
+symmetry; rewrite H5; auto.
 (* <> *)
 assert (exists Gamma'', exists GH, exists GT,
   Gamma'' *=* (v, A0)::Gamma'0 /\ G = GH & Gamma'' ++ GT) as HP.
@@ -792,7 +792,7 @@ apply ok_Bg_LF_PPermut with
 constructor; auto. PPermut_LF_simpl.
 PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:= v); auto.
-eapply H6 with (Gamma'0:=Gamma'0) (G0:=GH ++ GT & Gamma')
+eapply H7 with (Gamma'0:=Gamma'0) (G0:=GH ++ GT & Gamma')
   (G':=GH ++ GT & Gamma' & Gamma);subst; try PPermut_LF_simpl.
 clear H5 H6 IHHT.
 assert (GH ++ Gamma'' :: GT & Gamma ~=~ G0 & Gamma'').
@@ -861,7 +861,7 @@ apply WeakeningG; auto.
 repeat apply ok_Bg_LF_nil; apply ok_Bg_LF_empty.
 rewrite H0; auto.
 
-destruct (permut_dec (var * ty) Gamma ((v,A0)::Gamma'0)).
+destruct (permut_Dec (var * ty) Gamma ((v,A0)::Gamma'0)).
   intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
 (* = *)
@@ -878,17 +878,17 @@ transitivity (Gamma :: Gamma' :: G).
 PPermut_LF_simpl.
 transitivity (Gamma' :: Gamma :: G).
 PPermut_LF_simpl. constructor; auto. PPermut_LF_simpl.
-rewrite H5. transitivity (Gamma' :: Gamma'0::G1).
+rewrite H6. transitivity (Gamma' :: Gamma'0::G1).
 constructor; auto; PPermut_LF_simpl.
 transitivity (Gamma'0::Gamma'::G1); auto.
 constructor; auto; PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (v:=v) (A0:=A0); auto.
 apply PPermutationG_LF with (G:=G & Gamma'); auto.
-apply H6; auto.
+apply H7; auto.
 apply PPermutationG_LF with (G:=emptyEquiv_LF G'); auto.
-rewrite H5; rewrite H2; auto.
+rewrite H6; rewrite H2; auto.
 intros; unfold open_LF in *.
-rewrite notin_union in H6; rewrite notin_singleton in H6; destruct H6;
+rewrite notin_union in H7; rewrite notin_singleton in H7; destruct H7;
 rewrite <- subst_t_comm_LF; auto.
 edestruct H with (v:=v0) (A0:=A0)
   (v0:=v) (M:=M0) as (Ha, Hb);
@@ -897,33 +897,33 @@ eapply Hb with (G0 := ((v0,A)::nil) ::G) (Gamma'0:=Gamma'0);
 [ | auto |  | ]; try PPermut_LF_simpl.
 rew_app; simpl. apply WeakeningG.
 apply PPermutationG_LF with (G:=emptyEquiv_LF G');
-auto. rewrite H2; rewrite H5; auto.
+auto. rewrite H2; rewrite H6; auto.
 repeat apply ok_Bg_LF_nil; apply ok_Bg_LF_empty.
 
 (* <> *)
 assert (G & (Gamma) ~=~ G1 & ((v, A0) :: Gamma'0)).
   (transitivity G0; auto).
-symmetry in H5;
+symmetry in H6;
 assert (exists Gamma0, exists GH, exists GT,
   Gamma0 *=* Gamma /\ G1 = GH & (Gamma0) ++ GT).
   (apply PPermut_LF_split_neq with (Gamma:=(v,A0) :: Gamma'0) (G':=G);
     auto).
-  intro; elim n; symmetry; auto.
-destruct H6 as (Gamma'', (GH, (GT, (H8, H9)))).
+  intro; elim H5; symmetry; auto.
+destruct H7 as (Gamma'', (GH, (GT, (H8, H9)))).
 apply t_letdia_get_LF with (G:=GH++GT & (Gamma'0)) (Gamma:=Gamma) (A:=A)
   (L:=L \u \{v}); auto.
 apply ok_Bg_LF_PPermut with (G:=Gamma' :: (G1 & Gamma'0)).
 apply ok_Bg_LF_permut_no_last_spec with (v:=v)(A:=A0).
 apply ok_Bg_LF_PPermut with (G:=Gamma :: G & Gamma'); auto.
 transitivity ((G & Gamma) & Gamma'). auto.
-rewrite <- H5. transitivity (G1 & Gamma' & ((v,A0)::Gamma'0)).
+rewrite <- H6. transitivity (G1 & Gamma' & ((v,A0)::Gamma'0)).
 PPermut_LF_simpl. auto.
 subst; PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:=v); auto.
-eapply H7 with (G0:=GH ++ GT & Gamma') (Gamma'0:=Gamma'0).
+eapply H10 with (G0:=GH ++ GT & Gamma') (Gamma'0:=Gamma'0).
 rew_app; PPermut_LF_simpl; subst.
 apply PPermut_LF_last_rev with (Gamma:=Gamma) (Gamma':=Gamma'');
-[ symmetry | ]; auto. rewrite <- H5.
+[ symmetry | ]; auto. rewrite <- H6.
 PPermut_LF_simpl. eauto.
 PPermut_LF_simpl.
 apply PPermutationG_LF with (G:= emptyEquiv_LF(G')).
@@ -931,11 +931,11 @@ auto.
 subst; rewrite H2; repeat rewrite emptyEquiv_LF_rewrite; simpl;
 PPermut_LF_simpl.
 intros; unfold open_LF in *.
-rewrite notin_union in H6; rewrite notin_singleton in H6; destruct H6;
+rewrite notin_union in H7; rewrite notin_singleton in H7; destruct H7;
 rewrite <- subst_t_comm_LF; auto.
 destruct H with (v:=v0) (M:=M0) (A0:=A0) (v0:=v); auto.
-eapply H11 with (G0:= G1 & ((v0,A)::nil)) (Gamma'0:=Gamma'0).
-subst; rewrite <- H5; rew_app; PPermut_LF_simpl.
+eapply H12 with (G0:= G1 & ((v0,A)::nil)) (Gamma'0:=Gamma'0).
+subst; rewrite <- H6; rew_app; PPermut_LF_simpl.
 eauto.
 subst; rew_app; PPermut_LF_simpl.
 apply PPermutationG_LF with (G:=emptyEquiv_LF (((v0,A)::nil) :: G')).
@@ -1036,11 +1036,11 @@ assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G0).
 assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
         (Gamma *=* Delta0 /\ G ~=~ Gamma0::G0) \/
         (exists c, exists hd, exists tl, Gamma *=* c /\ G0 = hd & c ++ tl)).
-  assert ({Gamma *=* Gamma0} + {~ Gamma *=* Gamma0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Gamma0 \/ ~ Gamma *=* Gamma0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H4. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Gamma0); auto; rewrite H3; PPermut_LF_simpl.
@@ -1049,16 +1049,16 @@ assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
   (Gamma':=Delta0); auto; rewrite H3; PPermut_LF_simpl.
   right; right.
   assert (G & Gamma ~=~ G0 & Delta0 & Gamma0) by (rewrite H3; PPermut_LF_simpl).
-  symmetry in H4.
-  apply PPermut_LF_split_neq in H4; auto.
-  destruct H4 as (Gamma'', (hd, (tl, (H4, H5)))).
-  assert (G0 & Delta0 ~=~ (hd ++ tl) & Gamma).
-    rewrite H5; PPermut_LF_simpl.
+  symmetry in H6.
   apply PPermut_LF_split_neq in H6; auto.
-  destruct H6 as (Delta'', (hd', (tl', (H6, H7)))).
+  destruct H6 as (Gamma'', (hd, (tl, (H6, H7)))).
+  assert (G0 & Delta0 ~=~ (hd ++ tl) & Gamma).
+    rewrite H7; PPermut_LF_simpl.
+  apply PPermut_LF_split_neq in H8; auto.
+  destruct H8 as (Delta'', (hd', (tl', (H8, H9)))).
   exists Delta''; exists hd'; exists tl'; split; auto; symmetry; auto.
-  intro nn; symmetry in nn; elim n0; auto.
-  intro nn; symmetry in nn; elim n; auto.
+  intro nn; symmetry in nn; elim H5; auto.
+  intro nn; symmetry in nn; elim H4; auto.
 destruct H4. destruct H4.
 apply t_unbox_fetch_LF with (G:=G0) (Gamma:=Gamma0++Delta0).
 eapply ok_Bg_LF_concat
@@ -1093,16 +1093,16 @@ assert (G & Gamma ~=~ Delta0 :: G0).
   transitivity G'; auto.
 assert ((Gamma *=* Delta0 /\ G ~=~ G0) \/
         (exists c, exists hd, exists tl, c *=* Gamma /\ G0 = hd & c ++ tl)).
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H3. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Delta0); auto; rewrite H2; PPermut_LF_simpl.
   right.
   assert (G & Gamma ~=~ G0 & Delta0) by (rewrite H2; PPermut_LF_simpl).
-  symmetry in H3.
-  apply PPermut_LF_split_neq in H3; auto.
-  intro nn; symmetry in nn; elim n; auto.
+  symmetry in H4.
+  apply PPermut_LF_split_neq in H4; auto.
+  intro nn; symmetry in nn; elim H3; auto.
 destruct H3.
 destruct H3.
 constructor.
@@ -1138,11 +1138,11 @@ assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G0).
 assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
         (Gamma *=* Delta0 /\ G ~=~ Gamma0::G0) \/
         (exists c, exists hd, exists tl, Gamma *=* c /\ G0 = hd & c ++ tl)).
-  assert ({Gamma *=* Gamma0} + {~ Gamma *=* Gamma0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Gamma0 \/ ~ Gamma *=* Gamma0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H4. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Gamma0); auto; rewrite H3; PPermut_LF_simpl.
@@ -1151,16 +1151,16 @@ assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) \/
   (Gamma':=Delta0); auto; rewrite H3; PPermut_LF_simpl.
   right; right.
   assert (G & Gamma ~=~ G0 & Delta0 & Gamma0) by (rewrite H3; PPermut_LF_simpl).
-  symmetry in H4.
-  apply PPermut_LF_split_neq in H4; auto.
-  destruct H4 as (Gamma'', (hd, (tl, (H4, H5)))).
-  assert (G0 & Delta0 ~=~ (hd ++ tl) & Gamma).
-    rewrite H5; PPermut_LF_simpl.
+  symmetry in H6.
   apply PPermut_LF_split_neq in H6; auto.
-  destruct H6 as (Delta'', (hd', (tl', (H6, H7)))).
+  destruct H6 as (Gamma'', (hd, (tl, (H6, H7)))).
+  assert (G0 & Delta0 ~=~ (hd ++ tl) & Gamma).
+    rewrite H7; PPermut_LF_simpl.
+  apply PPermut_LF_split_neq in H8; auto.
+  destruct H8 as (Delta'', (hd', (tl', (H8, H9)))).
   exists Delta''; exists hd'; exists tl'; split; auto; symmetry; auto.
-  intro nn; symmetry in nn; elim n0; auto.
-  intro nn; symmetry in nn; elim n; auto.
+  intro nn; symmetry in nn; elim H5; auto.
+  intro nn; symmetry in nn; elim H4; auto.
 destruct H4. destruct H4.
 apply t_get_here_LF with (G:=G0) (Gamma:=Gamma0++Delta0).
 eapply ok_Bg_LF_concat
@@ -1196,16 +1196,16 @@ assert (G & Gamma ~=~ Delta0 :: G0).
   transitivity G'; auto.
 assert ((Gamma *=* Delta0 /\ G ~=~ G0) \/
         (exists c, exists hd, exists tl, c *=* Gamma /\ G0 = hd & c ++ tl)).
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H3. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Delta0); auto; rewrite H2; PPermut_LF_simpl.
   right.
   assert (G & Gamma ~=~ G0 & Delta0) by (rewrite H2; PPermut_LF_simpl).
-  symmetry in H3.
-  apply PPermut_LF_split_neq in H3; auto.
-  intro nn; symmetry in nn; elim n; auto.
+  symmetry in H4.
+  apply PPermut_LF_split_neq in H4; auto.
+  intro nn; symmetry in nn; elim H3; auto.
 destruct H3.
 destruct H3.
 constructor.
@@ -1250,11 +1250,11 @@ assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G1).
 assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G1) \/
         (Gamma *=* Delta0 /\ G ~=~ Gamma0::G1) \/
         (exists c, exists hd, exists tl, Gamma *=* c /\ G1 = hd & c ++ tl)).
-  assert ({Gamma *=* Gamma0} + {~ Gamma *=* Gamma0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Gamma0 \/ ~ Gamma *=* Gamma0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H5. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Gamma0); auto; rewrite H4; PPermut_LF_simpl.
@@ -1263,16 +1263,16 @@ assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G1) \/
   (Gamma':=Delta0); auto; rewrite H4; PPermut_LF_simpl.
   right; right.
   assert (G & Gamma ~=~ G1 & Delta0 & Gamma0) by (rewrite H4; PPermut_LF_simpl).
-  symmetry in H5.
-  apply PPermut_LF_split_neq in H5; auto.
-  destruct H5 as (Gamma'', (hd, (tl, (H5, H6)))).
-  assert (G1 & Delta0 ~=~ (hd ++ tl) & Gamma).
-    rewrite H6; PPermut_LF_simpl.
+  symmetry in H7.
   apply PPermut_LF_split_neq in H7; auto.
-  destruct H7 as (Delta'', (hd', (tl', (H7, H8)))).
+  destruct H7 as (Gamma'', (hd, (tl, (H7, H8)))).
+  assert (G1 & Delta0 ~=~ (hd ++ tl) & Gamma).
+    rewrite H8; PPermut_LF_simpl.
+  apply PPermut_LF_split_neq in H9; auto.
+  destruct H9 as (Delta'', (hd', (tl', (H9, H10)))).
   exists Delta''; exists hd'; exists tl'; split; auto; symmetry; auto.
-  intro nn; symmetry in nn; elim n0; auto.
-  intro nn; symmetry in nn; elim n; auto.
+  intro nn; symmetry in nn; elim H6; auto.
+  intro nn; symmetry in nn; elim H5; auto.
 destruct H5. destruct H5.
 apply t_letdia_get_LF with (G:=G1) (Gamma:=Gamma++Delta0) (L:=L) (A:=A).
 eapply ok_Bg_LF_concat with (G0:=G1 & Gamma') (G1:=Gamma::G & Gamma'); eauto;
@@ -1314,19 +1314,19 @@ assert (G & Gamma ~=~ Delta0 :: G1).
   transitivity G0; auto.
 assert ((Gamma *=* Delta0 /\ G ~=~ G1) \/
         (exists c, exists hd, exists tl, Gamma *=* c /\ G1 = hd & c ++ tl)).
-  assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
-  apply permut_dec. intros. destruct k; destruct k'; decide equality.
+  assert (Gamma *=* Delta0 \/ ~ Gamma *=* Delta0).
+  apply permut_Dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
   destruct H4. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
   (Gamma':=Delta0); auto; rewrite H3; PPermut_LF_simpl.
   right.
   assert (G & Gamma ~=~ G1 & Delta0) by (rewrite H3; PPermut_LF_simpl).
-  symmetry in H4.
-  apply PPermut_LF_split_neq in H4; auto.
-  destruct H4 as (Gamma'', (hd, (tl, (H5, H6)))).
+  symmetry in H5.
+  apply PPermut_LF_split_neq in H5; auto.
+  destruct H5 as (Gamma'', (hd, (tl, (H5, H6)))).
   exists Gamma''; exists hd; exists tl; split.
   symmetry; auto. auto.
-  intro nn; symmetry in nn; elim n; auto.
+  intro nn; symmetry in nn; elim H4; auto.
 destruct H4.
 destruct H4.
 apply t_letdia_LF with (A:=A)(L:=L).
