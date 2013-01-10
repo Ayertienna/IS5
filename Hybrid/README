@@ -5,5 +5,5 @@ by Hybrid.v
 
 Note
 ----
-It requires Shared.v, PermutLib.v and FSetLib.v from the main directory to be
+It requires Shared.v, PermutLib.v and ListLib.v from the main directory to be
 compiled.

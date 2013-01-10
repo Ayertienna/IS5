@@ -3,7 +3,7 @@ Require Import Setoid.
 Require Export Shared.
 Require Export PermutLib.
 Require Export PPermutLib.
-Require Export FSetLib.
+Require Export ListLib.
 
 Open Scope permut_scope.
 

@@ -1,5 +1,3 @@
-(* Rename to fsetpermut or move to permutlib *)
-(* FlatMap should be moved to ListLib *)
 Require Export PermutLib.
 
 Open Scope permut_scope.
