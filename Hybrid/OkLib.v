@@ -651,7 +651,27 @@ forall G G' w C C',
   ok_Bg_Hyb ((w, C) :: G) ->
   G & (w, C) ~=~ G' & (w, C') ->
   G ~=~ G' /\ C *=* C'.
-Admitted. (*!!! Bug: #42 *)
+unfold ok_Bg_Hyb.
+intros. destruct H.
+assert ((w,C) :: G ~=~ (w, C') :: G').
+  transitivity (G & (w,C)); [ | rewrite H0]; PPermut_simpl.
+apply PPermut_split_head in H2.
+destruct H2 as (C'', (hd, (tl, (H2, H3)))).
+assert ((w, C') :: G' = hd & (w, C'') ++ tl) by auto.
+apply cons_eq_last_val_app_inv in H4; destruct H4.
+(* case 1: positive - hd = nil and C *=* C'' *)
+destruct H4; destruct H5; subst; rew_app in *;
+inversion H3; subst; split; auto;
+apply PPermut_last_rev with (Gamma:=C)(Gamma':=C'')(w:=w); auto.
+(* case 2: negative *)
+destruct H4 as (hd', H4); subst.
+assert ((w, C) :: G ~=~ (w, C') :: (w, C'') :: hd' ++ tl).
+  transitivity (G & (w,C)). PPermut_simpl.
+  rewrite H0; transitivity ((w, C') :: G'); [ | rewrite H3];
+  PPermut_simpl.
+rewrite H4 in H; inversion H; subst; inversion H10; subst.
+elim H11; apply Mem_here.
+Qed.
 
 
 (* FIXME: generalize all the ok_Bg_Hyb_split* into :
