@@ -67,7 +67,7 @@ Tactic Notation "rew_flat_map" "in" "*" :=
   autorewrite with rew_flat_map rew_app in *.
 
 Definition ok_Bg_Hyb (G: Background_LF) : Prop :=
-ok_Hyb G nil  /\
+ok_Hyb G nil /\
 ok_Hyb (flat_map snd_ G) nil.
 
 Fixpoint used_t_vars (G: Background_LF) :=
@@ -263,7 +263,7 @@ forall X (G: list (var * X)) G',
   G *=* G' ->
   forall U, ok_Hyb G U <-> ok_Hyb G' U.
 split; intros; [ | symmetry in H]; eapply ok_Hyb_permut_any0; eauto.
-Qed. (* !!! Bug: #40 *)
+Qed.
 
 Lemma ok_Hyb_PPermut_ty:
 forall G G'
@@ -281,14 +281,44 @@ forall G Gamma v A w U,
 intros; inversion H; subst; constructor; auto.
 Qed.
 
+Lemma ok_Hyb_merge_contexts:
+forall (G: list (var * list (var * ty))) U l1 l2 (w: var) w' w'',
+  ok_Hyb (flat_map snd_ ((w,l1)::(w',l2)::G)) U <->
+  ok_Hyb (flat_map snd_ ((w'', l1++l2)::G)) U.
+split; intros; simpl in *; rew_app in *; auto.
+Qed.
+
+Lemma ok_Hyb_fresh_te_ty0:
+forall G U w v A,
+  ok_Hyb (flat_map snd_ G) U ->
+  v \notin (used_t_vars G \u from_list U) ->
+  ok_Hyb (flat_map snd_ ((w, (v, A)::nil) :: G)) U.
+induction G; intros.
+simpl in *; constructor; [apply notin_Mem | constructor]; auto.
+eapply ok_Hyb_PPermut_ty with (G':=a:: (w, (v,A)::nil)::G).
+PPermut_simpl. destruct a; simpl in *; rew_app in *.
+generalize dependent U.
+induction l; intros; simpl in *.
+rew_app in *; apply IHG; eauto.
+destruct a.
+rew_app in *; inversion H; subst.
+constructor; auto.
+apply IHl; auto.
+simpl in *; rew_map in *; simpl in *; rewrite from_list_cons in *;
+repeat rewrite notin_union in *; destruct H0; destruct H0; destruct H0;
+repeat split; auto.
+Qed.
+
 Lemma ok_Hyb_fresh_te_ty:
-forall U Gamma G v A w,
+forall Gamma G U v A w,
  ok_Hyb (flat_map snd_ ((w, Gamma) :: G)) U ->
  v \notin (used_t_vars ((w, Gamma)::G) \u from_list U) ->
  ok_Hyb (flat_map snd_ ((w, (v, A)::Gamma) :: G)) U.
-intros. remember (flat_map snd_
-(* This proof should be somewhat similar to the one below *)
-Admitted. (*!!! Bug: #41 *)
+intros; simpl in *.
+replace (((v,A) :: Gamma) ++ flat_map snd_ G) with
+  ((flat_map snd_ ((w,(v,A)::nil)::((w,Gamma)::G)))) by (simpl; auto).
+apply ok_Hyb_fresh_te_ty0; auto.
+Qed.
 
 Lemma ok_Hyb_fresh_wo_list:
 forall G w U l,
