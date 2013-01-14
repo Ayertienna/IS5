@@ -1,9 +1,9 @@
 Add LoadPath "../..".
 Require Export Shared.
 
-Inductive vctx :=
-| bctx: nat -> vctx
-| cctx: ctx_LF -> vctx
+Inductive vctx_LF :=
+| bctx: nat -> vctx_LF
+| cctx: ctx_LF -> vctx_LF
 .
 
 Inductive te_LF :=
