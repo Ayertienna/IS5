@@ -107,7 +107,7 @@ match M with
 | fetch_L (bwo _) M => used_worlds_term_L M
 end.
 
-Definition used_vars_context_L (Gamma: Context_L) : fset var :=
+Definition used_vars_context_L (Gamma: ctx_L) : fset var :=
   from_list (map (fun x => fst (snd x)) Gamma).
 
 Lemma closed_w_succ_L:
