@@ -7,7 +7,7 @@ Require Import LibTactics. (* case_if *)
 (* Term variable substitution *)
 Reserved Notation " [ M // x ] N " (at level 5).
 
-Fixpoint subst_t M x N :=
+Fixpoint subst_t_L M x N :=
 match N with
 | hyp_L v => if (eq_nat_dec x v) then M else N
 | lam_L t N' => lam_L t [M//S x]N'
@@ -19,21 +19,21 @@ match N with
 | here_L N' => here_L [M//x]N'
 | fetch_L w N' => fetch_L w [M//x]N'
 end
-where " [ M // x ] N " := (subst_t M x N) : labeled_is5_scope.
+where " [ M // x ] N " := (subst_t_L M x N) : labeled_is5_scope.
 
 Open Scope labeled_is5_scope.
 
 (* Substitute L[0] for n, L[1] for n+1,.. in M *)
-Fixpoint subst_list L n N :=
+Fixpoint subst_list_L L n N :=
 match L with
 | nil => N
-| M :: L' => [M//n] (subst_list L' (S n) N)
+| M :: L' => [M//n] (subst_list_L L' (S n) N)
 end.
 
 (* World variable substitution *)
 Reserved Notation " {{ w1 // w2 }} N " (at level 5).
 
-Fixpoint subst_w w1 w2 N :=
+Fixpoint subst_w_L w1 w2 N :=
 match N with
 | hyp_L v => hyp_L v
 | lam_L t N' => lam_L t {{w1//w2}}N'
@@ -46,16 +46,16 @@ match N with
 | here_L N' => here_L {{w1//w2}}N'
 | fetch_L w N' => fetch_L (if eq_vwo_dec w w2 then w1 else w) {{w1//w2}}N'
 end
-where " {{ w1 // w2 }} N " := (subst_w w1 w2 N) : labeled_is5_scope.
+where " {{ w1 // w2 }} N " := (subst_w_L w1 w2 N) : labeled_is5_scope.
 
-Definition open_w M w := subst_w w (bwo 0) M.
-Notation " M ^ w " := (open_w M w) : labeled_is5_scope.
+Definition open_w_L M w := subst_w_L w (bwo 0) M.
+Notation " M ^ w " := (open_w_L M w) : labeled_is5_scope.
 
 Section Substitution_lemmas.
 
-Lemma no_unbound_worlds_subst_w_id:
+Lemma no_unbound_worlds_subst_w_L_id:
 forall M w n
-  (H_unbound: unbound_worlds n M = nil),
+  (H_unbound: unbound_worlds_L n M = nil),
   {{w//bwo n}}M = M.
 intros;
 generalize dependent w;
@@ -84,28 +84,28 @@ try (destruct w; [discriminate | assumption]).
 destruct v; [discriminate | assumption].
 Qed.
 
-Lemma closed_w_subst_id:
+Lemma closed_w_L_subst_id:
 forall M w n
-  (HT: lc_w_n M n),
+  (HT: lc_w_n_L M n),
   {{w//bwo n}} M = M.
 intros;
-apply no_unbound_worlds_subst_w_id;
-apply closed_no_unbound_worlds;
+apply no_unbound_worlds_subst_w_L_id;
+apply closed_no_unbound_worlds_L;
 assumption.
 Qed.
 
-Lemma subst_order_irrelevant:
+Lemma subst_order_irrelevant_L:
 forall N M n m w
-  (H_LC: lc_w M),
+  (H_LC: lc_w_L M),
   {{w//bwo m}}([M//n]N) = [M//n]({{w//bwo m}}N).
-unfold open_w; intro;
+unfold open_w_L; intro;
 induction N; intros; simpl; try (rewrite IHN; auto).
 (* hyp *)
 destruct (eq_nat_dec n0 n);
 simpl.
-  apply closed_w_subst_id;
+  apply closed_w_L_subst_id;
   replace m with (0+m) by auto;
-  apply closed_w_addition; assumption.
+  apply closed_w_addition_L; assumption.
   reflexivity.
 (* appl *)
 rewrite IHN1; try rewrite IHN2; auto.
@@ -113,7 +113,7 @@ rewrite IHN1; try rewrite IHN2; auto.
 destruct w; rewrite IHN1; try rewrite IHN2; auto.
 Qed.
 
-Lemma subst_w_comm:
+Lemma subst_w_L_comm:
 forall M w w' w'' n
   (Neq: w'' <> w),
   {{fwo w'//fwo w''}}({{fwo w//bwo n}}M) =
@@ -133,9 +133,9 @@ Qed.
 
 Lemma subst_id:
 forall M w n
-  (HT: fresh_world w M),
+  (HT: fresh_world_L w M),
   {{bwo n//fwo w}}({{fwo w//bwo n}}M) = M.
-unfold fresh_world;
+unfold fresh_world_L;
 intros; generalize dependent n;
 induction M; intros; simpl in *;
 try (rewrite IHM; auto).
@@ -161,9 +161,9 @@ repeat case_if; subst; auto.
 destruct v; auto.
 Qed.
 
-Lemma subst_neutral:
+Lemma subst_neutral_L:
 forall M w w' n
-  (HT: lc_w_n M n),
+  (HT: lc_w_n_L M n),
   {{fwo w//bwo n}}({{bwo n//fwo w'}}M) = {{fwo w//fwo w'}}M.
 intros; generalize dependent n;
 induction M; intros; simpl;
@@ -174,13 +174,13 @@ auto;
 repeat case_if; subst; auto.
 Qed.
 
-Lemma closed_step_opening:
+Lemma closed_step_opening_L:
 forall M n w
-  (HT: lc_w_n M (S n)),
-  lc_w_n ({{fwo w//bwo n}}M) n.
+  (HT: lc_w_n_L M (S n)),
+  lc_w_n_L ({{fwo w//bwo n}}M) n.
 intros; generalize dependent n; induction M;
 intros; inversion HT; subst; simpl;
-eauto using lc_w_n;
+eauto using lc_w_n_L;
 repeat case_if; subst; auto;
 constructor; auto.
 Qed.
