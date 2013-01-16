@@ -73,6 +73,42 @@ try eapply IHrtclosure; eauto;
 symmetry in H5; apply nil_eq_app_inv in H5; destruct H5; inversion H3.
 Qed.
 
+Lemma Mem_dec:
+forall A (l: list A) e
+  (Dec: forall k k':A, { k = k' } + {~ k = k'}),
+  {Mem e l} + {~ Mem e l}.
+induction l; intros; [ right; rewrite Mem_nil_eq; tauto | ].
+assert (forall k k' : A, {k = k'} + {k <> k'}) as DecP by auto.
+specialize Dec with e a; destruct Dec; subst; rewrite Mem_cons_eq.
+left; left; auto.
+specialize IHl with e; apply IHl in DecP; destruct DecP; [ left | right].
+right; auto. intro nn; destruct nn; subst; [ elim n | contradiction]; auto.
+Qed.
+
+Lemma Mem_cons_spec:
+forall (A : Type) (l: list A) (x y : A)
+  (Dec: forall k k': A, {k=k'} + {~k=k'}),
+  Mem x (y :: l) -> {x = y} + {Mem x l}.
+intros; destruct (Mem_dec A l x); auto;
+left; rewrite Mem_cons_eq in H; destruct H; auto; contradiction.
+Qed.
+
+Lemma Mem_split_spec:
+forall A l (a:A)
+  (Dec: forall k k': A, {k=k'} + {~k=k'}),
+  Mem a l ->
+  sigT (fun (hd: list A) =>
+      sigT (fun (tl: list A) => l = hd & a ++ tl)).
+induction l; intros.
+rewrite Mem_nil_eq in H; contradiction.
+apply Mem_cons_spec in H; auto;
+destruct H; subst;
+[exists nil; exists l; rew_app; auto | ];
+apply IHl in m; auto;
+destruct m as (hd, (tl, m)); subst;
+exists (a::hd); exists tl; rew_app; auto.
+Qed.
+
 Lemma Mem_split:
 forall A l (a: A),
   Mem a l ->
@@ -158,8 +194,6 @@ Add Parametric Morphism (a:A) : (cons a)
 Proof.
   auto using perm_skip.
 Qed.
-
-
 
 Theorem Permutation_nil : forall (l : list A), Permutation nil l -> l = nil.
 Proof.
@@ -421,18 +455,6 @@ repeat rewrite notin_union in *; destruct H0; destruct H;
 repeat split; try (rewrite from_list_nil; apply notin_empty); auto.
 Qed.
 
-Lemma Mem_dec:
-forall A (l: list A) e
-  (Dec: forall k k':A, { k = k' } + {~ k = k'}),
-  {Mem e l} + {~ Mem e l}.
-induction l; intros; [ right; rewrite Mem_nil_eq; tauto | ].
-assert (forall k k' : A, {k = k'} + {k <> k'}) as DecP by auto.
-specialize Dec with e a; destruct Dec; subst; rewrite Mem_cons_eq.
-left; left; auto.
-specialize IHl with e; apply IHl in DecP; destruct DecP; [ left | right].
-right; auto. intro nn; destruct nn; subst; [ elim n | contradiction]; auto.
-Qed.
-
 (* This is the decidability as in DecidableEquivalence class *)
 Lemma permut_Dec:
 forall A (a: list A) a'
@@ -465,14 +487,17 @@ intro; apply permut_nil_eq in H; inversion H.
 assert ({Mem a a'} + {~ Mem a a'}) as H by (apply Mem_dec; auto);
 destruct H.
 (* Mem a a' *)
-apply Mem_split in m.
-(* We'd like to use destruct m here *)
-Focus 2.
+apply Mem_split_spec in m; auto; destruct m as (hd, (tl, m)); subst.
+specialize IHa with (a':=hd++tl); apply IHa in Dec; destruct Dec;
+[left | right].
+rewrite p; permut_simpl.
+intro; elim n; apply permut_cons_inv with (a:=a).
+rewrite H; permut_simpl.
 (* ~ Mem a a' *)
 right; intro;
 apply permut_split_head in H; destruct H as (hd, (tl, H)); subst;
 repeat rewrite Mem_app_or_eq in n; elim n; left; right; apply Mem_here.
-Admitted. (* !!! Bug: #38 *)
+Qed.
 
 Lemma notin_Mem:
 forall A (x: A) U,
