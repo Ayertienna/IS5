@@ -103,7 +103,7 @@ Inductive step_L: te_L*vwo -> te_L*vwo -> Prop :=
    (get_L w M, w') |-> (get_L w M', w')
 | red_get_val_L: forall w M w' (HVal: value_L M),
    lc_w_L M ->
-   (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
+   (get_L w M, w') |-> ({{w'//w}}M, w')
 where " M |-> N " := (step_L M N ) : labeled_is5_scope.
 
 Section Lemmas.
@@ -149,7 +149,7 @@ apply closed_step_opening_L; auto.
 constructor; eapply IHM; eauto.
 inversion H; subst; constructor;
 eapply IHM; eauto.
-constructor; inversion H; subst;
+inversion H; subst;
 apply closed_step_renaming_world_L; auto.
 apply closed_step_subst_term_L; auto;
 apply closed_step_opening_L; auto.
@@ -509,9 +509,7 @@ replace (@nil (ty*vwo)) with
   (rename_world_context_L (fwo w') (fwo x) (@nil (ty*vwo))) by (simpl; auto);
 [ | apply closed_step_opening_L]; auto;
 apply rename_w_L_type_preserv with (w'':=x); auto; case_if; auto.
-(* red_get_here *)
-replace (here_L {{fwo w'0//fwo w'}}M0) with ({{fwo w'0//fwo w'}}(here_L M0))
-  by auto;
+(* red_get_val *)
 replace (@nil (ty*vwo)) with (rename_world_context_L (fwo w'0) (fwo w') nil)
   by auto;
 apply rename_w_L_type_preserv with (w'':=w'); [ | case_if | ]; auto;

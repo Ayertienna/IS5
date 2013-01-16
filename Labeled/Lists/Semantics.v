@@ -116,7 +116,7 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
    (get_L w M, w') |-> (get_L w M', w')
 | red_get_val_L: forall w M w' (HVal: value_L M),
    lc_t_L M -> lc_w_L M ->
-   (get_L w (here_L M), w') |-> (here_L {{w'//w}}M, w')
+   (get_L w M, w') |-> ({{w'//w}}M, w')
 where " M |-> N " := (step_L M N ) : labeled_is5_scope.
 
 Inductive steps_L : te_L * vwo -> te_L * vwo -> Prop :=
@@ -634,8 +634,7 @@ rewrite Mem_app_or_eq in Hin; destruct Hin.
   right; auto.
 simpl; destruct Ok; split; auto; apply ok_Omega_L_permut with (O1:=Omega); auto;
 rewrite H; permut_simpl.
-(* red_get_here *)
-inversion HType; subst; constructor; auto;
+(* red_get_val *)
 replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
   (simpl; auto).
 destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same_L|]; auto;
