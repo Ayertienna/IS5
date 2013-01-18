@@ -2,7 +2,7 @@ Add LoadPath "..".
 Require Import Setoid.
 Require Export Shared.
 Require Export PermutLib.
-Require Export PPermutLib.
+Require Export Hyb_PPermutLib.
 Require Export ListLib.
 
 Open Scope permut_scope.
@@ -162,25 +162,34 @@ Qed.
 (* ok_Hyb for a specific type -- would be nice to make it more general btw *)
 
 Add Morphism (@ok_Hyb (list (var*ty))) : ok_Hyb_PPermut_Hyb_lst_var_ty.
-intros x y H; induction H.
-intros; tauto.
-split; intros; inversion H1; subst; constructor; auto;
-apply IHPPermut_Hyb; auto.
-split; intros; inversion H1; subst; inversion H7; subst;
+split; intros;
+[apply ok_Hyb_used_permut with (U:=x0); auto |
+ apply ok_Hyb_used_permut with (U:=y0); [symmetry | ]; auto];
+generalize dependent y0; generalize dependent x0;
+induction H; intros; auto using ok_Hyb.
+inversion H1; subst; constructor; auto;
+eapply IHPPermut_Hyb; auto.
+inversion H1; subst; inversion H8; subst;
+constructor;
+[intro; elim H9; rewrite Mem_cons_eq; right; auto | ];
 constructor.
-intro; elim H8; rewrite Mem_cons_eq; right; auto.
+intro; rewrite Mem_cons_eq in H3; elim H9; destruct H3; subst.
+  elim H9; rewrite Mem_cons_eq; left; auto. contradiction.
+  apply ok_Hyb_used_permut with (U:=w'::w::y0); auto.
+  permut_simpl; symmetry; auto.
+  apply ok_Hyb_used_permut with (U:=(w'::w::x0)); auto.
+eapply IHPPermut_Hyb2; eauto; eapply IHPPermut_Hyb1; auto.
+inversion H2; subst; constructor; auto;
+eapply IHPPermut_Hyb; auto.
+inversion H2; subst; inversion H8; subst;
+constructor;
+[intro; elim H9; rewrite Mem_cons_eq; right; auto | ];
 constructor.
-  intro; rewrite Mem_cons_eq in H2; elim H6; destruct H2.
-  subst; elim H8; rewrite Mem_cons_eq; left; auto. auto.
-  apply ok_Hyb_used_permut with (U:=w'::w::y0); auto; permut_simpl.
-intro; elim H8; rewrite Mem_cons_eq; right; auto.
-constructor.
-  intro; rewrite Mem_cons_eq in H2; elim H6; destruct H2.
-  subst; elim H8; rewrite Mem_cons_eq; left; auto. auto.
-  apply ok_Hyb_used_permut with (U:=w::w'::y0); auto; permut_simpl.
-split; intros.
-  apply IHPPermut_Hyb2; apply IHPPermut_Hyb1; auto.
-  apply IHPPermut_Hyb1; apply IHPPermut_Hyb2; auto.
+intro; rewrite Mem_cons_eq in H3; elim H9; destruct H3; subst.
+  elim H9; rewrite Mem_cons_eq; left; auto. contradiction.
+  apply ok_Hyb_used_permut with (U:=w::w'::y0); auto.
+  permut_simpl; symmetry; auto.
+eapply IHPPermut_Hyb1; eauto; eapply IHPPermut_Hyb2; auto.
 Qed.
 
 Lemma ok_Hyb_permut_any0:

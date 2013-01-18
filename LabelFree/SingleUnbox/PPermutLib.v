@@ -401,12 +401,10 @@ Lemma PPermut_LF_last_rev_simpl:
 forall G G' a,
   G & a ~=~ G' & a ->
   G ~=~ G'.
-intros. replace G with (G ++ nil);
-replace G' with (G'++nil).
-destruct a; eapply PPermut_LF_app_rev; rew_app; eauto.
-rew_app; auto.
-rew_app; auto.
-rew_app; auto.
+intros. replace G with (G ++ nil) by (rew_app; auto);
+replace G' with (G'++nil) by (rew_app; auto);
+apply PPermut_LF_app_rev with (a:=a) (a':=a);
+rew_app; eauto.
 Qed.
 
 Lemma PPermut_LF_last_rev:

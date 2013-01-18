@@ -1,5 +1,5 @@
 Add LoadPath "..".
-Require Export Syntax.
+Require Export Hyb_Syntax.
 Require Export LibTactics. (* case_if *)
 Require Import Gt.
 

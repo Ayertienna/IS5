@@ -1,8 +1,8 @@
 Add LoadPath "..".
 Require Import Shared.
 Require Import LibList.
-Require Import OkLib.
-Require Import PPermutLib.
+Require Import Hyb_OkLib.
+Require Import Hyb_PPermutLib.
 Require Import Relations.
 
 Open Scope permut_scope.

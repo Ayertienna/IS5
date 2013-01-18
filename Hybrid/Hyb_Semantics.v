@@ -1,11 +1,11 @@
 Add LoadPath "..".
-Require Import Substitution.
+Require Import Hyb_Substitution.
 Require Import Setoid.
 Require Import LibList.
 Require Import PermutLib.
-Require Import PPermutLib.
-Require Import OkLib.
-Require Import EmptyEquivLib.
+Require Import Hyb_PPermutLib.
+Require Import Hyb_OkLib.
+Require Import Hyb_EmptyEquivLib.
 
 Open Scope hybrid_is5_scope.
 Open Scope is5_scope.
@@ -984,7 +984,8 @@ assert ((w0, Gamma0) :: G0 & (w', (v, A0) :: Gamma') ~=~
 rewrite <- H9; auto.
 
 (* letdia_get *)
-assert (w <> w0) by eauto with ok_bg_hyb_rew;
+assert (w <> w0) by
+  (apply ok_Bg_Hyb_first_last_neq with (C:=Gamma) (C':=Gamma0) (G:=G); auto).
 eapply t_letdia_get_Hyb with (G:=G) (Gamma:=Gamma) (L_t := L_t \u \{v}) (A:=A)
   (L_w:=L_w \u used_w_vars_Hyb ((w0, nil) :: emptyEquiv_Hyb (G & (w, Gamma))));
 auto.
@@ -1009,7 +1010,8 @@ assert ((w, Gamma) :: G & (w0, Gamma0) ~=~ (w0, Gamma0):: G & (w, Gamma)) by
   auto;
 rewrite H9 in Ok_Bg; simpl in Ok_Bg; auto.
 
-assert (w <> w0) by eauto with ok_bg_hyb_rew;
+assert (w <> w0) by
+  (apply ok_Bg_Hyb_first_last_neq with (C:=Gamma) (C':=Gamma0) (G:=G); auto).
 destruct (eq_var_dec w w'); subst.
 (* = *)
 assert (G ~=~ G1 /\ Gamma *=* (v, A0) :: Gamma') by
@@ -1097,7 +1099,7 @@ assert (GH ++ GT ++ (w, Gamma) :: (w0, Gamma0) :: nil ~=~
 rewrite H13; auto.
 exists ((w'0, (@nil (var*ty))) :: nil); PPermut_Hyb_simpl.
 assert ((w, Gamma) :: G & (w0, Gamma0) ~=~ G0 & (w0, Gamma0)) by
-  (rewrite <- H0; auto);
+  (rewrite <- H0; auto).
 rewrite H13 in Ok_Bg; rewrite H1 in Ok_Bg; subst;
 assert ((w', nil)
       :: (w'0, nil)
@@ -1105,19 +1107,15 @@ assert ((w', nil)
       (w'0, nil)
       :: (w', nil)
          :: emptyEquiv_Hyb (GH ++ GT ++ (w, Gamma) :: (w0, Gamma0) :: nil))
-by auto;
+by auto.
 rewrite H9; apply ok_Bg_Hyb_fresh_wo;
 assert (((GH & (w, Gamma'') ++ GT) & (w', (v, A0) :: Gamma')) & (w0, Gamma0) ~=~
-  ((w', (v, A0) :: Gamma') :: GH ++ GT ++ (w, Gamma) :: nil) &  (w0, Gamma0)) by
-  (eapply PPermut_Hyb_last_rev; auto; try PPermut_Hyb_simpl);
+  ((w', (v, A0) :: Gamma') :: GH ++ GT ++ (w, Gamma) :: nil) &  (w0, Gamma0))
+  by PPermut_Hyb_simpl;
 rew_app in *; [rewrite H14 in Ok_Bg | auto];
 apply emptyEquiv_Hyb_ok_Bg_Hyb in Ok_Bg; simpl in *; auto.
 symmetry; transitivity (G1 & (w', Gamma')); subst; rew_app in *;
 PPermut_Hyb_simpl.
-Existential 1 := v'.
-Existential 1 := Gamma.
-Existential 1 := v'.
-Existential 1 := Gamma.
 Qed.
 
 Lemma subst_t_Hyb_preserv_types_inner:
@@ -1185,27 +1183,31 @@ eapply ok_Bg_Hyb_split2; eauto.
 constructor;
 [ rewrite H in Ok_Bg; rewrite H0 | ]; auto;
 eapply ok_Bg_Hyb_split3; eauto.
+
 (* lam *)
 apply t_lam_Hyb with (L := L);
-[ rewrite H0 in Ok_Bg; eapply ok_Bg_Hyb_split2; eauto |
+[ rewrite H0 in Ok_Bg; apply ok_Bg_Hyb_split2 with (w:=w'); eauto |
   intros; unfold open_t_Hyb in *];
 rewrite subst_Hyb_order_irrelevant_free; simpl; auto;
 apply H with (v':=v') (G':=G') (Gamma := (v',A)::Gamma0); auto.
-apply t_lam_Hyb with (L := L);
-[ rewrite H0 in Ok_Bg; eapply ok_Bg_Hyb_split2; eauto |
-  intros]; unfold open_t_Hyb in *;
+apply t_lam_Hyb with (L := L).
+rewrite H0 in Ok_Bg; apply ok_Bg_Hyb_split2 with (w:=w0); eauto.
+intros; unfold open_t_Hyb in *;
 rewrite subst_Hyb_order_irrelevant_free;
-edestruct H; eauto; destruct H3;
+destruct H with (v':=v') (G':=G') (Gamma':=Gamma')
+(w':=w')(w:=w0) (Gamma:=(v',A)::Gamma0); eauto; destruct H3;
 [ apply ContextPermutImpl_Hyb with (Gamma := (Gamma' ++ (v', A) :: Gamma0));
   [permut_simpl | ] | simpl; apply notin_empty ]; eauto.
+
 apply t_lam_Hyb with (L := L);
 [ rewrite H0 in Ok_Bg |
   intros];
 rewrite H1; try eapply ok_Bg_Hyb_split3; eauto;
 unfold open_t_Hyb in *;
 rewrite subst_Hyb_order_irrelevant_free;
-edestruct H; eauto; destruct H4;
-eauto;
+destruct H with (v':=v') (G':=G0 & (w', Gamma'++Gamma'')) (Gamma':=Gamma')
+(w':=w')(w:=w0) (Gamma:=(v',A)::Gamma0); eauto. destruct H4.
+apply H5 with (G1:=G0) (Gamma''0:=Gamma''); eauto.
 simpl; apply notin_empty.
 
 (* appl *)
@@ -1227,11 +1229,14 @@ eapply ok_Bg_Hyb_split3; eauto.
 
 (* box *)
 apply t_box_Hyb with (L:=\{w'} \u L);
-[ rewrite H0 in Ok_Bg; eapply ok_Bg_Hyb_split4; eauto |
+[ rewrite H0 in Ok_Bg; apply ok_Bg_Hyb_split4 with (w:=w'); eauto |
   intros];
 unfold open_w_Hyb in *; rewrite notin_union in H1; destruct H1;
-rewrite notin_singleton in *; rewrite <- subst_w_Hyb_comm; auto;
-eapply H; eauto; PPermut_Hyb_simpl.
+rewrite notin_singleton in *; rewrite <- subst_w_Hyb_comm; auto.
+destruct H with (w':=w'0) (G':=G' & (w0, Gamma0++Gamma')) (Gamma':=Gamma0)
+                          (w'0:=w0) (w:=w'0)
+                          (Gamma:=(@nil (var * ty))); auto.
+destruct H4. eapply H5; eauto; PPermut_Hyb_simpl.
 apply t_box_Hyb with (L:=\{w0} \u L);
 [ rewrite H0 in Ok_Bg; apply ok_Bg_Hyb_split4 with (w:=w0);
   apply ok_Bg_Hyb_ppermut with (G:=G' & (w', Gamma') & (w0, Gamma0)); auto |
@@ -1781,12 +1786,6 @@ eapply H with (G0:=(w'0, (v', A) :: nil) :: (GH ++ GT) & (w, Gamma))
 apply PPermut_Hyb_last_rev_simpl with (a:=(w, Gamma)); rewrite H5;
 PPermut_Hyb_simpl.
 rewrite H2; PPermut_Hyb_simpl.
-Existential 1 := G.
-Existential 1 := Gamma'.
-Existential 1 := w'.
-Existential 1 := G.
-Existential 1 := Gamma'.
-Existential 1 := w'.
 Qed.
 
 Lemma rename_w_Hyb_preserv_types_new:

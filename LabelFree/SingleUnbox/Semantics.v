@@ -160,10 +160,6 @@ apply t_letdia_get_LF with (A:=A) (L:=L) (G:=G) (Gamma:=Gamma);
 rewrite <- H2; auto.
 Qed.
 
-Add Morphism types_LF: PPermut_LF_types.
-split; intros; eapply PPermutationG_LF; eauto.
-Qed.
-
 Lemma PermutationGamma_LF:
 forall G Gamma M A Gamma',
   G |= Gamma |- M ::: A ->
@@ -207,6 +203,14 @@ apply t_letdia_LF with (A:=A) (L:=L);
 apply t_letdia_get_LF with (A:=A) (L:=L) (G:=G) (Gamma:=Gamma);
 [apply ok_Bg_LF_PPermut with (G:= Gamma :: G & Gamma') | | |]; auto.
 apply PPermutationG_LF with (G:=G & Gamma'); auto.
+Qed.
+
+
+Add Morphism types_LF: PPermut_LF_types.
+split; intros.
+eapply PermutationGamma_LF; eauto; eapply PPermutationG_LF; eauto.
+apply PermutationGamma_LF with (Gamma:=y0); [ | symmetry ]; eauto;
+eapply PPermutationG_LF; eauto.
 Qed.
 
 Lemma WeakeningG_LF:
