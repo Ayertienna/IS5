@@ -10,12 +10,13 @@ Require Import LibLogic.
 Require Import LibList.
 Require Import LibListSorted.
 
-Open Scope labeled_is5_scope.
-Open Scope hybrid_is5_scope.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
 Section HYB_to_L.
+
+Open Scope hybrid_is5_scope.
+Open Scope labeled_is5_scope.
 
 Fixpoint annotate_worlds (w: var) (L: list (var * ty)) : ctx_L :=
 match L with
@@ -60,21 +61,21 @@ inversion H; subst; auto; inversion H; subst. apply IHG in H0;
 [ contradiction | ]; inversion H; subst; apply ok_LF_used_weakening in H7; auto.
 Qed.
 
-Lemma PPermut_map_fst:
+Lemma PPermut_Hyb__map_fst:
 forall G G',
   G ~=~ G' ->
   map fst_ G *=* map fst_ G'.
 induction G; intros.
-apply PPermut_nil_impl in H; subst; auto.
+apply PPermut_Hyb_nil_impl in H; subst; auto.
 assert (a::G ~=~ G') by auto;
-destruct a; apply PPermut_split_head in H;
+destruct a; apply PPermut_Hyb_split_head in H;
 destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
 rew_map; simpl; permut_simpl;
 replace (map fst_ hd ++ map fst_ tl) with (map fst_ (hd++tl))
   by (rew_map; auto);
 apply IHG.
-apply PPermut_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
-auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_simpl.
+apply PPermut_Hyb_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
+auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_Hyb_simpl.
 Qed.
 
 Lemma annotate_worlds_app:
@@ -97,7 +98,7 @@ with (annotate_worlds x (hd++tl)) by (apply annotate_worlds_app; auto);
 apply IHl; apply permut_cons_inv with (a:=(v,t)); rewrite H0; permut_simpl.
 Qed.
 
-Lemma PPermut_flat_map_annotate_worlds:
+Lemma PPermut_Hyb_flat_map_annotate_worlds:
 forall G G',
   G ~=~ G' ->
   flat_map (fun x => annotate_worlds (fst_ x) (snd_ x)) G *=*
@@ -105,17 +106,17 @@ forall G G',
 induction G; intros.
 remember (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
   as g.
-apply PPermut_nil_impl in H; subst; auto.
+apply PPermut_Hyb_nil_impl in H; subst; auto.
 assert (a::G ~=~ G') by auto;
-destruct a; apply PPermut_split_head in H;
+destruct a; apply PPermut_Hyb_split_head in H;
 destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
 rew_flat_map; simpl;
 assert (l *=* l') by auto;
 apply permut_annotate_worlds with (x:=v) in Ha;
 rewrite Ha; permut_simpl;
 rewrite IHG with (G':=hd++tl); rew_flat_map; auto;
-apply PPermut_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
-auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_simpl.
+apply PPermut_Hyb_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
+auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_Hyb_simpl.
 Qed.
 
 Lemma ok_LF_impl_ok_Omega:
