@@ -1,6 +1,6 @@
 Add LoadPath "../..".
-Require Import Syntax.
-Require Import Substitution.
+Require Import L_Syntax.
+Require Import L_Substitution.
 Require Import FSets.
 Require Import Arith.
 Require Import Relations.

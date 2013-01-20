@@ -1,54 +1,56 @@
-(* LL <-> LF (labeled <-> hybrid) *)
+Add LoadPath "Labeled/Lists".
+Add LoadPath "Hybrid".
+Add LoadPath "LabelFree/SingleUnbox".
 Require Import Labeled.
+Require Import Hybrid.
 Require Import LabelFree.
+
 Require Import LibVar.
 Require Import LibLogic.
 Require Import LibList.
 Require Import LibListSorted.
-Require Import OkLib.
-Require Import LLOkLib.
 
 Open Scope labeled_is5_scope.
-Open Scope label_free_is5_scope.
+Open Scope hybrid_is5_scope.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
-Section LF_to_L.
+Section HYB_to_L.
 
-Fixpoint annotate_worlds (w: var) (L: list (var * ty)) : Context_L :=
+Fixpoint annotate_worlds (w: var) (L: list (var * ty)) : ctx_L :=
 match L with
   | nil => nil
   | (x, T) :: L' => (w, (x, T)) :: annotate_worlds w L'
 end.
 
-Definition labeled_context (G: Background_LF) (Ctx: Context_LF) :
-  (list var) * Context_L * var :=
+Definition labeled_context (G: bg_Hyb) (Ctx: ctx_Hyb) :
+  (list var) * ctx_L * var :=
   let Omega := map fst_ (Ctx :: G) in
   let Delta := flat_map (fun x => annotate_worlds (fst_ x) (snd_ x))
     (Ctx :: G) in
   (Omega, Delta, fst Ctx).
 
-Fixpoint labeled_term (M0: te_LF) :=
+Fixpoint labeled_term (M0: te_Hyb) :=
 match M0 with
-| hyp_LF v =>
+| hyp_Hyb v =>
   hyp_L v
-| lam_LF A M =>
+| lam_Hyb A M =>
   lam_L A (labeled_term M)
-| appl_LF M N =>
+| appl_Hyb M N =>
   appl_L (labeled_term M) (labeled_term N)
-| box_LF M =>
+| box_Hyb M =>
   box_L (labeled_term M)
-| unbox_fetch_LF w M =>
+| unbox_fetch_Hyb w M =>
   unbox_L (fetch_L w (labeled_term M))
-| get_here_LF w M =>
+| get_here_Hyb w M =>
   get_L w (here_L (labeled_term M))
-| letdia_get_LF w M N =>
+| letdia_get_Hyb w M N =>
   letd_L (get_L w (labeled_term M)) (labeled_term N)
 end.
 
 (* FIXME: move this :) *)
 Lemma ok_LF_not_Mem_fst:
-forall (G: Background_LF) U w,
+forall (G: bg_Hyb) U w,
   ok_LF G U -> Mem w U ->
   ~ Mem w (map fst_ G) .
 induction G; intros; simpl in *.

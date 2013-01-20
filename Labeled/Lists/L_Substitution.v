@@ -1,6 +1,6 @@
 Add LoadPath "../..".
-Require Export Syntax.
-Require Import OkLib.
+Require Export L_Syntax.
+Require Import L_OkLib.
 Require Import LibTactics.
 Require Import Arith.
 

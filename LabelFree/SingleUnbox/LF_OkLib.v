@@ -1,11 +1,11 @@
 Add LoadPath "../..".
-Require Export PPermutLib.
+Require Export LF_PPermutLib.
 Require Export ListLib.
-Require Export EmptyEquivLib.
+Require Export LF_EmptyEquivLib.
 
 Inductive ok_LF {A}: list (prod var A) -> list var -> Prop :=
-| Ok_nil: forall U, ok_LF nil U
-| Ok_step: forall G T w U,
+| Ok_LF_nil: forall U, ok_LF nil U
+| Ok_LF_step: forall G T w U,
   ~ Mem w U -> ok_LF G (w::U) -> ok_LF ((w, T)::G) U
 .
 

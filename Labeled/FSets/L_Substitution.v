@@ -1,5 +1,5 @@
 Add LoadPath "../..".
-Require Export Syntax.
+Require Export L_Syntax.
 Require Import Arith.
 Require Import LibList.
 Require Import LibTactics. (* case_if *)

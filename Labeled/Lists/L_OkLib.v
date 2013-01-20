@@ -1,5 +1,5 @@
 Add LoadPath "../..".
-Require Import Syntax.
+Require Import L_Syntax.
 Require Import PermutLib.
 Require Import LibTactics. (* case_if *)
 

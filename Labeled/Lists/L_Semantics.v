@@ -1,8 +1,8 @@
 Add LoadPath "../..".
-Require Import Substitution.
+Require Import L_Substitution.
 Require Import PermutLib.
 Require Import LibTactics.
-Require Import OkLib.
+Require Import L_OkLib.
 Require Import Relations.
 
 Open Scope is5_scope.

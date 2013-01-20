@@ -1,8 +1,8 @@
 Add LoadPath "../..".
-Require Import Syntax.
-Require Import Substitution.
-Require Import OkLib.
-Require Import EmptyEquivLib.
+Require Import LF_Syntax.
+Require Import LF_Substitution.
+Require Import LF_OkLib.
+Require Import LF_EmptyEquivLib.
 
 Open Scope permut_scope.
 Open Scope is5_scope.

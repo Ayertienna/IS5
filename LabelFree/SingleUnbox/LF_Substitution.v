@@ -1,6 +1,6 @@
 Add LoadPath "../..".
 Require Import PermutLib.
-Require Import Syntax.
+Require Import LF_Syntax.
 Require Import Arith.
 Require Export LibTactics. (* case_if *)
 
