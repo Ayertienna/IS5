@@ -119,21 +119,21 @@ apply PPermut_Hyb_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
 auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_Hyb_simpl.
 Qed.
 
-Lemma ok_LF_impl_ok_Omega:
+Lemma ok_Hyb_impl_ok_Omega_L:
 forall G w Gamma Omega,
-  ok_LF ((w, Gamma)::G) nil ->
+  ok_Hyb ((w, Gamma)::G) nil ->
   Omega *=* fst_ (fst_ (labeled_context G (w, Gamma))) ->
-  ok_Omega Omega.
+  ok_Omega_L Omega.
 induction G; intros; inversion H; subst;
 [simpl in *; eauto | destruct a];
 rew_map in *; simpl in *.
-apply ok_Omega_permut with (O1:=w::nil);
+apply ok_Omega_L_permut with (O1:=w::nil);
   [symmetry | constructor]; auto; constructor.
 rew_map in *; simpl in *.
 inversion H6; subst;
 assert (v::w::map fst_ G *=* Omega) by (rewrite H0; permut_simpl).
 apply permut_split_head in H1; destruct H1 as (hd, (tl, H1)); subst.
-apply ok_Omega_permut with (O1:=v::hd++tl); [permut_simpl | constructor].
+apply ok_Omega_L_permut with (O1:=v::hd++tl); [permut_simpl | constructor].
 apply ok_LF_not_Mem_fst with (w:=v) in H8; [ | apply Mem_here].
 intro. apply Mem_permut with (l':=w::map fst_ G) in H1.
 rewrite Mem_cons_eq in H1; destruct H1;
@@ -147,23 +147,23 @@ transitivity (hd & v ++ tl); [ | rewrite H0]; permut_simpl.
     transitivity (hd & v ++ tl); [ | rewrite H0]; permut_simpl.
 Qed.
 
-Lemma ok_LF_impl_ok_Gamma:
+Lemma ok_Hyb_impl_ok_Gamma_L:
 forall G Gamma w Delta U,
-  ok_LF (flat_map snd_ ((w, Gamma)::G)) U ->
+  ok_Hyb (flat_map snd_ ((w, Gamma)::G)) U ->
   Delta *=* snd_ (fst_ (labeled_context G (w, Gamma))) ->
-  ok_Gamma Delta U.
+  ok_Gamma_L Delta U.
 induction G; induction Gamma; intros; simpl in *; rew_app in *.
 symmetry in H0; apply permut_nil_eq in H0; subst; constructor.
 destruct a; simpl in *; inversion H; subst;
-apply ok_Gamma_permut with (G1:=(w, (v, t)) :: annotate_worlds w Gamma);
+apply ok_Gamma_L_permut with (G1:=(w, (v, t)) :: annotate_worlds w Gamma);
 [symmetry | constructor]; auto; apply IHGamma with (w:=w); rew_app; auto.
 destruct a; simpl in *;
-apply ok_Gamma_permut with (G1:=annotate_worlds v l ++ flat_map
+apply ok_Gamma_L_permut with (G1:=annotate_worlds v l ++ flat_map
          (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
          G); [symmetry |]; auto;
 apply IHG with (w:=v) (Gamma:=l); auto; permut_simpl.
 destruct a0; destruct a; simpl in *; inversion H; subst;
-apply ok_Gamma_permut with (G1:=((w, (v, t)) :: annotate_worlds w Gamma) ++
+apply ok_Gamma_L_permut with (G1:=((w, (v, t)) :: annotate_worlds w Gamma) ++
        annotate_worlds v0 l ++
        flat_map
          (fun x : var * list (var * ty) => annotate_worlds (fst_ x) (snd_ x))
@@ -174,13 +174,13 @@ Qed.
 
 Lemma ok_Bg_impl_ok_L:
 forall G w Gamma Omega Delta,
-  ok_Bg ((w, Gamma)::G) ->
+  ok_Bg_Hyb ((w, Gamma)::G) ->
   Omega *=* fst_ (fst_ (labeled_context G (w, Gamma))) ->
   Delta *=* snd_ (fst_ (labeled_context G (w, Gamma))) ->
   ok_L Omega Delta.
 intros; destruct H; split;
-[eapply ok_LF_impl_ok_Omega |
- eapply ok_LF_impl_ok_Gamma]; eauto.
+[eapply ok_Hyb_impl_ok_Omega_L |
+ eapply ok_Hyb_impl_ok_Gamma_L]; eauto.
 Qed.
 
 Lemma Mem_preserved_world_L:
@@ -599,10 +599,12 @@ eapply HT in IHM1. eauto; inversion HT; subst; auto.
 
 
 
+Close Scope labeled_is5_scope.
+Close Scope hybrid_is5_scope.
 
-End LF_to_L.
+End Hyb_to_L.
 
-Section L_to_LF.
+Section L_to_Hyb.
 
 (* label-free from labeled *)
 Fixpoint filter_w (L: Context_L) (e: var) :=

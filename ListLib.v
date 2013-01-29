@@ -85,3 +85,16 @@ destruct H; subst.
   left; rewrite in_singleton in H; subst; auto.
   right; eapply IHU; auto.
 Qed.
+
+Lemma flat_map_snd_permut:
+forall A B (G: list (A * list B)) G',
+  G *=* G' ->
+  flat_map snd_ G *=* flat_map snd_ G'.
+induction G; intros; simpl in *.
+apply permut_nil_eq in H; subst; simpl; auto.
+destruct a; simpl in *; assert ((a,l)::G *=* G') as H0 by auto;
+apply permut_split_head in H0; destruct H0 as (hd, (tl, H0)); subst;
+rew_flat_map; simpl; permut_simpl; transitivity (flat_map snd_ (hd++tl));
+[ apply IHG | rew_flat_map]; auto; apply permut_cons_inv with (a:=(a,l));
+rewrite H; permut_simpl.
+Qed.

@@ -154,6 +154,14 @@ unfold ok_L; intros; split; destruct H; auto.
 simpl in *; destruct H0; apply ok_Gamma_L_weakening_used with (u:=x); auto.
 Qed.
 
+Lemma ok_L_smaller_Omega:
+forall O X w,
+  ok_L (w::O) X ->
+  ok_L O X.
+unfold ok_L; intros; split; destruct H; auto;
+inversion H; auto.
+Qed.
+
 Lemma ok_L_Mem_contr:
 forall X w x a U,
   ok_Gamma_L ((w, (x, a)) :: X) U  ->
