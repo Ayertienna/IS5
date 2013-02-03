@@ -97,16 +97,26 @@ Inductive lc_w_n_Hyb: nat -> te_Hyb -> Prop :=
 | lcw_box_Hyb: forall M n,
     lc_w_n_Hyb (S n) M ->
     lc_w_n_Hyb n (box_Hyb M)
-| lcw_unbox_fetch_Hyb: forall M w n,
+| lcw_unbox_fetch_fwo_Hyb: forall M w n,
     lc_w_n_Hyb n M ->
     lc_w_n_Hyb n (unbox_fetch_Hyb (fwo w) M)
-| lcw_get_here_Hyb: forall M w n,
+| lcw_unbox_fetch_bwo_Hyb: forall M n m,
+    lc_w_n_Hyb n M -> n > m ->
+    lc_w_n_Hyb n (unbox_fetch_Hyb (bwo m) M)
+| lcw_get_here_fwo_Hyb: forall M w n,
     lc_w_n_Hyb n M ->
     lc_w_n_Hyb n (get_here_Hyb (fwo w) M)
-| lcw_letdia_get_Hyb: forall M N w n,
+| lcw_get_here_bwo_Hyb: forall M n m,
+    lc_w_n_Hyb n M -> n > m ->
+    lc_w_n_Hyb n (get_here_Hyb (bwo m) M)
+| lcw_letdia_get_fwo_Hyb: forall M N w n,
     lc_w_n_Hyb (S n) N ->
     lc_w_n_Hyb n M ->
     lc_w_n_Hyb n (letdia_get_Hyb (fwo w) M N)
+| lcw_letdia_get_bwo_Hyb: forall M N n m,
+    lc_w_n_Hyb (S n) N ->
+    lc_w_n_Hyb n M -> n > m ->
+    lc_w_n_Hyb n (letdia_get_Hyb (bwo m) M N)
 .
 
 Definition lc_w_Hyb M := lc_w_n_Hyb 0 M.
@@ -139,6 +149,9 @@ forall M n,
 intros; generalize dependent n;
 induction M; intros; inversion H; subst;
 eauto using lc_w_n_Hyb.
+constructor; [ | omega]; eauto.
+constructor; [ | omega]; eauto.
+constructor; [ | | omega]; eauto.
 Qed.
 
 Lemma closed_t_succ:

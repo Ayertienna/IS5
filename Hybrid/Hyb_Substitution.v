@@ -152,12 +152,14 @@ Qed.
 
 Lemma closed_subst_w_Hyb_bound:
 forall M w0 w n
-  (H_lc: lc_w_n_Hyb n M),
+  (H_lc: lc_w_n_Hyb n M)
+  (Gt: w0 >= n),
   {{ w // bwo w0}} M  = M.
 induction M; intros; simpl in *;
 repeat case_if; auto;
 inversion H_lc; subst;
-erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
+erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto;
+omega.
 Qed.
 
 Lemma closed_subst_t_Hyb_bound:
@@ -240,8 +242,12 @@ rewrite IHHT; auto.
 rewrite IHHT1; try rewrite IHHT2; auto.
 destruct w; destruct w'; simpl; try rewrite IHHT; auto; omega.
 repeat case_if; rewrite IHHT; auto.
+repeat case_if; rewrite IHHT; auto; inversion H1; subst; omega.
 repeat case_if; rewrite IHHT; auto.
+repeat case_if; rewrite IHHT; auto; inversion H1; subst; omega.
 repeat case_if; rewrite IHHT1; try rewrite IHHT2; auto; omega.
+repeat case_if; rewrite IHHT1; try rewrite IHHT2; auto; try omega;
+inversion H1; subst; omega.
 Qed.
 
 (* With two different types of substitution, the order does not matter *)
@@ -256,7 +262,7 @@ repeat case_if; simpl;
 unfold shift_vte in *; unfold shift_vwo in *;
 try destruct v; try destruct w; auto;
 try rewrite IHN; try (rewrite IHN1; try rewrite IHN2);
-auto; erewrite closed_subst_w_Hyb_bound; eauto.
+auto; erewrite closed_subst_w_Hyb_bound; eauto; omega.
 Qed.
 
 Lemma subst_Hyb_order_irrelevant_free:

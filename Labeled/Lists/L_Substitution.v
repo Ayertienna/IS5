@@ -95,12 +95,14 @@ Qed.
 
 Lemma closed_subst_w_bound_L:
 forall M w0 w n
-  (H_lc: lc_w_n_L n M),
+  (H_lc: lc_w_n_L n M)
+  (Gt: w0 >= n),
   {{ w // bwo w0}} M  = M.
 induction M; intros; simpl in *;
 repeat case_if; auto;
 inversion H_lc; subst;
-erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
+erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto;
+omega.
 Qed.
 
 Lemma closed_subst_t_bound_L:
@@ -132,7 +134,7 @@ induction M; intros; simpl in *; repeat case_if; simpl;
 unfold shift_vte in *; unfold shift_vwo in *; auto;
 try destruct v; try destruct w; auto;
 try (rewrite IHM || (rewrite IHM1; try rewrite IHM2; auto));
-auto; erewrite closed_subst_w_bound_L; eauto.
+auto; erewrite closed_subst_w_bound_L; eauto. omega.
 Qed.
 
 Lemma lc_t_subst_L:
@@ -153,13 +155,11 @@ Qed.
 Lemma lc_w_subst_L:
 forall M w k,
   lc_w_n_L (S k) M ->
-  lc_w_n_L k {{w // bwo k}} M.
+  lc_w_n_L k {{fwo w // bwo k}} M.
 induction M; intros; simpl in *; repeat case_if;
-try (try destruct w; econstructor;
-  (eapply IHM || (try eapply IHM1; try eapply IHM2; eauto));
-  inversion H; subst; eauto);
-try inversion H; subst;
-constructor; eapply IHM; auto.
+inversion H; subst;
+try constructor; eauto;
+try (destruct (eq_nat_dec m k); subst; [elim H0; auto | omega]).
 Qed.
 
 Lemma subst_t_comm_L:

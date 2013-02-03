@@ -61,15 +61,21 @@ Inductive lc_w_n_L: nat -> te_L -> Prop :=
 | lcw_unbox_L: forall M n,
     lc_w_n_L n M ->
     lc_w_n_L n (unbox_L M)
-| lcw_fetch_L: forall M w n,
+| lcw_fetch_fwo_L: forall M w n,
     lc_w_n_L n M ->
     lc_w_n_L n (fetch_L (fwo w) M)
+| lcw_fetch_bwo_L: forall M n m,
+    lc_w_n_L n M -> n > m ->
+    lc_w_n_L n (fetch_L (bwo m) M)
 | lcw_here_L: forall M n,
     lc_w_n_L n M ->
     lc_w_n_L n (here_L M)
-| lcw_get_L: forall M w n,
+| lcw_get_fwo_L: forall M w n,
     lc_w_n_L n M ->
     lc_w_n_L n (get_L (fwo w) M)
+| lcw_get_bwo_L: forall M n m,
+    lc_w_n_L n M -> n > m ->
+    lc_w_n_L n (get_L (bwo m) M)
 | lcw_letd_L: forall M N n,
     lc_w_n_L (S n) N -> lc_w_n_L n M ->
     lc_w_n_L n (letd_L M N)
@@ -115,7 +121,8 @@ forall M n,
   lc_w_n_L n M -> lc_w_n_L (S n) M.
 intros; generalize dependent n;
 induction M; intros; inversion H; subst;
-eauto using lc_w_n_L.
+eauto using lc_w_n_L;
+constructor; auto.
 Qed.
 
 Lemma closed_t_succ_L:
