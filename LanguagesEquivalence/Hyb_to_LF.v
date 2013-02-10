@@ -159,6 +159,25 @@ rew_map in *; simpl in *; auto.
 apply map_snd_PPermut_LF_Hyb in H1; rewrite <- H1; rew_map; simpl; auto.
 Qed.
 
+Lemma Hyb_to_LF_lc_t:
+forall M n,
+  lc_t_n_Hyb n M -> lc_t_n_LF n (Hyb_to_LF_term M).
+induction M; intros; simpl; inversion H; subst; constructor; auto.
+Qed.
+Hint Resolve Hyb_to_LF_lc_t.
+
+Lemma Hyb_to_LF_step:
+forall M N w,
+  step_Hyb (M, w) (N, w) ->
+  step_LF (Hyb_to_LF_term M) (Hyb_to_LF_term N).
+induction M; intros; inversion H; subst;
+unfold open_t_Hyb in *; unfold open_w_Hyb in *;
+simpl; try rewrite <- Hyb_to_LF_term_subst_t;
+try rewrite Hyb_to_LF_term_subst_w;
+constructor;  unfold lc_t_Hyb in *; unfold lc_t_LF in *;
+unfold lc_w_Hyb in *; eauto.
+Qed.
+
 Close Scope hybrid_is5_scope.
 Close Scope permut_scope.
 Close Scope is5_scope.
