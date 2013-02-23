@@ -460,22 +460,23 @@ apply t_letd_L with (A:=A) (Lt:=L_t) (Lw:=L_w).
     simpl; auto.
 Qed.
 
-(*
-Lemma lc_w_rewrite_L:
+Lemma Hyb_to_L_term_lc_w:
 forall M n,
   lc_w_n_Hyb n M -> lc_w_n_L n (Hyb_to_L_term M).
 induction M; intros; inversion H; subst; simpl in *;
 try destruct v; repeat constructor; eauto.
 Qed.
 
-Lemma lc_t_rewrite_L:
+Lemma Hyb_to_L_term_lc_t:
 forall M n,
   lc_t_n_Hyb n M -> lc_t_n_L n (Hyb_to_L_term M).
 induction M; intros; inversion H; subst; simpl in *;
 repeat constructor; eauto.
 Qed.
 
-(* FIXME: Move these & rename
+Hint Resolve Hyb_to_L_term_lc_w Hyb_to_L_term_lc_t.
+
+(* FIXME: Move these & rename *)
 Lemma lc_t_n_L_subst_w:
 forall M w w' n,
   lc_t_n_L n M ->
@@ -496,7 +497,19 @@ replace n with (0+n) by omega; apply closed_w_addition_L; auto.
 replace n with (0+n) by omega; apply closed_w_addition_L; auto.
 Qed.
 
-Lemma lc_t_step_preserv:
+Lemma lc_w_n_L_subst_w:
+forall M w1 w2 n,
+  lc_w_n_L n M ->
+  lc_w_n_L n (subst_w_L M (fwo w1) (fwo w2)).
+induction M; intros; simpl in *; auto; repeat case_if;
+try econstructor; inversion H; subst; eauto.
+constructor; apply IHM; auto.
+constructor; auto; apply IHM; auto.
+constructor; apply IHM; auto.
+constructor; auto; apply IHM; auto.
+Qed.
+
+Lemma lc_t_step_L_preserv:
 forall M N w,
   lc_t_L M ->
   step_L (M, w) (N, w) ->
@@ -504,110 +517,173 @@ forall M N w,
 induction M; intros; inversion H0; subst; auto;
 unfold open_t_L in *; unfold open_w_L in *.
 constructor; [eapply IHM1 |]; eauto.
-apply lc_t_subst_w; auto.
+apply lc_t_n_L_subst_w; auto.
 constructor; eapply IHM; eauto.
 constructor; eapply IHM; eauto.
-inversion H; subst;
-apply lc_t_subst_w; auto.
-rewrite <- subst_order_irrelevant_bound_L; auto;
-apply lc_t_subst_w; auto.
+inversion H; subst; inversion H3; subst; constructor; auto.
+inversion H; subst; inversion H9; subst.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
 inversion H; subst; constructor; auto; eapply IHM1; eauto.
 constructor; eapply IHM; eauto.
-constructor; eapply IHM; eauto.
-apply lc_t_subst_w; auto.
+inversion H; subst; repeat constructor; auto.
+inversion H; subst; constructor; eapply IHM; eauto.
 Qed.
 
-Lemma lc_w_step_preserv:
+Lemma lc_w_step_L_preserv:
 forall M N w,
   lc_w_L M ->
-  step_L (M, w) (N, w) ->
+  step_L (M, fwo w) (N, fwo w) ->
   lc_w_L N.
 induction M; intros; inversion H0; subst; auto;
 unfold open_t_L in *; unfold open_w_L in *; simpl in *.
-eapply lc_w_subst_L.
+eapply lc_w_n_L_subst_t; auto.
 constructor; [eapply IHM1 |]; eauto.
-apply lc_t_subst_w; auto.
 constructor; eapply IHM; eauto.
+destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
+inversion H; subst; try omega; auto.
+inversion H; subst; try omega;
+apply lc_w_n_L_subst_t; auto;
+apply lc_w_n_L_subst_w; auto.
+constructor; inversion H; subst; auto; eapply IHM1; eauto.
 constructor; eapply IHM; eauto.
-inversion H; subst; constructor.
-apply lc_t_subst_w; auto.
-rewrite <- subst_order_irrelevant_bound_L; auto;
-apply lc_t_subst_w; auto.
-inversion H; subst; constructor; auto; eapply IHM1; eauto.
-constructor; eapply IHM; eauto.
-constructor; eapply IHM; eauto.
-apply lc_t_subst_w; auto.
+constructor; auto.
+destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
 Qed.
-*)
 
+Lemma lc_t_steps_L_preserv:
+forall M N w,
+  lc_t_L M ->
+  steps_L M N w ->
+  lc_t_L N.
+intros; induction H0.
+apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
+apply IHsteps_L;
+apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
+Qed.
 
-Lemma appl_steps:
+Lemma lc_w_steps_L_preserv:
+forall M N w,
+  lc_w_L M ->
+  steps_L M N (fwo w) ->
+  lc_w_L N.
+intros. remember (fwo w) as w'; generalize dependent w.
+induction H0; intros; subst.
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
+apply IHsteps_L with (w:=w0); auto;
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
+Qed.
+
+Lemma steps_L_appl_L:
 forall M M' N w,
   lc_t_L M -> lc_t_L N -> lc_w_L M -> lc_w_L N ->
-  steps_L (M, w) (M', w) ->
-  steps_L (appl_L M N, w) (appl_L M' N, w).
-intros; remember (M, w) as S0; remember (M', w) as S1;
-generalize dependent N;
-generalize dependent M; generalize dependent M';
-generalize dependent w.
-induction H3; intros; inversion HeqS1; inversion HeqS0; subst.
-constructor; constructor; auto.
-apply multi_step_L with (M':=appl_L M' N).
-  constructor; auto.
-  apply IHsteps_L; auto.
-  apply lc_t_step_preserv with (M:=M0) (w:=w0); eauto.
-  apply lc_w_step_preserv with (M:=M0) (w:=w0); eauto.
+  steps_L M M' (fwo w) ->
+  steps_L (appl_L M N) (appl_L M' N) (fwo w).
+intros. remember (fwo w) as w'. generalize dependent w.
+induction H3; intros;
+[constructor; constructor; auto | ];
+apply stepm_L with (M':=appl_L M' N);
+[constructor; auto | eapply IHsteps_L]; eauto.
+apply lc_t_step_L_preserv with (M:=M) (w:= w); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); subst; eauto.
+Qed.
 
-inversion H; subst;
-  unfold open_t_L; unfold open_w_L; auto.
-  app
+Lemma steps_L_unbox_L_fetch_L:
+forall M M' w v,
+  lc_t_L M -> lc_w_L M ->
+  steps_L M M' (fwo v) ->
+  steps_L (unbox_L (fetch_L (fwo v) M)) (unbox_L (fetch_L (fwo v) M')) w.
+intros; remember (fwo v) as v'; generalize dependent v.
+induction H1; intros; subst.
+repeat constructor; auto.
+apply stepm_L with (M':=unbox_L (fetch_L (fwo v) M'));
+[repeat constructor | eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.
 
+Lemma steps_L_get_L_here_L:
+forall M M' w v,
+  lc_t_L M -> lc_w_L M ->
+  steps_L M M' (fwo v) ->
+  steps_L (get_L (fwo v) (here_L M)) (get_L (fwo v) (here_L M')) w.
+intros; remember (fwo v) as v'; generalize dependent v.
+induction H1; intros; subst.
+repeat constructor; auto.
+apply stepm_L with (M':=get_L (fwo v) (here_L M'));
+[repeat constructor | eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.
 
+Lemma steps_L_letd_L_get_L:
+forall M M' N w v,
+  lc_t_L M -> lc_t_n_L 1 N -> lc_w_L M -> lc_w_n_L 1 N ->
+  steps_L M M' (fwo v) ->
+  steps_L (letd_L (get_L (fwo v) M) N) (letd_L (get_L (fwo v) M') N) (fwo w).
+intros; remember (fwo v) as v'; generalize dependent v.
+remember (fwo w) as w'; generalize dependent w.
+induction H3; intros; subst.
+repeat constructor; unfold open_t_L; unfold open_w_L; auto;
+[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]; auto.
+apply stepm_L with (M':=letd_L (get_L (fwo v) M') N);
+[repeat constructor; unfold open_t_L; unfold open_w_L; auto;
+[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]
+| eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.
 
-
-Lemma labeled_step:
-forall M M' w,
-  step_Hyb (M, w) (M', w) ->
-  steps_L (Hyb_to_L_term M, w) (Hyb_to_L_term M', w).
-induction M; intros;
-inversion H; subst; simpl in *;
-unfold open_t in *; unfold open_w in *; simpl in *.
+Lemma Hyb_to_L_steps:
+forall M N w,
+  lc_w_Hyb M -> lc_t_Hyb M ->
+  step_Hyb (M, fwo w) (N, fwo w) ->
+  steps_L (Hyb_to_L_term M) (Hyb_to_L_term N) (fwo w).
+induction M; intros; inversion H1; subst;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+unfold open_w_L in *; unfold open_t_L in *;
+unfold lc_w_Hyb in *; unfold lc_t_Hyb in *;
+simpl;
+try rewrite <- Hyb_to_L_term_subst_t;
+try rewrite <- Hyb_to_L_term_subst_w.
 (* appl_lam *)
-constructor;
-rewrite <- subst_t_rewrite_L; constructor;
-unfold open_t_L;
-repeat rewrite <- subst_w_rewrite_L;
-apply lc_t_subst || apply lc_w_subst || simpl;
-apply lc_w_rewrite_L ||
-apply lc_t_rewrite_L || eauto; auto.
+constructor; constructor; unfold lc_w_L in *; unfold lc_t_L in *; auto;
+unfold open_t_L; apply lc_t_subst_L; auto.
 (* appl *)
-apply IHM1 in HT.
-inversion HT; subst.
-  constructor; constructor; auto;
-  apply lc_w_rewrite_L ||
-  apply lc_t_rewrite_L; eauto.
-  apply multi_step_L with (M':=appl_L M' (Hyb_to_L_term M2)).
-    constructor; auto;
-    apply lc_w_rewrite_L ||
-    apply lc_t_rewrite_L; eauto.
-
-inversion H3; subst;
-[inversion HT | ].
-constructor. constructor.
-inversion H.
-eapply IHM1 in HT0; eauto.
-
-constructor;
-try (apply lc_t_subst);
-try (apply lc_w_subst);
-apply lc_w_rewrite_L ||
-apply lc_t_rewrite_L || eauto; eauto.
-inversion H3; subst.
-  inversion HT. apply single_step_Hyb in HT0.
-eapply IHM1 in HT0; eauto.
-eapply HT in IHM1. eauto; inversion HT; subst; auto.
-
-*)
+apply steps_L_appl_L; unfold lc_w_L in *; unfold lc_t_L in *; eauto.
+(* unbox_box *)
+apply stepm_L with (M':= unbox_L (box_L (Hyb_to_L_term M0))).
+repeat constructor; unfold lc_w_L in *; unfold lc_t_L in *;
+inversion H; inversion H0; subst; auto;
+repeat constructor; eauto.
+repeat constructor; unfold lc_w_L in *; unfold lc_t_L in *;
+unfold open_w_L; auto.
+apply lc_w_subst_L; auto.
+(* unbox_fetch *)
+destruct v; inversion H; subst; try omega;
+apply steps_L_unbox_L_fetch_L; unfold lc_w_L in *; unfold lc_t_L in *; auto.
+(* get_here *)
+destruct v; inversion H0; subst;
+apply steps_L_get_L_here_L; unfold lc_w_L in *; unfold lc_t_L in *; auto;
+inversion H1; subst.
+(* letd_here*)
+clear IHM2;
+destruct v; destruct ctx''; inversion H; inversion H11; subst; try omega.
+apply stepm_L with
+  (M':=letd_L (get_L (fwo v0) (here_L (Hyb_to_L_term M)))
+              (Hyb_to_L_term M2)).
+repeat constructor; auto;
+unfold open_t_L; unfold open_w_L;
+unfold open_w_L; unfold open_t_L;
+[ apply lc_t_subst_L | apply lc_w_subst_L]; auto; repeat constructor; auto.
+constructor; constructor; auto;
+unfold lc_t_L in *; unfold lc_w_L in *; auto;
+unfold open_t_L; unfold open_w_L;
+[apply lc_t_subst_L | apply lc_w_subst_L]; auto.
+(* letd_get *)
+destruct v; inversion H0; subst;
+apply steps_L_letd_L_get_L; unfold lc_w_L in *; unfold lc_t_L in *; auto.
+Qed.
 
 Close Scope labeled_is5_scope.
 Close Scope hybrid_is5_scope.

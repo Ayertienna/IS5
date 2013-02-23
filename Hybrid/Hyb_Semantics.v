@@ -1,4 +1,4 @@
-Add LoadPath "..".
+SAdd LoadPath "..".
 Require Import Hyb_Substitution.
 Require Import Setoid.
 Require Import LibList.
