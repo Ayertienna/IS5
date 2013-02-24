@@ -93,7 +93,7 @@ Inductive step_LF: te_LF -> te_LF -> Prop :=
   unbox_LF (box_LF M)|-> M
 
 | red_letdia_here_LF: forall M N ,
-  lc_t_LF M -> lc_t_n_LF 1 N ->
+  lc_t_LF M -> lc_t_n_LF 1 N -> value_LF M ->
   letdia_LF (here_LF M) N |-> N ^t^ M
 
 | red_appl_LF: forall M M' N,
@@ -1555,15 +1555,12 @@ assert (emptyEquiv_LF G0 & nil = emptyEquiv_LF (G0 & nil)).
 rewrite H1; rewrite <- double_emptyEquiv_LF; rewrite <- H1.
 assert (emptyEquiv_LF G0 & nil ~=~ nil::emptyEquiv_LF G0).
   PPermut_LF_simpl.
-rewrite H3.
+rewrite H4.
 apply WeakeningG_LF; auto.
 symmetry;
 remember (emptyEquiv_LF G0) as G'.
-
 apply PPermut_LF_first_last.
 eauto.
-
-
 apply merge_LF_preserv_types_old with (G:=emptyEquiv_LF G0 & nil).
 apply subst_t_LF_preserv_types_outer with
   (A:=A) (G:=((v_fresh, A) :: nil) :: emptyEquiv_LF G0) (G0:=emptyEquiv_LF G0)
@@ -1572,15 +1569,14 @@ PPermut_LF_simpl.
 replace (emptyEquiv_LF G0 & nil) with (emptyEquiv_LF (G0 & nil)).
 rewrite <- double_emptyEquiv_LF.
 assert (Gamma = nil).
-  apply emptyEquiv_LF_PPermut in H7; auto.
+  apply emptyEquiv_LF_PPermut in H8; auto.
 subst.
-rewrite emptyEquiv_LF_rewrite; rewrite <- H7; simpl.
+rewrite emptyEquiv_LF_rewrite; rewrite <- H8; simpl.
 apply PPermutationG_LF with (G:=nil :: G & nil); auto;
 apply WeakeningG_LF; auto.
 rewrite emptyEquiv_LF_rewrite;simpl; auto.
 symmetry; apply PPermut_LF_first_last.
 eauto.
-
 inversion HT; subst;
 unfold open_LF in *;
 assert (exists v, v \notin L \u used_vars_te_LF N) as HF by apply Fresh;
@@ -1599,7 +1595,7 @@ assert (emptyEquiv_LF G1 & nil = emptyEquiv_LF (G1 & nil)).
 rewrite H2; rewrite <- double_emptyEquiv_LF; rewrite <- H2.
 assert (emptyEquiv_LF G1 & nil ~=~ nil::emptyEquiv_LF G1).
   PPermut_LF_simpl.
-rewrite H4.
+rewrite H5.
 apply WeakeningG_LF; auto.
 rewrite <- H0;
 assert (Gamma = nil).
@@ -1622,17 +1618,17 @@ assert (emptyEquiv_LF G1 & nil = emptyEquiv_LF (G1 & nil)).
 rewrite H2; rewrite <- double_emptyEquiv_LF; rewrite <- H2.
 assert (emptyEquiv_LF G1 & nil ~=~ nil::emptyEquiv_LF G1).
   symmetry; apply PPermut_LF_first_last.
-rewrite H4;
+rewrite H5;
 apply WeakeningG_LF; rewrite <- H0; auto.
 assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in H0; auto.
 subst.
 assert (Gamma0 = nil).
-  rewrite H0 in H8; apply emptyEquiv_LF_PPermut in H8; auto.
+  rewrite H0 in H9; apply emptyEquiv_LF_PPermut in H9; auto.
 subst.
 assert (G0 ~=~ G).
   apply PPermut_LF_last_rev_simpl with (a:=nil); auto.
-rewrite <- H6; auto.
+rewrite <- H7; auto.
 repeat apply ok_Bg_LF_nil; rewrite H0; apply ok_Bg_LF_empty.
 rewrite <- H0;
 apply HT2; eauto.

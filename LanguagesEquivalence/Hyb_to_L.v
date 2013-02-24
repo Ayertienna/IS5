@@ -524,6 +524,10 @@ inversion H; subst; inversion H3; subst; constructor; auto.
 inversion H; subst; inversion H9; subst.
 apply lc_t_subst_L; auto;
 apply lc_t_n_L_subst_w; auto.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
 inversion H; subst; constructor; auto; eapply IHM1; eauto.
 constructor; eapply IHM; eauto.
 inversion H; subst; repeat constructor; auto.
@@ -634,6 +638,12 @@ apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
 apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
 Qed.
 
+Lemma Hyb_to_L_value:
+forall M,
+  value_Hyb M -> value_L (Hyb_to_L_term M).
+induction M; intros; simpl; inversion H; subst; constructor; auto.
+Qed.
+
 Lemma Hyb_to_L_steps:
 forall M N w,
   lc_w_Hyb M -> lc_t_Hyb M ->
@@ -668,7 +678,7 @@ apply steps_L_get_L_here_L; unfold lc_w_L in *; unfold lc_t_L in *; auto;
 inversion H1; subst.
 (* letd_here*)
 clear IHM2;
-destruct v; destruct ctx''; inversion H; inversion H11; subst; try omega.
+destruct v; destruct ctx''; inversion H; inversion H12; subst; try omega.
 apply stepm_L with
   (M':=letd_L (get_L (fwo v0) (here_L (Hyb_to_L_term M)))
               (Hyb_to_L_term M2)).
@@ -679,7 +689,7 @@ unfold open_w_L; unfold open_t_L;
 constructor; constructor; auto;
 unfold lc_t_L in *; unfold lc_w_L in *; auto;
 unfold open_t_L; unfold open_w_L;
-[apply lc_t_subst_L | apply lc_w_subst_L]; auto.
+[apply lc_t_subst_L | apply lc_w_subst_L | apply Hyb_to_L_value]; auto.
 (* letd_get *)
 destruct v; inversion H0; subst;
 apply steps_L_letd_L_get_L; unfold lc_w_L in *; unfold lc_t_L in *; auto.

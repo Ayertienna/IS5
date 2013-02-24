@@ -166,6 +166,11 @@ induction M; intros; simpl; inversion H; subst; constructor; auto.
 Qed.
 Hint Resolve Hyb_to_LF_lc_t.
 
+Lemma Hyb_to_LF_value:
+forall M, value_Hyb M -> value_LF (Hyb_to_LF_term M).
+induction M; intros; inversion H; constructor; auto.
+Qed.
+
 Lemma Hyb_to_LF_step:
 forall M N w,
   step_Hyb (M, w) (N, w) ->
@@ -175,7 +180,8 @@ unfold open_t_Hyb in *; unfold open_w_Hyb in *;
 simpl; try rewrite <- Hyb_to_LF_term_subst_t;
 try rewrite Hyb_to_LF_term_subst_w;
 constructor;  unfold lc_t_Hyb in *; unfold lc_t_LF in *;
-unfold lc_w_Hyb in *; eauto.
+unfold lc_w_Hyb in *; eauto;
+apply Hyb_to_LF_value; auto.
 Qed.
 
 Close Scope hybrid_is5_scope.

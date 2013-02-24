@@ -89,7 +89,7 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
    (unbox_L (box_L M), w) |-> (M ^w^ w, w)
 | red_letd_get_here_L: forall M N w w',
    lc_t_L M -> lc_w_L M ->
-   lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w') ->
+   lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w') -> value_L M ->
    (letd_L (get_L w' (here_L M)) N, w) |-> ((N ^w^ w') ^t^ M, w)
 | red_appl_L: forall M N M' w (HRed: (M, w) |-> (M', w)),
    lc_t_L M -> lc_w_L M ->

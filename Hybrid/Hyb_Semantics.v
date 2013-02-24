@@ -1,4 +1,4 @@
-SAdd LoadPath "..".
+Add LoadPath "..".
 Require Import Hyb_Substitution.
 Require Import Setoid.
 Require Import LibList.
@@ -121,7 +121,7 @@ Inductive step_Hyb: (te_Hyb * vwo) -> (te_Hyb * vwo) -> Prop :=
 | red_letdia_get_get_here_Hyb: forall ctx ctx' ctx'' M N,
   lc_w_Hyb M -> lc_t_Hyb M ->
   lc_w_n_Hyb 1 N ->
-  lc_t_n_Hyb 1 N ->
+  lc_t_n_Hyb 1 N -> value_Hyb M ->
   (letdia_get_Hyb ctx' (get_here_Hyb ctx'' M) N, ctx) |->
     ((N ^w^ ctx'') ^t^ M, ctx)
 
@@ -2054,13 +2054,13 @@ assert ( emptyEquiv_Hyb (G & (w0, nil)) = G & (w0, nil)) by
 assert (Gamma = nil) by
   ( apply emptyEquiv_Hyb_permut_empty with (G:= (G & (w, Gamma)))
     (G':=G0) (w:=w); auto; apply Mem_last).
-subst; rew_app; rewrite <- H9 in HT0; auto.
+subst; rew_app; rewrite <- H10 in HT0; auto.
 apply rename_w_Hyb_preserv_types_outer with (G0:=G)
   (Gamma'':=(v_fresh,A) :: nil)
   (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil));
 assert (G & (w, Gamma) & (w_fresh, (v_fresh, A) :: nil) ~=~
   (w_fresh, (v_fresh, A) :: nil) :: emptyEquiv_Hyb G0) by PPermut_Hyb_simpl.
-rewrite H11; rewrite <- subst_Hyb_order_irrelevant_bound;
+rewrite H12; rewrite <- subst_Hyb_order_irrelevant_bound;
 [eapply HT2; auto | constructor].
 PPermut_Hyb_simpl; auto.
 PPermut_Hyb_simpl.
@@ -2105,7 +2105,7 @@ unfold open_t_Hyb in *; unfold open_w_Hyb in *; destruct (eq_var_dec w1 w0);
 subst.
 assert (G0  ~=~ G /\ Gamma0 *=* nil) by
   (apply ok_Bg_Hyb_impl_ppermut with (w:=w0); eauto);
-destruct H12; symmetry in H13; apply permut_nil_eq in H13;
+destruct H13; symmetry in H14; apply permut_nil_eq in H14;
 rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
 [ eapply subst_t_Hyb_preserv_types_inner with (A:=A) |
   apply subst_w_Hyb_preserv_free_vars]; eauto;
@@ -2121,20 +2121,20 @@ apply rename_w_Hyb_preserv_types_new with
   (G:= (w_fresh, (v_fresh,A)::nil) :: G0 & (w, nil));
 [ rewrite <- subst_Hyb_order_irrelevant_bound; try constructor; subst |
   rew_app; eauto].
-rewrite H12; eapply HT2; auto.
+rewrite H13; eapply HT2; auto.
 PPermut_Hyb_simpl.
-rewrite H14; rewrite <- H12; subst; auto.
+rewrite H15; rewrite <- H13; subst; auto.
 assert (Gamma0 = nil) by
   ( apply emptyEquiv_Hyb_permut_empty with (G:= (G0 & (w1, Gamma0)))
       (G':=G & (w0, nil)) (w:=w1); auto;
     assert (emptyEquiv_Hyb G = G) by
       (apply emptyEquiv_Hyb_permut_split_last with (C:=(w, nil)) (H:=G1); auto);
     [ rewrite emptyEquiv_Hyb_rewrite; simpl | apply Mem_last ];
-rewrite H12; auto); subst; assert (exists Gamma'', exists GH, exists GT,
+rewrite H13; auto); subst; assert (exists Gamma'', exists GH, exists GT,
   Gamma'' *=* nil /\ G = GH & (w1, Gamma'') ++ GT) by
   ( apply PPermut_Hyb_split_neq with (w:=w0) (G':=G0) (Gamma:=nil);
     [ symmetry | right; intro; subst; elim n]; auto);
-destruct H12 as (Gamma'', (GH, (GT, (H12a, H12b))));
+destruct H13 as (Gamma'', (GH, (GT, (H12a, H12b))));
 symmetry in H12a; apply permut_nil_eq in H12a; subst;
 rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
 [ apply subst_t_Hyb_preserv_types_outer with (A:=A) (G0 :=GH ++ GT & (w, nil))
@@ -2148,7 +2148,7 @@ assert (G0 & (w, nil) ~=~ GH ++ GT & (w,nil) & (w0, nil)) by
     assert (G0 ~=~ GH ++ GT & (w0, nil)) by
       (apply PPermut_Hyb_last_rev_simpl with (a:=(w1,nil)); rew_app in *; auto);
   try PPermut_Hyb_simpl;
-  rewrite H13; rew_app; auto); rew_app in *; rewrite <- H12.
+  rewrite H14; rew_app; auto); rew_app in *; rewrite <- H13.
 assert (emptyEquiv_Hyb G0 = G0) by
 ( assert (G0 ~=~ GH ++ GT & (w0, nil)) by
     ( apply PPermut_Hyb_last_rev_simpl with (a:=(w, nil));
@@ -2159,9 +2159,9 @@ assert (emptyEquiv_Hyb G0 = G0) by
     GH & (w1, nil) ++ GT)) by
   ( apply emptyEquiv_Hyb_permut_split_last with (C:=(w, nil))
     (H:= (w0,nil)::G1); simpl; rewrite <- H0; rew_app; symmetry; auto);
-  rewrite H13; rewrite H14; rew_app;
+  rewrite H14; rewrite H15; rew_app;
   transitivity (GH ++ (w0, nil) :: (w1, nil)::GT); auto; PPermut_Hyb_simpl);
-rewrite emptyEquiv_Hyb_rewrite; simpl; rewrite H13; auto.
+rewrite emptyEquiv_Hyb_rewrite; simpl; rewrite H14; auto.
 rewrite subst_Hyb_order_irrelevant_bound;
 [ rewrite <- subst_w_Hyb_neutral_free with (w0:=w_fresh) | constructor];
 [ apply rename_w_Hyb_preserv_types_outer
