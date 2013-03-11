@@ -263,11 +263,9 @@ elim H; apply Mem_here.
 rewrite IHl; auto; intro; elim H; rewrite Mem_cons_eq; right; auto.
 Qed.
 
-(*
 (* Shift helpers *)
 
 (* FIXME: Move this to Hybrid/Hyb_Syntax *)
-(* ?? *)
 Fixpoint shift_term_Hyb (M: te_Hyb) :=
 match M with
 | hyp_Hyb v => M
@@ -315,8 +313,6 @@ simpl in *; repeat case_if;
 try erewrite <- IHM;
 try erewrite <- IHM1; try erewrite <- IHM2; eauto.
 Qed.
-
-*)
 
 (* Things to be moved into language definitions *)
 
@@ -516,8 +512,10 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
 | hyp_L_Hyb:
     forall v w, L_to_Hyb_term w (hyp_L v) (hyp_Hyb v)
 | lam_L_Hyb:
-    forall M N A w,
-      L_to_Hyb_term w M N ->
+    forall L M N A w,
+      (forall v0, v0 \notin L ->
+         L_to_Hyb_term w (open_t_L M (hyp_L (fte v0)))
+                       (N ^t^ (hyp_Hyb (fte v0)))) ->
       L_to_Hyb_term w (lam_L A M) (lam_Hyb A N)
 | appl_L_Hyb:
     forall M1 M2 N1 N2 w,
@@ -526,7 +524,9 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term w (appl_L M1 M2) (appl_Hyb N1 N2)
 | box_L_Hyb:
     forall L M N w,
-      (forall w0, w0 \notin L -> L_to_Hyb_term (fwo w0) M N) ->
+      (forall w0, w0 \notin L ->
+                  L_to_Hyb_term (fwo w0) (open_w_L M (fwo w0))
+                                (N^w^ (fwo w0))) ->
       L_to_Hyb_term w (box_L M) (box_Hyb N)
 | unbox_L_Hyb:
     forall M N w,
@@ -537,26 +537,36 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term w M N ->
       L_to_Hyb_term w (here_L M) (get_here_Hyb w N)
 | letd_L_Hyb:
-    forall M1 M2 N1 N2 w,
+    forall Lw Lt M1 M2 N1 N2 w,
       L_to_Hyb_term w M1 N1 ->
-      L_to_Hyb_term (shift_vwo w) M2 N2 ->
+      (forall w0, w0 \notin Lw ->
+         forall v0, v0 \notin Lt ->
+            L_to_Hyb_term (shift_vwo w)
+                          (open_t_L (open_w_L M2 (fwo w0)) (hyp_L (fte v0)))
+                          ((N2 ^w^ (fwo w0)) ^t^ (hyp_Hyb (fte v0)))) ->
       L_to_Hyb_term w (letd_L M1 M2) (letdia_get_Hyb w N1 N2)
 | fetch_L_Hyb:
     forall M N w w',
-      L_to_Hyb_term w M N ->
-      L_to_Hyb_term w' (fetch_L w M) (N ^w^ w)
+      L_to_Hyb_term w M (shift_term_Hyb N) ->
+      L_to_Hyb_term w' (fetch_L w M) (box_Hyb (unbox_fetch_Hyb (shift_vwo w)
+                                                          (shift_term_Hyb N)))
+(*
 | get_L_Hyb:
     forall M N w w',
       L_to_Hyb_term w M N ->
       L_to_Hyb_term w' (get_L w M) N
+*)
 .
 
+(*
 Lemma L_to_Hyb_lc_w:
 forall M n,
   lc_w_n_L n M ->
   forall w N w' k,
     (w = fwo w' \/ (w = bwo k /\ k < n)) ->
-    L_to_Hyb_term w M N -> lc_w_n_Hyb n N.
+    L_to_Hyb_term w M N -> lc_w_n_Hyb (S n) N.
+Admitted.
+(*
 induction M; intros; inversion H; inversion H1; subst;
 unfold open_w_Hyb in *.
 constructor.
@@ -588,28 +598,55 @@ apply IHM2 with (n:=S n) (w':=w') (k:=S k) in H12; auto;
 destruct H0; [| destruct H0; inversion H0]; subst; constructor;
 try omega; eapply IHM; eauto.
 (* fetch fwo *)
-apply IHM with (w:=fwo w0)(N:=N0)(w':=w0)(k:=n) in H4; auto;
-apply lc_w_subst_Hyb_same_n_fwo; auto.
-(* fetch bwo *)
-apply IHM with (w:=bwo m)(N:=N0)(w':=w')(k:=m) in H5;
-auto; try omega;
+repeat constructor.
+apply IHM with (w:=fwo w0)(N:=shift_term_Hyb N0)(w':=w0)(k:=n) in H4; auto.
+apply closed_w_succ; auto.
+(*
+apply IHM with (w:=fwo w0)(N:=shift_term_Hyb N0)(w':=w0)(k:=n) in H4; auto.
+destruct H0; subst;
+[apply lc_w_subst_Hyb_same_n_fwo; auto | destruct H0]; subst;
 apply lc_w_subst_Hyb_same_n_bwo; auto.
-
+*)
+(* fetch bwo *)
+simpl. constructor. constructor.
+apply IHM with (w:=bwo m)(N:=shift_term_Hyb N0)(w':=w')(k:=m) in H5;
+auto; try omega; apply closed_w_succ; auto.
+omega.
+(*
+destruct H0; [ | destruct H0]; subst;
+[apply lc_w_subst_Hyb_same_n_fwo |
+apply lc_w_subst_Hyb_same_n_bwo]; auto.
+*)
 Grab Existential Variables.
 auto. auto. auto. auto. auto. auto. auto.
 Qed.
+*)
 
 Lemma L_to_Hyb_term_subst_t:
 forall M N w C1 C2 v,
   L_to_Hyb_term w M N -> lc_w_Hyb C2 ->
+  free_worlds_Hyb C2 = \{} -> shift_term_Hyb C2 = C2 ->
   (forall w0, L_to_Hyb_term w0 C1 C2) ->
   L_to_Hyb_term w (subst_t_L C1 v M) (subst_t_Hyb C2 v N).
-induction M; intros; inversion H; subst; simpl in *; try case_if;
+Admitted.
+(*
+induction M; intros; inversion H; simpl in *; try case_if;
 auto; try constructor; auto.
-apply box_L_Hyb with (L:=L); intros; apply IHM; auto.
-unfold open_w_Hyb in *; simpl in *;
-rewrite subst_Hyb_order_irrelevant_bound; auto; constructor; eapply IHM; auto.
+apply box_L_Hyb with (L:=L); unfold open_w_Hyb in *;
+unfold open_w_L in *; intros. apply IHM; auto.
+rewrite <- H2;
+rewrite subst_t_Hyb_shift_term_Hyb; auto.
+constructor; auto.
+rewrite <- subst_t_Hyb_shift_term_Hyb; auto;
+rewrite H2; auto.
 Qed.
+apply IHM; eauto.
+destruct v.
+rewrite subst_Hyb_order_irrelevant_bound; auto; constructor; eapply IHM; auto.
+rewrite subst_Hyb_order_irrelevant_free; auto. constructor; eapply IHM; auto.
+rewrite H1; apply notin_empty.
+Qed.
+*)
 
 Lemma L_to_Hyb_term_subst_w:
 forall M N w,
@@ -626,24 +663,25 @@ simpl in *; repeat case_if; subst; eauto using L_to_Hyb_term;
 try (constructor; eapply IHL_to_Hyb_term; repeat case_if; eauto);
 try (constructor; [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2];
      repeat case_if; eauto).
+
 apply box_L_Hyb with (L:=L \u var_from_vwo w0 \u var_from_vwo w1); intros;
-eapply H0; repeat case_if; eauto.
-repeat rewrite notin_union in H2; eauto; destruct H2; eauto.
+eapply H0; repeat case_if; eauto;
+[repeat rewrite notin_union in H2; eauto; destruct H2; eauto | ];
 subst; destruct w0; simpl in *; inversion H2; subst;
 repeat rewrite notin_union in H1; eauto; destruct H1; destruct H3;
 apply notin_singleton in H3; elim H3; auto.
 
 apply box_L_Hyb with (L:=L \u var_from_vwo w0 \u var_from_vwo w1); intros;
-eapply H0; repeat case_if; eauto.
-repeat rewrite notin_union in H1; eauto; destruct H1; eauto.
+eapply H0; repeat case_if; eauto;
+[repeat rewrite notin_union in H1; eauto; destruct H1; eauto | ];
 subst; destruct w0; simpl in *; inversion H3; subst;
 repeat rewrite notin_union in H1; eauto; destruct H1; destruct H4;
 apply notin_singleton in H4; elim H4; auto.
 
 destruct w; destruct w0; simpl in *; inversion H1; subst; elim H2; auto.
 
-rewrite subst_w_Hyb_shift_term_Hyb; constructor;
-(*rewrite <- subst_w_Hyb_shift_term_Hyb.*)
+rewrite subst_w_Hyb_shift_term_Hyb; constructor.
+rewrite <- subst_w_Hyb_shift_term_Hyb.
 eapply IHL_to_Hyb_term; case_if; auto.
 (* apply fetch_L_Hyb.*)
 
@@ -736,278 +774,143 @@ destruct w1; simpl in *; inversion H2.
 Qed.
 *) *)
 *)
+*)
 
 Lemma L_to_Hyb_typing:
 forall Omega_L Gamma_L M_L A w_L G_Hyb Gamma_Hyb M_Hyb,
   L_to_Hyb_ctx Omega_L Gamma_L w_L = (G_Hyb, Some (w_L, Gamma_Hyb)) ->
   L_to_Hyb_term (fwo w_L) M_L M_Hyb ->
-  lc_w_L M_L -> lc_w_Hyb M_Hyb ->
   Omega_L; Gamma_L |- M_L ::: A @ w_L ->
   G_Hyb |= (w_L, Gamma_Hyb) |- M_Hyb ::: A.
 unfold L_to_Hyb_ctx; intros;
 generalize dependent G_Hyb;
 generalize dependent Gamma_Hyb;
 generalize dependent M_Hyb;
-induction H3; intros; inversion H0; subst; simpl in *; inversion H1; subst.
+induction H1; intros; inversion H0; subst; simpl in *.
 (* hyp *)
 constructor;
 [apply ok_L_to_Hyb_ctx_ok_Hyb with (Omega:=Omega) (Gamma:=Gamma) (w:=w)| ];
 auto; eapply Mem_L_to_Hyb_ctx; eauto.
 (* lam *)
-inversion H1; inversion H2; subst.
-apply t_lam_Hyb with (L:=L);
+apply t_lam_Hyb with (L:=L \u L0);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros]; unfold open_t_Hyb in *;
-unfold open_t_L in *; apply H with (x:=v'); auto.
-apply lc_w_subst_t_L; [constructor | ]; auto.
-apply L_to_Hyb_term_subst_t; simpl; auto.
-constructor.
-intros; constructor.
-apply lc_w_subst_t_Hyb; [constructor | ]; auto.
+unfold open_t_L in *; apply H with (x:=v'); auto;
 destruct Ok; apply split_at_Hyb_cons; auto.
 (* appl *)
-inversion H1; inversion H2; subst;
 apply t_appl_Hyb with (A:=A);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb |
  apply IHtypes_L1 | apply IHtypes_L2]; eauto.
 (* box *)
-inversion H1; inversion H2; subst;
 apply t_box_Hyb with (L:=L \u L0 \u
                            from_list (map fst Gamma)).
 assert (G_Hyb & (w, Gamma_Hyb) ~=~ (w, Gamma_Hyb) :: G_Hyb) as HP
   by PPermut_Hyb_simpl; rewrite HP;
 eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-intros; unfold open_w_L in *; unfold open_w_Hyb in *.
-assert ( G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma).
-  apply permut_PPermut_Hyb.
-  symmetry; rewrite bucket_sort_L_permut with
-            (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto.
-rewrite H5.
-eapply H; eauto. apply lc_w_subst_L; auto.
-apply L_to_Hyb_term_subst_w with (w:=fwo w').
-apply H6; eauto. case_if; auto.
-apply lc_w_subst_Hyb; auto.
-case_if; destruct Ok.
+intros; unfold open_w_L in *; unfold open_w_Hyb in *;
+assert ( G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma) by
+  (apply permut_PPermut_Hyb;
+   symmetry; rewrite bucket_sort_L_permut with
+            (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto);
+rewrite H3; eapply H; eauto; case_if; destruct Ok;
 rewrite gather_keys_L_fresh; [|apply notin_Mem]; eauto.
 (* unbox *)
-inversion H1; inversion H2; subst;
 apply t_unbox_Hyb; auto;
 eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
 (* fetch *)
-unfold open_w_Hyb in *; destruct (eq_var_dec w w'); subst.
+apply t_box_Hyb with (L:=used_w_vars_Hyb ((w', Gamma_Hyb) :: G_Hyb)).
+assert (G_Hyb & (w', Gamma_Hyb) ~=~ (w', Gamma_Hyb) :: G_Hyb) as HP
+  by PPermut_Hyb_simpl; rewrite HP;
+eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
+intros; unfold open_w_Hyb; simpl; case_if;
+destruct (eq_var_dec w w'); subst.
 (* = *)
-apply IHtypes_L with (M_Hyb:=N) (Gamma_Hyb:=Gamma_Hyb)(G_Hyb:=G_Hyb) in H6;
-auto;
-[assert (lc_w_Hyb N) by (apply types_Hyb_lc_w_Hyb in H6; auto);
- erewrite closed_subst_w_Hyb_bound |
- apply L_to_Hyb_lc_w with (n:=0) (w':=w') (k:=0) in H8]; eauto.
-(* <> *)
-assert (exists Gw Gammaw, L_to_Hyb_ctx Omega Gamma w =
-                          (Gw, Some (w, Gammaw))).
-  exists (fst (split_at_Hyb (bucket_sort_L Omega Gamma) w)).
-  assert (exists Gamma1, snd (split_at_Hyb (bucket_sort_L Omega Gamma) w) =
-                 Some (w, Gamma1)).
-  apply L_to_Hyb_ctx_Mem_Some;  apply types_L_Mem_Omega in H3; auto.
-  destruct H4; exists x; rewrite <- H4; apply surjective_pairing.
-destruct H4 as (G_w, (Gamma_w, H4)).
-assert ((w', Gamma_Hyb) :: G_Hyb *=* (w, Gamma_w) :: G_w).
-  transitivity (bucket_sort_L Omega Gamma); [symmetry |];
-  unfold L_to_Hyb_ctx in *; apply bucket_sort_L_permut; auto.
-apply permut_split_head in H5; destruct H5 as (hd, (tl, H5)).
-apply IHtypes_L with (Gamma_Hyb:=Gamma_w) (G_Hyb:=G_w) in H8; auto.
-Focus 2.
-apply L_to_Hyb_lc_w with (n:=0) (w':=w) (k:=0) in H8; auto.
-assert (exists w0, w0 \notin free_worlds_Hyb N) by apply Fresh;
-destruct H7 as (w_f);
-rewrite <- subst_w_Hyb_neutral_free with (w0:=w_f); auto.
-replace Gamma_Hyb with (Gamma_Hyb++nil).
-eapply rename_w_Hyb_preserv_types.
-
-erewrite closed_subst_w_Hyb_bound; eauto.
-
-assert (exists G0, G_Hyb ~=~ G0 & (w, Gamma_w)).
-
-
-skip. destruct H6 as (G0).
-rewrite H6. unfold open_w_Hyb in *; simpl.
-case_if.
-apply t_unbox_fetch_Hyb with (G:=G0&(w_L, Gamma_Hyb)) (Gamma:=Gamma_w).
-skip.
-specialize IHM_L with Omega_L Gamma_L ([*]A0) w G_w Gamma_w N.
-apply IHM_L in H5; auto.
-Focus 2. inversion H1; subst; auto. Focus 2. skip. (* from H15 + inv. H1 *)
-assert (G_w ~=~ G0 & (w_L, Gamma_Hyb)). skip.
-rewrite  H8 in H5.
-assert (lc_w_Hyb N). skip.
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto.
-replace (G0 & (w_L, Gamma_Hyb) & (w', nil)) with
- ((G0 & (w_L, Gamma_Hyb)) & (w', nil) ++ nil) by (rew_app; auto).
-apply GlobalWeakening_Hyb; rew_app; auto.
-skip. PPermut_Hyb_simpl.
-
-
-
-destruct (eq_var_dec w w'); subst.
-(* w = w' *)
-eapply IHtypes_L; auto.
-inversion H1; subst; auto.
-apply H8.
-apply t_unbox_fetch_Hyb with (G:=G_Hyb) (Gamma:=Gamma_Hyb); auto.
-=======
-inversion H2; subst; apply t_unbox_Hyb; auto;
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-(* fetch *)
-unfold open_w_Hyb in *.
-destruct (eq_var_dec w w'); subst.
-(* w = w' *)
-apply IHtypes_L with (M_Hyb:=N)(Gamma_Hyb:=Gamma_Hyb) (G_Hyb:=G_Hyb) in H6.
->>>>>>> Stashed changes
+apply t_unbox_fetch_Hyb with (Gamma:=Gamma_Hyb) (G:=G_Hyb).
 assert ((w', Gamma_Hyb) :: G_Hyb & (w'0, nil) ~=~
-        (w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb) by PPermut_Hyb_simpl;
-rewrite H7; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
-assert (G_Hyb & (w'0, nil) ~=~ nil & (w'0, nil) ++ G_Hyb) by PPermut_Hyb_simpl.
-rewrite H7; apply GlobalWeakening_Hyb; rew_app.
-inversion
-eapply IHtypes_L; auto.
-rewrite H13.
-apply lc_w_n_shift_term_Sn_Hyb in H10.
-
-rewrite lc_w_shift_term_Hyb; auto;
-inversion H0; subst. apply H13; auto.
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto. *)
-apply lc_w_subst_Hyb; auto.
-assert ((w', Gamma_Hyb) :: (w'0, nil) :: G_Hyb ~=~
-        (w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb) by PPermut_Hyb_simpl;
-rewrite H9. apply ok_Bg_Hyb_fresh_wo; auto;
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-(* w <> w' *)
+                        (w'0, nil) :: (w', Gamma_Hyb)::G_Hyb)
+       by PPermut_Hyb_simpl;
+rewrite H4; apply ok_Bg_Hyb_fresh_wo;
+[eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
+apply IHtypes_L with (M_Hyb:=shift_term_Hyb N)
+                             (Gamma_Hyb:=Gamma_Hyb) (G_Hyb:=G_Hyb) in H6; auto;
+assert (lc_w_Hyb (shift_term_Hyb N)) by (apply types_Hyb_lc_w_Hyb in H6; auto);
+rewrite closed_subst_w_Hyb_bound with (n:=0); auto;
+replace G_Hyb with (G_Hyb ++ nil) in H6 by (rew_app; auto);
+apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6; rew_app in *; auto.
+assert ((w', Gamma_Hyb) :: G_Hyb & (w'0, nil) ~=~
+                        (w'0, nil) :: (w', Gamma_Hyb)::G_Hyb)
+       by PPermut_Hyb_simpl;
+rewrite H5; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
+PPermut_Hyb_simpl.
+(* <> *)
 assert (exists G0, exists Gamma0,
           split_at_Hyb (bucket_sort_L Omega Gamma) w = (G0, Some (w, Gamma0))).
   exists (fst (split_at_Hyb (bucket_sort_L Omega Gamma) w)).
   assert (exists Gamma1, snd (split_at_Hyb (bucket_sort_L Omega Gamma) w) =
                  Some (w, Gamma1)).
   apply L_to_Hyb_ctx_Mem_Some.
-  apply types_L_Mem_Omega in H3; auto.
-  destruct H7; exists x; rewrite <- H7; apply surjective_pairing.
-  exists (fst (split_at_Hyb (bucket_sort_L Omega Gamma) w)).
-  assert (exists Gamma1, snd (split_at_Hyb (bucket_sort_L Omega Gamma) w) =
-                 Some (w, Gamma1)).
-  apply L_to_Hyb_ctx_Mem_Some.
-  apply types_L_Mem_Omega in H3; auto.
-  destruct H7; exists x; rewrite <- H7; apply surjective_pairing.
-destruct H7 as (G0, (Gamma0, H7)).
-assert ((w, Gamma0) :: G0 *=* (w', Gamma_Hyb) :: G_Hyb).
-  transitivity (bucket_sort_L Omega Gamma); [symmetry | ];
+  apply types_L_Mem_Omega in H1; auto.
+  destruct H4; exists x; rewrite <- H4; apply surjective_pairing.
+destruct H4 as (Gw, (Gammaw, H4)).
+assert ((w, Gammaw) :: Gw *=* (w', Gamma_Hyb) :: G_Hyb).
+transitivity (bucket_sort_L Omega Gamma); [symmetry | ];
   apply bucket_sort_L_permut; eauto.
-apply t_unbox_fetch_Hyb with (G:=G0) (Gamma:=Gamma0).
-assert ((w, Gamma0) :: G0 & (w'0, nil) ~=~
-        (w'0, nil) :: (w, Gamma0) :: G0) by PPermut_Hyb_simpl.
-rewrite H10; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ];
-eauto. rewrite PPermut_Hyb_used_w with (y:=(w', Gamma_Hyb)::G_Hyb); auto;
-apply permut_PPermut_Hyb; auto.
-inversion H11; subst.
-assert (G0 & (w'0, nil) ~=~ nil & (w'0, nil) ++ G0) by PPermut_Hyb_simpl.
-rewrite H10; apply GlobalWeakening_Hyb; rew_app.
-eapply IHtypes_L; auto.
-(*apply lc_w_n_shift_term_Sn_Hyb in H13;
-rewrite lc_w_shift_term_Hyb; auto;
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto.*)
-apply lc_w_subst_Hyb; auto.
-assert ((w, Gamma0) :: (w'0, nil) :: G0 ~=~
-        (w'0, nil) :: (w, Gamma0) :: G0) by PPermut_Hyb_simpl;
-rewrite H12. apply ok_Bg_Hyb_fresh_wo; auto.
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-rewrite PPermut_Hyb_used_w with (y:=(w', Gamma_Hyb)::G_Hyb); auto.
-apply permut_PPermut_Hyb; auto.
-apply permut_PPermut_Hyb;
-transitivity ((w, Gamma0)::G0); [| rewrite H9]; permut_simpl.
+assert (exists hd, exists tl, G_Hyb = hd & (w, Gammaw) ++ tl).
+apply permut_neq_split with (l1:=(w, Gammaw)::Gw) (b:=(w', Gamma_Hyb)); auto.
+intro nn; inversion nn; subst; elim n; auto. apply Mem_here.
+destruct H7 as (hd, (tl, H7)).
+apply t_unbox_fetch_Hyb with (Gamma:=Gammaw)(G:=hd++tl & (w', Gamma_Hyb)).
+assert (ok_Bg_Hyb ((w'0, nil)::(w', Gamma_Hyb)::G_Hyb)) by
+(eapply ok_Bg_Hyb_fresh_wo; eauto; eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto);
+assert ((w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb ~=~
+                   (w, Gammaw) :: (hd ++ tl & (w', Gamma_Hyb)) & (w'0, nil))
+by (subst; PPermut_Hyb_simpl); rewrite <- H9; auto.
+apply IHtypes_L with (M_Hyb:=shift_term_Hyb N)
+                     (Gamma_Hyb:=Gammaw) (G_Hyb:=Gw) in H6;
+auto.
+assert (lc_w_Hyb (shift_term_Hyb N)) by (apply types_Hyb_lc_w_Hyb in H6; auto).
+rewrite closed_subst_w_Hyb_bound with (n:=0); auto.
+replace Gw with (Gw ++ nil) in H6 by (rew_app; auto).
+apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6.
+assert (Gw & (w'0, nil) ~=~  (hd ++ tl & (w', Gamma_Hyb)) & (w'0, nil)).
+PPermut_Hyb_simpl. apply PPermut_Hyb_last_rev_simpl with (a:=(w, Gammaw)).
+transitivity ((w, Gammaw)::Gw). PPermut_Hyb_simpl.
+apply permut_PPermut_Hyb in H5. rewrite H5. subst; PPermut_Hyb_simpl.
+rewrite <- H9; rew_app in *; auto.
+rew_app.
+assert ((w, Gammaw) :: Gw & (w'0, nil) ~=~
+                    (w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb).
+PPermut_Hyb_simpl. apply permut_PPermut_Hyb in H5; rewrite H5; auto.
+rewrite H9; apply ok_Bg_Hyb_fresh_wo. eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
+eauto.
+subst; PPermut_Hyb_simpl.
 (* here *)
 apply t_here_Hyb; auto;
 eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-(* get *)
-destruct (eq_var_dec w w'); subst.
-(* w = w' *)
-apply t_letdia_Hyb with (A:=A) (L_w:=used_w_vars_Hyb (G_Hyb & (w', Gamma_Hyb)))
-                               (L_t:=used_t_vars_Hyb (G_Hyb & (w', Gamma_Hyb))).
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-eapply IHtypes_L; auto.
-intros; unfold open_t_Hyb; unfold open_w_Hyb; simpl; repeat case_if.
-apply t_get_here_Hyb with (G:=G_Hyb) (Gamma:=(v',A)::nil).
-apply ok_Bg_Hyb_fresh_wo_te; auto.
-assert (G_Hyb & (w', Gamma_Hyb) ~=~ (w', Gamma_Hyb) :: G_Hyb)
-  by PPermut_Hyb_simpl; rewrite H7;
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-constructor.
-apply ok_Bg_Hyb_fresh_wo_te; auto.
-assert (G_Hyb & (w', Gamma_Hyb) ~=~ (w', Gamma_Hyb) :: G_Hyb)
-  by PPermut_Hyb_simpl; rewrite H7;
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-apply Mem_here.
-PPermut_Hyb_simpl.
-(* w <> w' *)
-assert (exists G0, exists Gamma0,
-          split_at_Hyb (bucket_sort_L Omega Gamma) w = (G0, Some (w, Gamma0))).
-  exists (fst (split_at_Hyb (bucket_sort_L Omega Gamma) w)).
-  assert (exists Gamma1, snd (split_at_Hyb (bucket_sort_L Omega Gamma) w) =
-                 Some (w, Gamma1)).
-  apply L_to_Hyb_ctx_Mem_Some.
-  apply types_L_Mem_Omega in H3; auto.
-  destruct H7; exists x; rewrite <- H7; apply surjective_pairing.
-destruct H7 as (G0, (Gamma0, H7)).
-assert ((w, Gamma0) :: G0 *=* (w', Gamma_Hyb) :: G_Hyb).
-  transitivity (bucket_sort_L Omega Gamma); [symmetry | ];
-  apply bucket_sort_L_permut; eauto.
-apply t_unbox_fetch_Hyb with (G:=G0) (Gamma:=Gamma0).
-assert ((w, Gamma0) :: G0 & (w'0, nil) ~=~
-        (w'0, nil) :: (w, Gamma0) :: G0) by PPermut_Hyb_simpl.
-rewrite H10; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ];
-eauto. rewrite PPermut_Hyb_used_w with (y:=(w', Gamma_Hyb)::G_Hyb); auto;
-apply permut_PPermut_Hyb; auto.
-inversion H11; subst.
-assert (G0 & (w'0, nil) ~=~ nil & (w'0, nil) ++ G0) by PPermut_Hyb_simpl.
-rewrite H10; apply GlobalWeakening_Hyb; rew_app.
-eapply IHtypes_L; auto.
-apply lc_w_n_shift_term_Sn_Hyb in H13;
-rewrite lc_w_shift_term_Hyb; auto;
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto.
-apply lc_w_subst_Hyb; auto.
-assert ((w, Gamma0) :: (w'0, nil) :: G0 ~=~
-        (w'0, nil) :: (w, Gamma0) :: G0) by PPermut_Hyb_simpl;
-rewrite H12. apply ok_Bg_Hyb_fresh_wo; auto.
-eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
-rewrite PPermut_Hyb_used_w with (y:=(w', Gamma_Hyb)::G_Hyb); auto.
-apply permut_PPermut_Hyb; auto.
-apply permut_PPermut_Hyb;
-transitivity ((w, Gamma0)::G0); [| rewrite H9]; permut_simpl.
-
 (* letd *)
-apply t_letdia_Hyb with (L_w:=Lw \u from_list Omega \u from_list (map fst Gamma)
+apply t_letdia_Hyb with (L_w:=Lw \u Lw0 \u from_list Omega \u
+                                 from_list (map fst Gamma)
                               \u used_w_vars_Hyb ((w, Gamma_Hyb) :: G_Hyb))
-                          (L_t:=Lt \u used_t_vars_Hyb ((w, Gamma_Hyb) :: G_Hyb))
+                          (L_t:=Lt \u Lt0 \u
+                                   used_t_vars_Hyb ((w, Gamma_Hyb) :: G_Hyb))
                           (A:=A); auto;
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros];
 unfold open_w_L in *; unfold open_w_Hyb in *;
-unfold open_t_L in *; unfold open_t_Hyb in *.
+unfold open_t_L in *; unfold open_t_Hyb in *;
 clear IHtypes_L HT2.
-assert (lc_w_L
-           (subst_t_L (hyp_L (fte v')) (bte 0)
-                      (subst_w_L N (fwo w') (bwo 0)))).
-  apply lc_w_subst_t_L; [ constructor | apply lc_w_subst_L]; auto.
-assert (G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma).
-  apply permut_PPermut_Hyb.
-  symmetry; rewrite bucket_sort_L_permut with
-            (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto.
-eapply H; eauto. eauto. eauto.
-apply L_to_Hyb_term_subst_t; [ | constructor | intros; constructor ];
-apply L_to_Hyb_term_subst_w with (w:=fwo w); auto; case_if; auto.
-apply lc_w_subst_t_Hyb; [constructor | apply lc_w_subst_Hyb]; auto.
+assert (G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma) by
+  (apply permut_PPermut_Hyb;
+   symmetry; rewrite bucket_sort_L_permut with
+            (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto).
+apply H with (t:=v') (w':=w'); eauto.
 repeat case_if.
-simpl in *; repeat rewrite notin_union in H6; destruct H6; destruct H13;
-destruct H14; destruct H16; rewrite notin_singleton in H16; elim H16; auto.
+simpl in *; repeat rewrite notin_union in H4; destruct H4; destruct H7;
+destruct H9; destruct H10; destruct H11; rewrite notin_singleton in H11;
+elim H11; auto.
 rewrite bucket_sort_L_smaller; [| apply notin_Mem]; eauto;
 rewrite gather_keys_L_fresh; [| apply notin_Mem]; eauto;
-symmetry in H4; rewrite surjective_pairing in H4; inversion H4; subst;
-rewrite H18; auto.
-Qed
+symmetry in H2; rewrite surjective_pairing in H2; inversion H2; subst;
+rewrite H11; auto.
+Qed.
 
 
 (*
