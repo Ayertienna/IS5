@@ -21,24 +21,39 @@ match G with
   (w, Gamma) :: (LF_to_Hyb_ctx G' (w::U))
 end.
 
-Lemma LF_to_Hyb_ctx_Ok_simpl1:
-forall G X U,
-  ok_LF (X ++ concat G) U -> ok_Hyb (LF_to_Hyb_ctx G (map fst_ X ++ U)) U.
-induction G; simpl; intros; rew_concat in *; [constructor | ].
-constructor. apply notin_Mem; subst; apply var_gen_spec.
-apply IHG with (X:=X++a); rew_app.
-apply ok_LF_fresh_used; auto.
-apply notin_Mem; rew_app.
+(* Alternative definition of context rewrite *)
+Definition compatible_ctx (G: bg_LF) (G':bg_Hyb) :=
+  map snd_ G' *=* G /\
+  ok_Hyb G' nil.
 
+Lemma LF_to_Hyb_ctx_Ok_simpl_worlds:
+forall G U,
+  ok_LF (concat G) U -> ok_Hyb (LF_to_Hyb_ctx G U) U.
+induction G; simpl; intros; rew_concat in *; [constructor | ].
+constructor.
+apply notin_Mem; subst; apply var_gen_spec.
+Admitted.
+
+Lemma LF_to_Hyb_ctx_Ok_simpl_terms:
+forall G U,
+  ok_LF (concat G) U -> ok_Hyb (flat_map snd_ (LF_to_Hyb_ctx G U)) U.
+Admitted.
 
 Lemma LF_to_Hyb_ctx_Ok:
 forall G,
   ok_Bg_LF G -> ok_Bg_Hyb (LF_to_Hyb_ctx G nil).
-unfold ok_Bg_LF in *; intros;
-eapply LF_to_Hyb_ctx_Ok_simpl; eauto.
+unfold ok_Bg_LF in *; intros; split.
+eapply LF_to_Hyb_ctx_Ok_simpl_worlds; eauto.
+eapply LF_to_Hyb_ctx_Ok_simpl_terms; eauto.
 Qed.
 
-Inductive LF_to_Hyb_term: vwo -> te_LF -> te_Hyb -> Prop :=
+Lemma compatible_ctx_Ok:
+forall G G',
+  ok_Bg_LF G -> compatible_ctx G G' -> ok_Bg_Hyb G'.
+unfold compatible_ctx; intros; destruct H0; split; auto.
+Admitted.
+
+Inductive LF_to_Hyb_term: var -> te_LF -> te_Hyb -> Prop :=
 | hyp_LF_Hyb:
     forall v w, LF_to_Hyb_term w (hyp_LF v) (hyp_Hyb v)
 | lam_LF_Hyb:
@@ -55,12 +70,14 @@ Inductive LF_to_Hyb_term: vwo -> te_LF -> te_Hyb -> Prop :=
       LF_to_Hyb_term w (appl_LF M N) (appl_Hyb M' N')
 | box_LF_Hyb:
     forall L M N w,
-      (forall w0, w0 \notin L -> LF_to_Hyb_term w0 M (open_w_Hyb N w0)) ->
+      (forall w0, w0 \notin L -> LF_to_Hyb_term w0 M
+                                                (open_w_Hyb N (fwo w0))) ->
       LF_to_Hyb_term w (box_LF M) (box_Hyb N)
 | unbox_LF_Hyb:
     forall M N w w',
       LF_to_Hyb_term w M N ->
-      LF_to_Hyb_term w' (unbox_LF M) (unbox_fetch_Hyb w N)
+      LF_to_Hyb_term w' (unbox_LF M) (unbox_fetch_Hyb (fwo w) N)
+(*
 | here_LF_Hyb:
     forall M N w w',
       LF_to_Hyb_term w M N ->
@@ -70,16 +87,48 @@ Inductive LF_to_Hyb_term: vwo -> te_LF -> te_Hyb -> Prop :=
       LF_to_Hyb_term w M M' ->
       LF_to_Hyb_term w' N N' ->
       LF_to_Hyb_term w' (letdia_LF M N) (letdia_get_Hyb w M' N')
+*)
 .
 
 Lemma LF_to_Hyb_typing:
-forall G0 Gamma0 M0 A G w M,
-  LF_to_Hyb_ctx (Gamma0::G0) \{} = (w, Gamma0) :: G ->
-  LF_to_Hyb_term (fwo w) M0 M ->
+forall M0 G0 Gamma0 A,
   types_LF G0 Gamma0 M0 A ->
+  forall M w G,
+  compatible_ctx (Gamma0::G0) ((w, Gamma0) :: G) ->
+  LF_to_Hyb_term w M0 M ->
   G |= (w, Gamma0) |- M ::: A.
-intros; induction H1; inversion H0; subst.
-constructor.
+intros M0 G0 Gamma0 A H. induction H; subst;
+intros M1 w G1 Ctx H2;
+inversion H2; subst.
+(* hyp *)
+econstructor.
+apply compatible_ctx_Ok in Ctx; auto. auto.
+(* lam *)
+apply t_lam_Hyb with (L:=L \u L0).
+apply compatible_ctx_Ok in Ctx; auto. intros; auto.
+apply H0 with (G0:=G1); eauto.
+skip. (* compatibility relation gives that from Ctx *)
+(* appl *)
+apply t_appl_Hyb with (A:=A).
+apply compatible_ctx_Ok in Ctx; auto. auto. auto.
+(* box *)
+apply t_box_Hyb with (L:=L).
+apply compatible_ctx_Ok in Ctx; auto.
+assert (G1 & (w, Gamma) ~=~ (w, Gamma) :: G1) by PPermut_Hyb_simpl.
+rewrite H0; auto.
+assert (PPermut_LF (G & Gamma) (Gamma::G)) by PPermut_LF_simpl;
+rewrite H0 in Ok; auto.
+intros; eapply IHtypes_LF; eauto.
+skip. (* compatibility relation gives that from Ctx *)
+(* unbox *)
+destruct (eq_var_dec w0 w); subst.
+constructor; [apply compatible_ctx_Ok in Ctx | eapply IHtypes_LF]; eauto.
+assert (exists G0, exists Gamma0, G1 ~=~ (w0, Gamma0)::G0).
+skip.
+destruct H0 as (G0, (Gamma0, H0)).
+rewrite H0.
+apply t_unbox_fetch_Hyb with (Gamma:=Gamma0) (G:=G0).
+skip. (* permut *) eapply IHtypes_LF.
 
 Lemma LF_to_Hyb_steps:
 forall M M' N,
