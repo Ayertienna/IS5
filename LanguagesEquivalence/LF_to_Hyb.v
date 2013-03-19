@@ -7,50 +7,28 @@ Require Import LabelFree.
 Require Import Hybrid.
 Require Import Arith.
 Require Import ListLib.
+Require Import Setoid.
 
 Open Scope is5_scope.
 Open Scope permut_scope.
 (* FIXME: There is no labelfree is5 scope *)
 Open Scope hybrid_is5_scope.
 
-Fixpoint LF_to_Hyb_ctx (G: bg_LF) (U: list var) : bg_Hyb :=
-match G with
-| nil => nil
-| Gamma::G' =>
-  let w := var_gen (from_list U) in
-  (w, Gamma) :: (LF_to_Hyb_ctx G' (w::U))
-end.
-
-(* Alternative definition of context rewrite *)
-Definition compatible_ctx (G: bg_LF) (G':bg_Hyb) :=
-  map snd_ G' *=* G /\
-  ok_Hyb G' nil.
-
-Lemma LF_to_Hyb_ctx_Ok_simpl_worlds:
-forall G U,
-  ok_LF (concat G) U -> ok_Hyb (LF_to_Hyb_ctx G U) U.
-induction G; simpl; intros; rew_concat in *; [constructor | ].
-constructor.
-apply notin_Mem; subst; apply var_gen_spec.
-Admitted.
-
-Lemma LF_to_Hyb_ctx_Ok_simpl_terms:
-forall G U,
-  ok_LF (concat G) U -> ok_Hyb (flat_map snd_ (LF_to_Hyb_ctx G U)) U.
-Admitted.
+Definition LF_to_Hyb_ctx (G: bg_LF) (G': bg_Hyb) :=
+  map snd_ G' *=* G /\ ok_Hyb G' nil.
 
 Lemma LF_to_Hyb_ctx_Ok:
-forall G,
-  ok_Bg_LF G -> ok_Bg_Hyb (LF_to_Hyb_ctx G nil).
-unfold ok_Bg_LF in *; intros; split.
-eapply LF_to_Hyb_ctx_Ok_simpl_worlds; eauto.
-eapply LF_to_Hyb_ctx_Ok_simpl_terms; eauto.
-Qed.
-
-Lemma compatible_ctx_Ok:
 forall G G',
-  ok_Bg_LF G -> compatible_ctx G G' -> ok_Bg_Hyb G'.
-unfold compatible_ctx; intros; destruct H0; split; auto.
+  ok_Bg_LF G -> LF_to_Hyb_ctx G G' -> ok_Bg_Hyb G'.
+Admitted.
+
+Lemma LF_to_Hyb_ctx_extend:
+forall G G' w Gamma v A,
+  LF_to_Hyb_ctx (Gamma::G) ((w, Gamma)::G') ->
+  LF_to_Hyb_ctx (((v,A)::Gamma)::G) ((w, (v,A)::Gamma)::G').
+Admitted.
+
+Add Morphism LF_to_Hyb_ctx: LF_to_Hyb_ctx_LF.
 Admitted.
 
 Inductive LF_to_Hyb_term: var -> te_LF -> te_Hyb -> Prop :=
@@ -93,42 +71,60 @@ Inductive LF_to_Hyb_term: var -> te_LF -> te_Hyb -> Prop :=
 Lemma LF_to_Hyb_typing:
 forall M0 G0 Gamma0 A,
   types_LF G0 Gamma0 M0 A ->
-  forall M w G,
-  compatible_ctx (Gamma0::G0) ((w, Gamma0) :: G) ->
+  forall M w G G0' G',
+  PPermut_LF (Gamma0::G0) G0' ->
+  PPermut_Hyb ((w, Gamma0)::G) G' ->
+  LF_to_Hyb_ctx G0' G' ->
   LF_to_Hyb_term w M0 M ->
   G |= (w, Gamma0) |- M ::: A.
-intros M0 G0 Gamma0 A H. induction H; subst;
-intros M1 w G1 Ctx H2;
+intros M0 G0 Gamma0 A H; induction H; subst;
+intros M1 w G1 G1' G'' Perm1 Perm2 Ctx H2;
 inversion H2; subst.
 (* hyp *)
-econstructor.
-apply compatible_ctx_Ok in Ctx; auto. auto.
+econstructor;
+[apply LF_to_Hyb_ctx_Ok in Ctx | ]; auto;
+[rewrite Perm2 | rewrite <- Perm1]; auto.
 (* lam *)
-apply t_lam_Hyb with (L:=L \u L0).
-apply compatible_ctx_Ok in Ctx; auto. intros; auto.
-apply H0 with (G0:=G1); eauto.
-skip. (* compatibility relation gives that from Ctx *)
+apply t_lam_Hyb with (L:=L \u L0);
+assert (LF_to_Hyb_ctx G1' G'') by auto;
+apply LF_to_Hyb_ctx_Ok in Ctx; [rewrite Perm2 | rewrite <- Perm1 | |]; auto.
+intros; auto; eapply H0 with (G0:=G1); eauto.
+apply LF_to_Hyb_ctx_extend; rewrite Perm1; rewrite Perm2; auto.
+rewrite <- Perm1; auto.
 (* appl *)
-apply t_appl_Hyb with (A:=A).
-apply compatible_ctx_Ok in Ctx; auto. auto. auto.
+apply t_appl_Hyb with (A:=A);
+assert (LF_to_Hyb_ctx G1' G'') by auto;
+apply LF_to_Hyb_ctx_Ok in Ctx; auto.
+rewrite Perm2; auto. rewrite <- Perm1; auto.
+eapply IHtypes_LF1; eauto.
+rewrite <- Perm1; auto.
+eapply IHtypes_LF2; eauto.
+rewrite <- Perm1; auto.
 (* box *)
 apply t_box_Hyb with (L:=L).
-apply compatible_ctx_Ok in Ctx; auto.
-assert (G1 & (w, Gamma) ~=~ (w, Gamma) :: G1) by PPermut_Hyb_simpl.
-rewrite H0; auto.
+apply LF_to_Hyb_ctx_Ok in Ctx; auto.
+assert (G1 & (w, Gamma) ~=~ (w, Gamma) :: G1) by PPermut_Hyb_simpl;
+rewrite H0; rewrite Perm2; auto.
 assert (PPermut_LF (G & Gamma) (Gamma::G)) by PPermut_LF_simpl;
-rewrite H0 in Ok; auto.
+rewrite H0 in Ok; rewrite <- Perm1; auto.
 intros; eapply IHtypes_LF; eauto.
 skip. (* compatibility relation gives that from Ctx *)
 (* unbox *)
 destruct (eq_var_dec w0 w); subst.
-constructor; [apply compatible_ctx_Ok in Ctx | eapply IHtypes_LF]; eauto.
+(* = *)
+constructor; [apply LF_to_Hyb_ctx_Ok in Ctx | eapply IHtypes_LF]; eauto.
+rewrite Perm2; auto.
+rewrite <- Perm1; auto.
+(* <> *)
 assert (exists G0, exists Gamma0, G1 ~=~ (w0, Gamma0)::G0).
 skip.
 destruct H0 as (G0, (Gamma0, H0)).
 rewrite H0.
 apply t_unbox_fetch_Hyb with (Gamma:=Gamma0) (G:=G0).
-skip. (* permut *) eapply IHtypes_LF.
+skip. (* permut *)
+(* problem: we explicitely use Gamma in the assumptions, so it is required in
+ihtypes :( *)
+eapply IHtypes_LF.
 
 Lemma LF_to_Hyb_steps:
 forall M M' N,
