@@ -569,9 +569,9 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term w (letd_L M1 M2) (letdia_get_Hyb w N1 N2)
 | fetch_L_Hyb:
     forall M N w w',
-      L_to_Hyb_term w M (shift_term_Hyb N) ->
+      L_to_Hyb_term w M N ->
       L_to_Hyb_term w' (fetch_L w M) (box_Hyb (unbox_fetch_Hyb (shift_vwo w)
-                                                          (shift_term_Hyb N)))
+                                                          (N)))
 | get_L_Hyb:
     forall M N w w',
       L_to_Hyb_term w M N ->
@@ -670,9 +670,9 @@ rewrite <- subst_t_comm_L; try omega; auto;
 [rewrite <- subst_t_Hyb_comm; try omega; auto | ];
 rewrite notin_union in H10; destruct H10; simpl in *; eauto.
 (* fetch *)
-rewrite <- H5; rewrite subst_t_Hyb_shift_term_Hyb; auto;
+rewrite <- H5; try rewrite subst_t_Hyb_shift_term_Hyb; auto;
 apply fetch_L_Hyb;
-rewrite <- subst_t_Hyb_shift_term_Hyb; auto;
+try rewrite <- subst_t_Hyb_shift_term_Hyb; auto;
 rewrite H5; eapply IHL_to_Hyb_term; eauto.
 (* get *)
 case_if; [destruct v; simpl in *; inversion H7 | ];
@@ -735,8 +735,8 @@ replace (if eq_vwo_dec (shift_vwo w) (fwo w0)
             else shift_vwo w) with (shift_vwo w'1).
 replace (fwo w1) with (shift_vwo (fwo w1)) by (simpl; auto);
 replace (fwo w0) with (shift_vwo (fwo w0)) by (simpl; auto);
-rewrite subst_w_Hyb_shift_term_Hyb; apply fetch_L_Hyb.
-rewrite <- subst_w_Hyb_shift_term_Hyb.
+try rewrite subst_w_Hyb_shift_term_Hyb; apply fetch_L_Hyb.
+try rewrite <- subst_w_Hyb_shift_term_Hyb. simpl.
 apply IHL_to_Hyb_term. case_if; auto.
 repeat case_if; subst; simpl; auto.
 destruct w; simpl in *; try discriminate; try destruct H1; subst; elim H2; auto.
@@ -802,9 +802,9 @@ assert ((w', Gamma_Hyb) :: G_Hyb & (w'0, nil) ~=~
        by PPermut_Hyb_simpl;
 rewrite H4; apply ok_Bg_Hyb_fresh_wo;
 [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
-apply IHtypes_L with (M_Hyb:=shift_term_Hyb N)
-                             (Gamma_Hyb:=Gamma_Hyb) (G_Hyb:=G_Hyb) in H6; auto;
-assert (lc_w_Hyb (shift_term_Hyb N)) by (apply types_Hyb_lc_w_Hyb in H6; auto);
+apply IHtypes_L with (M_Hyb:=N)
+                             (Gamma_Hyb:=Gamma_Hyb) (G_Hyb:=G_Hyb) in H6; auto.
+assert (lc_w_Hyb ( N)) by (apply types_Hyb_lc_w_Hyb in H6; auto);
 rewrite closed_subst_w_Hyb_bound with (n:=0); auto;
 replace G_Hyb with (G_Hyb ++ nil) in H6 by (rew_app; auto);
 apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6; rew_app in *; auto.
@@ -836,10 +836,10 @@ assert (ok_Bg_Hyb ((w'0, nil)::(w', Gamma_Hyb)::G_Hyb)) by
 assert ((w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb ~=~
                    (w, Gammaw) :: (hd ++ tl & (w', Gamma_Hyb)) & (w'0, nil))
 by (subst; PPermut_Hyb_simpl); rewrite <- H9; auto.
-apply IHtypes_L with (M_Hyb:=shift_term_Hyb N)
+apply IHtypes_L with (M_Hyb:= N)
                      (Gamma_Hyb:=Gammaw) (G_Hyb:=Gw) in H6;
 auto.
-assert (lc_w_Hyb (shift_term_Hyb N)) by (apply types_Hyb_lc_w_Hyb in H6; auto).
+assert (lc_w_Hyb ( N)) by (apply types_Hyb_lc_w_Hyb in H6; auto).
 rewrite closed_subst_w_Hyb_bound with (n:=0); auto.
 replace Gw with (Gw ++ nil) in H6 by (rew_app; auto).
 apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6.
