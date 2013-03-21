@@ -679,16 +679,74 @@ case_if; [destruct v; simpl in *; inversion H7 | ];
 apply get_L_Hyb; eapply IHL_to_Hyb_term; eauto.
 Qed.
 
-Lemma L_to_Hyb_term_subst_w:
+Lemma L_to_Hyb_term_rename_w:
 forall M N w,
   L_to_Hyb_term w M N ->
   forall w0 w1 w',
-    (w' = if eq_vwo_dec w w0 then w1 else w) ->
-    L_to_Hyb_term w' (subst_w_L M w1 w0)
-                     (subst_w_Hyb w1 w0 N).
-Admitted.
-
-
+    (w' = if eq_vwo_dec w (fwo w0) then (fwo w1) else w) ->
+    L_to_Hyb_term w' (subst_w_L M (fwo w1) (fwo w0))
+                     (subst_w_Hyb (fwo w1) (fwo w0) N).
+intros.
+generalize dependent w0;
+generalize dependent w1;
+generalize dependent w'.
+induction H; intros; simpl in *.
+(* hyp *)
+constructor.
+(* lam *)
+apply lam_L_Hyb with (L:=L); intros;
+unfold open_t_L in *; unfold open_t_Hyb in *.
+rewrite <- subst_order_irrelevant_free_L; auto;
+[ rewrite subst_Hyb_order_irrelevant_free; auto | ];
+simpl; auto.
+(* appl *)
+constructor; [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2];
+case_if; eauto.
+(* box *)
+apply box_L_Hyb with (L:=L \u \{w0}); intros;
+unfold open_w_L in *; unfold open_w_Hyb in *;
+rewrite <- subst_w_comm_L;
+[rewrite <- subst_w_Hyb_comm; try omega; auto | ];
+[eapply H0; repeat case_if; auto; inversion H3; subst | ];
+rewrite notin_union in H2; destruct H2; simpl in *; eauto;
+rewrite notin_singleton in H2; elim H2; auto.
+(* unbox *)
+rewrite <- H0; constructor;
+eapply IHL_to_Hyb_term; case_if; auto.
+(* here *)
+rewrite <- H0; constructor;
+eapply IHL_to_Hyb_term; case_if; auto.
+(* letdia *)
+rewrite <- H2; apply letd_L_Hyb with (Lw:=Lw \u \{w0}) (Lt:=Lt).
+eapply IHL_to_Hyb_term; auto.
+intros; unfold open_w_L in *; unfold open_t_L in *;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *.
+rewrite <- subst_w_Hyb_comm; [rewrite <- subst_w_comm_L | ].
+rewrite subst_Hyb_order_irrelevant_free; try (simpl; auto);
+rewrite <- subst_order_irrelevant_free_L; try (simpl; auto);
+eapply H1; eauto; destruct w; repeat case_if; subst; simpl in *;
+auto; [inversion H5; subst; elim H6 | inversion H6; subst; elim H5]; auto.
+rewrite notin_union in H3; simpl in *; destruct H3; auto.
+rewrite notin_union in H3; simpl in *; destruct H3; auto.
+(* fetch *)
+remember (if eq_vwo_dec w (fwo w0) then fwo w1 else w) as w'1.
+replace (if eq_vwo_dec (shift_vwo w) (fwo w0)
+            then fwo w1
+            else shift_vwo w) with (shift_vwo w'1).
+replace (fwo w1) with (shift_vwo (fwo w1)) by (simpl; auto);
+replace (fwo w0) with (shift_vwo (fwo w0)) by (simpl; auto);
+rewrite subst_w_Hyb_shift_term_Hyb; apply fetch_L_Hyb.
+rewrite <- subst_w_Hyb_shift_term_Hyb.
+apply IHL_to_Hyb_term. case_if; auto.
+repeat case_if; subst; simpl; auto.
+destruct w; simpl in *; try discriminate; try destruct H1; subst; elim H2; auto.
+destruct w; simpl in *; try discriminate; try destruct H1; subst; elim H2; auto.
+elim H1; simpl; auto.
+elim H1; simpl; auto.
+(* get *)
+repeat case_if; apply get_L_Hyb; eapply IHL_to_Hyb_term;
+case_if; auto.
+Qed.
 
 Lemma L_to_Hyb_typing:
 forall Omega_L Gamma_L M_L A w_L G_Hyb Gamma_Hyb M_Hyb,
