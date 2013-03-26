@@ -659,13 +659,9 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term w M N ->
       L_to_Hyb_term w (here_L M) (get_here_Hyb w N)
 | letd_L_Hyb:
-    forall Lw Lt M1 M2 N1 N2 w,
+    forall M1 M2 N1 N2 w,
       L_to_Hyb_term w M1 N1 ->
-      (forall w0, w0 \notin Lw ->
-         forall v0, v0 \notin Lt ->
-            L_to_Hyb_term (shift_vwo w)
-                          (open_t_L (open_w_L M2 (fwo w0)) (hyp_L (fte v0)))
-                          ((N2 ^w^ (fwo w0)) ^t^ (hyp_Hyb (fte v0)))) ->
+      L_to_Hyb_term (shift_vwo w) M2 N2 ->
       L_to_Hyb_term w (letd_L M1 M2) (letdia_get_Hyb w N1 N2)
 | fetch_L_Hyb:
     forall M N w w',
@@ -706,18 +702,7 @@ constructor; eapply IHL_to_Hyb_term; eauto.
 (* here *)
 constructor; eapply IHL_to_Hyb_term; eauto.
 (* letdia *)
-apply letd_L_Hyb with (Lw:=Lw) (Lt:=Lt \u var_from_vte v).
-eapply IHL_to_Hyb_term; eauto.
-intros; unfold open_w_L in *; unfold open_t_L in *;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *.
-rewrite <- subst_Hyb_order_irrelevant_bound; auto;
-rewrite subst_order_irrelevant_bound_L; auto.
-destruct v; simpl.
-rewrite <- subst_t_comm2_L; try omega; auto;
-rewrite <- subst_t_comm2_Hyb; try omega; auto.
-rewrite <- subst_t_comm_L; try omega; auto;
-[rewrite <- subst_t_Hyb_comm; try omega; auto | ];
-rewrite notin_union in H9; destruct H9; simpl in *; eauto.
+constructor; eauto.
 (* fetch *)
 rewrite <- H4; rewrite subst_t_Hyb_shift_term_Hyb; auto;
 apply fetch_L_Hyb; eapply IHL_to_Hyb_term; eauto.
@@ -756,24 +741,9 @@ eapply IHL_to_Hyb_term; case_if; auto.
 rewrite <- H0; constructor;
 eapply IHL_to_Hyb_term; case_if; auto.
 (* letdia *)
-rewrite <- H2; apply letd_L_Hyb with (Lw:=Lw \u var_from_vwo w0) (Lt:=Lt).
-eapply IHL_to_Hyb_term; auto.
-intros; unfold open_w_L in *; unfold open_t_L in *;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *.
-destruct w0; simpl in *.
-rewrite <- subst_w_L_comm2; try omega; try discriminate;
-rewrite <- subst_w_Hyb_comm2; try omega; try discriminate;
-rewrite subst_Hyb_order_irrelevant_bound; try constructor;
-rewrite <- subst_order_irrelevant_bound_L; try constructor;
-eapply H1; eauto; destruct w; repeat case_if; subst; simpl in *;
-auto; [inversion H5; subst; elim H6 | inversion H6; subst; elim H5]; auto.
-rewrite <- subst_w_Hyb_comm; [rewrite <- subst_w_comm_L | ].
-rewrite subst_Hyb_order_irrelevant_free; try (simpl; auto);
-rewrite <- subst_order_irrelevant_free_L; try (simpl; auto);
-eapply H1; eauto; destruct w; repeat case_if; subst; simpl in *;
-auto; [inversion H5; subst; elim H6 | inversion H6; subst; elim H5]; auto.
-rewrite notin_union in H3; simpl in *; destruct H3; auto.
-rewrite notin_union in H3; simpl in *; destruct H3; auto.
+rewrite <- H1; constructor; eauto.
+eapply IHL_to_Hyb_term2; repeat case_if; subst; simpl in *; auto;
+destruct w; destruct w0; simpl in *; inversion H2; subst; elim H3; auto.
 (* fetch *)
 remember (if eq_vwo_dec w w0 then fwo w1 else w) as w'1;
 replace (if eq_vwo_dec (shift_vwo w) (shift_vwo w0)
@@ -963,10 +933,10 @@ PPermut_Hyb_simpl.
 subst; PPermut_Hyb_simpl.
 subst; PPermut_Hyb_simpl.
 (* letd *)
-apply t_letdia_Hyb with (L_w:=Lw \u Lw0 \u from_list Omega \u
+apply t_letdia_Hyb with (L_w:=Lw \u from_list Omega \u
                                  from_list (map fst Gamma)
                               \u used_w_vars_Hyb ((w, Gamma_Hyb) :: G_Hyb))
-                          (L_t:=Lt \u Lt0 \u
+                          (L_t:=Lt \u
                                    used_t_vars_Hyb ((w, Gamma_Hyb) :: G_Hyb))
                           (A:=A); auto;
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros];
@@ -978,10 +948,12 @@ assert (G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma) by
    symmetry; rewrite bucket_sort_L_permut with
             (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto).
 apply H with (t:=v') (w':=w'); eauto.
-repeat case_if.
+apply L_to_Hyb_term_subst_t; try constructor;
+eapply L_to_Hyb_term_subst_w; eauto; case_if; auto.
+repeat case_if; auto.
 simpl in *; repeat rewrite notin_union in H4; destruct H4; destruct H7;
-destruct H9; destruct H10; destruct H11; rewrite notin_singleton in H11;
-elim H11; auto.
+destruct H9; destruct H10; rewrite notin_singleton in H10;
+elim H10; auto.
 rewrite bucket_sort_L_smaller; [| apply notin_Mem]; eauto;
 rewrite gather_keys_L_fresh; [| apply notin_Mem]; eauto;
 symmetry in H2; rewrite surjective_pairing in H2; inversion H2; subst;
