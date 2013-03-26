@@ -285,6 +285,65 @@ elim H; apply Mem_here.
 rewrite IHl; auto; intro; elim H; rewrite Mem_cons_eq; right; auto.
 Qed.
 
+(* Shift helpers *)
+
+(* FIXME: Move this to Hybrid/Hyb_Syntax *)
+Fixpoint shift_term_Hyb (M: te_Hyb) :=
+match M with
+| hyp_Hyb v => M
+| lam_Hyb t M => lam_Hyb t (shift_term_Hyb M)
+| appl_Hyb M1 M2 => appl_Hyb (shift_term_Hyb M1) (shift_term_Hyb M2)
+| box_Hyb M => box_Hyb (shift_term_Hyb M)
+| unbox_fetch_Hyb w M => unbox_fetch_Hyb (shift_vwo w) (shift_term_Hyb M)
+| get_here_Hyb w M => get_here_Hyb (shift_vwo w) (shift_term_Hyb M)
+| letdia_get_Hyb w M N => letdia_get_Hyb (shift_vwo w) (shift_term_Hyb M)
+                                         (shift_term_Hyb N)
+end.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_w_n_shift_term_Sn_Hyb:
+forall N n,
+  lc_w_n_Hyb (S n) (shift_term_Hyb N) <->
+  lc_w_n_Hyb n N.
+split; generalize dependent n; generalize dependent N.
+induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
+try (destruct v; inversion H0; subst);
+constructor; auto; omega.
+induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
+try (destruct v; inversion H0; subst);
+constructor; auto; omega.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma subst_t_Hyb_shift_term_Hyb:
+forall N C v,
+  lc_w_Hyb C ->
+  subst_t_Hyb (shift_term_Hyb C) v (shift_term_Hyb N) =
+  shift_term_Hyb (subst_t_Hyb C v N).
+induction N; intros; simpl; try case_if; simpl;
+try (rewrite IHN; eauto);
+try (rewrite IHN1; try rewrite IHN2; auto); auto.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma subst_w_Hyb_shift_term_Hyb:
+forall M w w',
+  {{shift_vwo w // shift_vwo w'}} (shift_term_Hyb M) =
+  shift_term_Hyb ({{w//w'}}M).
+induction M; intros; destruct w; destruct w'; try destruct v;
+simpl in *; repeat case_if;
+try erewrite <- IHM;
+try erewrite <- IHM1; try erewrite <- IHM2; eauto.
+Qed.
+
+Lemma test_shift_lc_w:
+forall w N,
+lc_w_Hyb (shift_term_Hyb N) ->
+{{w // bwo 0}} (shift_term_Hyb N) = shift_term_Hyb N.
+intros;
+apply closed_subst_w_Hyb_bound with (n:=0); try omega; auto.
+Qed.
+
 (* Things to be moved into language definitions *)
 
 (* FIXME: Move this to Labeled/Lists/L_Substitution *)
@@ -526,10 +585,8 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
 | hyp_L_Hyb:
     forall v w, L_to_Hyb_term w (hyp_L v) (hyp_Hyb v)
 | lam_L_Hyb:
-    forall L M N A w,
-      (forall v0, v0 \notin L ->
-         L_to_Hyb_term w (open_t_L M (hyp_L (fte v0)))
-                       (N ^t^ (hyp_Hyb (fte v0)))) ->
+    forall M N A w,
+      L_to_Hyb_term w M N ->
       L_to_Hyb_term w (lam_L A M) (lam_Hyb A N)
 | appl_L_Hyb:
     forall M1 M2 N1 N2 w,
@@ -586,14 +643,7 @@ induction H1; intros; simpl in *.
 (* hyp *)
 case_if; auto; constructor.
 (* lam *)
-apply lam_L_Hyb with (L:=L \u var_from_vte v); intros;
-unfold open_t_L in *; unfold open_t_Hyb in *.
-destruct v; simpl.
-rewrite <- subst_t_comm2_L; try omega; auto;
-rewrite <- subst_t_comm2_Hyb; try omega; auto.
-rewrite <- subst_t_comm_L; try omega; auto;
-[rewrite <- subst_t_Hyb_comm; try omega; auto|];
-rewrite notin_union in H6; destruct H6; simpl in *; eauto.
+constructor; eauto.
 (* appl *)
 constructor;
 [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2]; eauto.
@@ -641,11 +691,7 @@ induction H; intros; simpl in *.
 (* hyp *)
 constructor.
 (* lam *)
-apply lam_L_Hyb with (L:=L); intros;
-unfold open_t_L in *; unfold open_t_Hyb in *;
-rewrite <- subst_order_irrelevant_free_L; auto;
-[ rewrite subst_Hyb_order_irrelevant_free; auto | ];
-simpl; auto.
+constructor; eauto.
 (* appl *)
 constructor; [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2];
 case_if; eauto.
@@ -707,9 +753,10 @@ constructor;
 [apply ok_L_to_Hyb_ctx_ok_Hyb with (Omega:=Omega) (Gamma:=Gamma) (w:=w)| ];
 auto; eapply Mem_L_to_Hyb_ctx; eauto.
 (* lam *)
-apply t_lam_Hyb with (L:=L \u L0);
+apply t_lam_Hyb with (L:=L);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros]; unfold open_t_Hyb in *;
-unfold open_t_L in *; apply H with (x:=v'); auto;
+unfold open_t_L in *; apply H with (x:=v'); auto.
+apply L_to_Hyb_term_subst_t; try constructor; auto.
 destruct Ok; apply split_at_Hyb_cons; auto.
 (* appl *)
 apply t_appl_Hyb with (A:=A);
