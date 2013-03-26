@@ -336,6 +336,59 @@ try erewrite <- IHM;
 try erewrite <- IHM1; try erewrite <- IHM2; eauto.
 Qed.
 
+(* FIXME: Real lemma with a proper proof would be nice... *)
+Lemma shift_term_Hyb_types_Hyb:
+forall N w G Gamma A w0,
+  G |= (w, Gamma) |- N ::: A ->
+  G |= (w, Gamma) |- (shift_term_Hyb N) ^w^ (fwo w0) ::: A.
+intros; generalize dependent w0; induction H; intros;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *.
+(* hyp *)
+constructor; eauto.
+(* lam *)
+econstructor; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+(* appl *)
+econstructor; eauto.
+(* box *)
+econstructor; unfold open_w_Hyb; intros; eauto.
+specialize H with w' w1; auto; apply H with w' in H0; eauto.
+rewrite <- subst_w_Hyb_shift_term_Hyb in H0; simpl in *.
+skip. (* !!! *)
+(* unbox *)
+case_if; constructor; eauto.
+(* unbox fetch *)
+rewrite <- H0;
+case_if; apply t_unbox_fetch_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
+(* here *)
+case_if; constructor; eauto.
+(* get_here *)
+rewrite <- H0;
+case_if; apply t_get_here_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
+(* letdia *)
+case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+rewrite subst_Hyb_order_irrelevant_bound; try constructor.
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+skip. (* !!! *)
+(* letdia_get *)
+rewrite <- H1.
+case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+rewrite subst_Hyb_order_irrelevant_bound; try constructor.
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+skip. (* !!! *)
+Grab Existential Variables.
+auto. auto. auto. auto.
+Qed.
+
 Lemma test_shift_lc_w:
 forall w N,
 lc_w_Hyb (shift_term_Hyb N) ->
@@ -808,14 +861,13 @@ rewrite H4; apply ok_Bg_Hyb_fresh_wo;
 [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
 apply IHtypes_L with (M_Hyb:=N)
                              (Gamma_Hyb:=Gamma_Hyb) (G_Hyb:=G_Hyb) in H6; auto.
-assert (lc_w_Hyb ( N)) by (apply types_Hyb_lc_w_Hyb in H6; auto);
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto;
 replace G_Hyb with (G_Hyb ++ nil) in H6 by (rew_app; auto);
 apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6; rew_app in *; auto.
+apply shift_term_Hyb_types_Hyb; eauto.
 assert ((w', Gamma_Hyb) :: G_Hyb & (w'0, nil) ~=~
                         (w'0, nil) :: (w', Gamma_Hyb)::G_Hyb)
-       by PPermut_Hyb_simpl;
-rewrite H5; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
+       by PPermut_Hyb_simpl.
+rewrite H4; apply ok_Bg_Hyb_fresh_wo; [eapply ok_L_to_Hyb_ctx_ok_Hyb | ]; eauto.
 PPermut_Hyb_simpl.
 (* <> *)
 assert (exists G0, exists Gamma0,
@@ -843,20 +895,19 @@ by (subst; PPermut_Hyb_simpl); rewrite <- H9; auto.
 apply IHtypes_L with (M_Hyb:= N)
                      (Gamma_Hyb:=Gammaw) (G_Hyb:=Gw) in H6;
 auto.
-assert (lc_w_Hyb ( N)) by (apply types_Hyb_lc_w_Hyb in H6; auto).
-rewrite closed_subst_w_Hyb_bound with (n:=0); auto.
+apply shift_term_Hyb_types_Hyb; eauto.
 replace Gw with (Gw ++ nil) in H6 by (rew_app; auto).
 apply GlobalWeakening_Hyb with (Ctx':=(w'0, nil)) in H6.
 assert (Gw & (w'0, nil) ~=~  (hd ++ tl & (w', Gamma_Hyb)) & (w'0, nil)).
 PPermut_Hyb_simpl. apply PPermut_Hyb_last_rev_simpl with (a:=(w, Gammaw)).
 transitivity ((w, Gammaw)::Gw). PPermut_Hyb_simpl.
 apply permut_PPermut_Hyb in H5. rewrite H5. subst; PPermut_Hyb_simpl.
-rewrite <- H9; rew_app in *; auto.
+rewrite <- H8; rew_app in *; auto.
 rew_app.
 assert ((w, Gammaw) :: Gw & (w'0, nil) ~=~
                     (w'0, nil) :: (w', Gamma_Hyb) :: G_Hyb).
 PPermut_Hyb_simpl. apply permut_PPermut_Hyb in H5; rewrite H5; auto.
-rewrite H9; apply ok_Bg_Hyb_fresh_wo. eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
+rewrite H8; apply ok_Bg_Hyb_fresh_wo. eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
 eauto.
 subst; PPermut_Hyb_simpl.
 (* here *)
