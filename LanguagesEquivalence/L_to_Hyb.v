@@ -647,9 +647,8 @@ Inductive L_to_Hyb_term: vwo -> te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term w M2 N2 ->
       L_to_Hyb_term w (appl_L M1 M2) (appl_Hyb N1 N2)
 | box_L_Hyb:
-    forall L M N w,
-      (forall w0, w0 \notin L ->
-                  L_to_Hyb_term (fwo w0) M N) ->
+    forall M N w,
+      L_to_Hyb_term (bwo 0) M N ->
       L_to_Hyb_term w (box_L M) (box_Hyb N)
 | unbox_L_Hyb:
     forall M N w,
@@ -701,8 +700,7 @@ constructor; eapply IHL_to_Hyb_term; eauto.
 constructor;
 [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2]; eauto.
 (* box *)
-apply box_L_Hyb with (L:=L); intros;
-unfold open_w_L in *; unfold open_w_Hyb in *; auto.
+constructor; auto.
 (* unbox *)
 constructor; eapply IHL_to_Hyb_term; eauto.
 (* here *)
@@ -748,13 +746,9 @@ constructor; eauto.
 constructor; [eapply IHL_to_Hyb_term1 | eapply IHL_to_Hyb_term2];
 case_if; eauto.
 (* box *)
-apply box_L_Hyb with (L:=L \u var_from_vwo w0); intros;
-unfold open_w_L in *; unfold open_w_Hyb in *;
+apply box_L_Hyb; auto.
 destruct w0; simpl in *;
-eapply H0; eauto; repeat case_if; eauto; eauto;
-inversion H3; subst;
-rewrite notin_union in H2; destruct H2; simpl in *; eauto;
-rewrite notin_singleton in H2; elim H2; auto.
+eapply IHL_to_Hyb_term; eauto; repeat case_if; eauto; eauto.
 (* unbox *)
 rewrite <- H0; constructor;
 eapply IHL_to_Hyb_term; case_if; auto.
@@ -823,7 +817,7 @@ apply t_appl_Hyb with (A:=A);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb |
  apply IHtypes_L1 | apply IHtypes_L2]; eauto.
 (* box *)
-apply t_box_Hyb with (L:=L \u L0 \u
+apply t_box_Hyb with (L:=L \u
                            from_list (map fst Gamma)).
 assert (G_Hyb & (w, Gamma_Hyb) ~=~ (w, Gamma_Hyb) :: G_Hyb) as HP
   by PPermut_Hyb_simpl; rewrite HP;
@@ -834,7 +828,7 @@ assert ( G_Hyb & (w, Gamma_Hyb) ~=~ bucket_sort_L Omega Gamma) by
    symmetry; rewrite bucket_sort_L_permut with
             (w:=w) (Gamma':=Gamma_Hyb) (G:=G_Hyb); [permut_simpl | ]; auto).
 rewrite H3; eapply H; eauto.
-apply L_to_Hyb_term_subst_w with (w:=fwo w'); auto; case_if; auto.
+apply L_to_Hyb_term_subst_w with (w:=bwo 0); auto; case_if; auto.
 case_if; destruct Ok;
 rewrite gather_keys_L_fresh; [|apply notin_Mem]; eauto.
 (* unbox *)
