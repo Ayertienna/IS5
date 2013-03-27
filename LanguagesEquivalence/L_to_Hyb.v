@@ -912,9 +912,25 @@ Qed.
 
 Lemma L_to_Hyb_steps:
 forall M w M',
+  lc_w_Hyb (L_to_Hyb_term w M) ->
+  lc_t_Hyb (L_to_Hyb_term w M) ->
   step_L (M, w) (M', w) ->
   value_Hyb (L_to_Hyb_term w M) \/
   step_Hyb (L_to_Hyb_term w M, w) (L_to_Hyb_term w M', w).
+induction M; intros; inversion H1; subst;
+unfold open_t_L in *; unfold open_t_Hyb in *;
+unfold open_w_L in *; unfold open_w_Hyb in *;
+simpl in *.
+(* appl_lam *)
+inversion H; inversion H0; subst;
+right; rewrite L_to_Hyb_term_subst_t with (C2:=L_to_Hyb_term w M2); auto.
+constructor; auto. skip. skip. skip. skip. (* !!! *)
+(* appl *)
+inversion H; inversion H0; subst;
+destruct IHM1 with (w:=w) (M':=M'0); auto.
+skip. (* value moves to value *)
+right; constructor; eauto.
+(* unbox_box *)
 Admitted.
 
 Close Scope labeled_is5_scope.
