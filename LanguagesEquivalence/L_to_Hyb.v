@@ -285,6 +285,118 @@ elim H; apply Mem_here.
 rewrite IHl; auto; intro; elim H; rewrite Mem_cons_eq; right; auto.
 Qed.
 
+(* Shift helpers *)
+
+(* FIXME: Move this to Hybrid/Hyb_Syntax *)
+Fixpoint shift_term_Hyb (M: te_Hyb) :=
+match M with
+| hyp_Hyb v => M
+| lam_Hyb t M => lam_Hyb t (shift_term_Hyb M)
+| appl_Hyb M1 M2 => appl_Hyb (shift_term_Hyb M1) (shift_term_Hyb M2)
+| box_Hyb M => box_Hyb (shift_term_Hyb M)
+| unbox_fetch_Hyb w M => unbox_fetch_Hyb (shift_vwo w) (shift_term_Hyb M)
+| get_here_Hyb w M => get_here_Hyb (shift_vwo w) (shift_term_Hyb M)
+| letdia_get_Hyb w M N => letdia_get_Hyb (shift_vwo w) (shift_term_Hyb M)
+                                         (shift_term_Hyb N)
+end.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_w_n_shift_term_Sn_Hyb:
+forall N n,
+  lc_w_n_Hyb (S n) (shift_term_Hyb N) <->
+  lc_w_n_Hyb n N.
+split; generalize dependent n; generalize dependent N.
+induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
+try (destruct v; inversion H0; subst);
+constructor; auto; omega.
+induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
+try (destruct v; inversion H0; subst);
+constructor; auto; omega.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma subst_t_Hyb_shift_term_Hyb:
+forall N C v,
+  lc_w_Hyb C ->
+  subst_t_Hyb (shift_term_Hyb C) v (shift_term_Hyb N) =
+  shift_term_Hyb (subst_t_Hyb C v N).
+induction N; intros; simpl; try case_if; simpl;
+try (rewrite IHN; eauto);
+try (rewrite IHN1; try rewrite IHN2; auto); auto.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma subst_w_Hyb_shift_term_Hyb:
+forall M w w',
+  {{shift_vwo w // shift_vwo w'}} (shift_term_Hyb M) =
+  shift_term_Hyb ({{w//w'}}M).
+induction M; intros; destruct w; destruct w'; try destruct v;
+simpl in *; repeat case_if;
+try erewrite <- IHM;
+try erewrite <- IHM1; try erewrite <- IHM2; eauto.
+Qed.
+
+(* FIXME: Real lemma with a proper proof would be nice... *)
+Lemma shift_term_Hyb_types_Hyb:
+forall N w G Gamma A w0,
+  G |= (w, Gamma) |- N ::: A ->
+  G |= (w, Gamma) |- (shift_term_Hyb N) ^w^ (fwo w0) ::: A.
+intros; generalize dependent w0; induction H; intros;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *.
+(* hyp *)
+constructor; eauto.
+(* lam *)
+econstructor; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+(* appl *)
+econstructor; eauto.
+(* box *)
+econstructor; unfold open_w_Hyb; intros; eauto.
+specialize H with w' w1; auto; apply H with w' in H0; eauto.
+rewrite <- subst_w_Hyb_shift_term_Hyb in H0; simpl in *.
+skip. (* !!! *)
+(* unbox *)
+case_if; constructor; eauto.
+(* unbox fetch *)
+rewrite <- H0;
+case_if; apply t_unbox_fetch_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
+(* here *)
+case_if; constructor; eauto.
+(* get_here *)
+rewrite <- H0;
+case_if; apply t_get_here_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
+(* letdia *)
+case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+rewrite subst_Hyb_order_irrelevant_bound; try constructor.
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+skip. (* !!! *)
+(* letdia_get *)
+rewrite <- H1.
+case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
+rewrite subst_Hyb_order_irrelevant_bound; try constructor;
+rewrite subst_Hyb_order_irrelevant_bound; try constructor.
+replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
+                                  by (simpl; auto);
+rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
+skip. (* !!! *)
+Grab Existential Variables.
+auto. auto. auto. auto.
+Qed.
+
+Lemma test_shift_lc_w:
+forall w N,
+lc_w_Hyb (shift_term_Hyb N) ->
+{{w // bwo 0}} (shift_term_Hyb N) = shift_term_Hyb N.
+intros;
+apply closed_subst_w_Hyb_bound with (n:=0); try omega; auto.
+Qed.
+
 (* Things to be moved into language definitions *)
 
 (* FIXME: Move this to Labeled/Lists/L_Substitution *)
@@ -518,218 +630,6 @@ forall M w w' w'',
 induction M; intros; simpl; repeat case_if;
 try rewrite IHM;
 try rewrite IHM1; try rewrite IHM2; eauto.
-Qed.
-
-
-(* Shift helpers *)
-
-(* FIXME: Move this to Hybrid/Hyb_Syntax *)
-Fixpoint shift_term_Hyb (M: te_Hyb) :=
-match M with
-| hyp_Hyb v => M
-| lam_Hyb t M => lam_Hyb t (shift_term_Hyb M)
-| appl_Hyb M1 M2 => appl_Hyb (shift_term_Hyb M1) (shift_term_Hyb M2)
-| box_Hyb M => box_Hyb (shift_term_Hyb M)
-| unbox_fetch_Hyb w M => unbox_fetch_Hyb (shift_vwo w) (shift_term_Hyb M)
-| get_here_Hyb w M => get_here_Hyb (shift_vwo w) (shift_term_Hyb M)
-| letdia_get_Hyb w M N => letdia_get_Hyb (shift_vwo w) (shift_term_Hyb M)
-                                         (shift_term_Hyb N)
-end.
-
-Fixpoint shift_by_n_vwo (w: vwo) (n:nat) :=
-match w with
-| fwo w0 => fwo w0
-| bwo n0 => bwo (n+n0)
-end.
-
-Fixpoint shift_term_by_n_Hyb (M: te_Hyb) (n:nat) :=
-match M with
-| hyp_Hyb v => M
-| lam_Hyb t M => lam_Hyb t (shift_term_by_n_Hyb M n)
-| appl_Hyb M1 M2 =>
-  appl_Hyb (shift_term_by_n_Hyb M1 n) (shift_term_by_n_Hyb M2 n)
-| box_Hyb M => box_Hyb (shift_term_by_n_Hyb M n)
-| unbox_fetch_Hyb w M =>
-  unbox_fetch_Hyb (shift_by_n_vwo w n) (shift_term_by_n_Hyb M n)
-| get_here_Hyb w M =>
-  get_here_Hyb (shift_by_n_vwo w n) (shift_term_by_n_Hyb M n)
-| letdia_get_Hyb w M N =>
-  letdia_get_Hyb (shift_by_n_vwo w n) (shift_term_by_n_Hyb M n)
-                 (shift_term_by_n_Hyb N n)
-end.
-
-Lemma shift_by_n_vwo_shift_vwo:
-forall w,
-shift_vwo w = shift_by_n_vwo w 1.
-destruct w; simpl; auto.
-Qed.
-
-Lemma shift_term_shift_term_by_n_Hyb:
-forall M,
-  shift_term_Hyb M = shift_term_by_n_Hyb M 1.
-induction M; intros; simpl;
-try rewrite IHM || (rewrite IHM1; rewrite IHM2); eauto;
-rewrite shift_by_n_vwo_shift_vwo; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_n_shift_term_Sn_Hyb:
-forall N n,
-  lc_w_n_Hyb (S n) (shift_term_Hyb N) <->
-  lc_w_n_Hyb n N.
-split; generalize dependent n; generalize dependent N.
-induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
-try (destruct v; inversion H0; subst);
-constructor; auto; omega.
-induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
-try (destruct v; inversion H0; subst);
-constructor; auto; omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_t_n_shift_term_n_Hyb:
-forall N n,
-  lc_t_n_Hyb n (shift_term_Hyb N) <->
-  lc_t_n_Hyb n N.
-split; generalize dependent n; generalize dependent N.
-induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
-try (destruct v; inversion H0; subst);
-constructor; auto; omega.
-induction N; intros; inversion H; subst; simpl in *; unfold shift_vwo in *;
-try (destruct v; inversion H0; subst);
-constructor; auto; omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma subst_t_Hyb_shift_term_Hyb:
-forall N C v,
-  lc_w_Hyb C ->
-  subst_t_Hyb (shift_term_Hyb C) v (shift_term_Hyb N) =
-  shift_term_Hyb (subst_t_Hyb C v N).
-induction N; intros; simpl; try case_if; simpl;
-try (rewrite IHN; eauto);
-try (rewrite IHN1; try rewrite IHN2; auto); auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma subst_w_Hyb_shift_term_Hyb:
-forall M w w',
-  {{shift_vwo w // shift_vwo w'}} (shift_term_Hyb M) =
-  shift_term_Hyb ({{w//w'}}M).
-induction M; intros; destruct w; destruct w'; try destruct v;
-simpl in *; repeat case_if;
-try erewrite <- IHM;
-try erewrite <- IHM1; try erewrite <- IHM2; eauto.
-Qed.
-
-Fixpoint list_subst_w_Hyb (L: list vwo) (n:nat) (M:te_Hyb):=
-match L with
-| nil => M
-| w0 :: L' => {{w0 // bwo n}}(list_subst_w_Hyb L' (S n) M)
-end.
-
-Fixpoint is_free_vwo (w:vwo):=
-match w with
-|fwo _ => True
-| _ => False
-end.
-
-Fixpoint map_shift_vwo (L: list vwo) :=
-match L with
-|nil => nil
-| w::L' => shift_vwo w :: (map_shift_vwo L')
-end.
-
-Lemma length_map_shift:
-forall L,
-length L = length (map_shift_vwo L).
-induction L; intros; [ | destruct a]; simpl; auto;
-rew_length; omega.
-Qed.
-
-Lemma list_subst_w_Hyb_box:
-forall L M n,
-  list_subst_w_Hyb L n (box_Hyb M) =
-  box_Hyb (list_subst_w_Hyb (map_shift_vwo L) (S n) M).
-induction L; intros; simpl; auto;
-rewrite IHL; simpl; auto.
-Qed.
-
-(* FIXME: Real lemma with a proper proof would be nice... *)
-Lemma shift_term_Hyb_types_Hyb:
-forall N w G Gamma A L n,
-  G |= (w, Gamma) |- N ::: A ->
-  n = length L ->
-  (forall w0, Mem w0 L -> is_free_vwo w0) ->
-  G |= (w, Gamma) |- list_subst_w_Hyb L 0 (shift_term_by_n_Hyb N n) ::: A.
-intros; generalize dependent n; generalize dependent L.
-induction H; intros; subst;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *.
-skip.
-skip.
-skip.
-rewrite list_subst_w_Hyb_box.
-assert (map_shift_vwo L0 = L0).
-induction L0; intros; simpl; eauto; destruct a.
-specialize H1 with (bwo n); elim H1; apply Mem_here.
-simpl. rewrite IHL0; eauto.
-intros; apply H1; rewrite Mem_cons_eq; right; auto.
-econstructor; intros. skip.
-unfold open_w_Hyb.
-replace ({{fwo w' // bwo 0}}
-      (list_subst_w_Hyb (map_shift_vwo L0) 1 (shift_term_by_n_Hyb M (length L0))))
-with (list_subst_w_Hyb ((fwo w')::L0) 0
-                       (shift_term_by_n_Hyb M ((length L0)))).
-Focus 2.
-simpl; rewrite H0; auto.
-
-simpl in *.
-
-(* hyp *)
-constructor; eauto.
-(* lam *)
-econstructor; unfold open_t_Hyb; intros; eauto.
-rewrite subst_Hyb_order_irrelevant_bound; try constructor;
-replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
-                                  by (simpl; auto);
-rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
-(* appl *)
-econstructor; eauto.
-(* box *)
-econstructor; unfold open_w_Hyb; intros; eauto.
-rewrite subst_w_Hyb_comm2; try omega; try discriminate.
-specialize H with w' w1; auto; apply H with w1 in H0; eauto.
-rewrite <- subst_w_Hyb_shift_term_Hyb in H0; simpl in *.
-skip. (* !!! *)
-(* unbox *)
-case_if; constructor; eauto.
-(* unbox fetch *)
-rewrite <- H0;
-case_if; apply t_unbox_fetch_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
-(* here *)
-case_if; constructor; eauto.
-(* get_here *)
-rewrite <- H0;
-case_if; apply t_get_here_Hyb with (Gamma:=Gamma0) (G:=G); eauto.
-(* letdia *)
-case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
-rewrite subst_Hyb_order_irrelevant_bound; try constructor;
-rewrite subst_Hyb_order_irrelevant_bound; try constructor.
-replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
-                                  by (simpl; auto);
-rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
-skip. (* !!! *)
-(* letdia_get *)
-rewrite <- H1.
-case_if; econstructor; unfold open_w_Hyb; unfold open_t_Hyb; intros; eauto.
-rewrite subst_Hyb_order_irrelevant_bound; try constructor;
-rewrite subst_Hyb_order_irrelevant_bound; try constructor.
-replace (hyp_Hyb (fte v')) with (shift_term_Hyb (hyp_Hyb (fte v')))
-                                  by (simpl; auto);
-rewrite subst_t_Hyb_shift_term_Hyb; try constructor;eauto.
-skip. (* !!! *)
-Grab Existential Variables.
-auto. auto. auto. auto.
 Qed.
 
 (* Term conversion *)
