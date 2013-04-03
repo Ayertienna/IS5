@@ -1,25 +1,3 @@
-(*
-Notes on trying to do it nicer :)
-
-fetch w M |->_w' M ^w^ w' (or sth similar)
- - counter example:
-take M0 = lam_L ([*]A) box_L (fetch_L w (hyp_L 0))
-Note that {w}; nil |- M0 ::: [*]A -> [*][*]A
-
-what will the M0's equivalent in Hyb be with such rule for fetch?
-
-L_to_Hyb_term w M0 N0
-N0 = lam_Hyb ([*]A) box_Hyb N1
-where N1 is what comes as equivalent of fetch_L w (hyp_L 0).
-Now, with rule for fetch stated as above, we get N1 = hyp_L 0.
-That is nowhere near something that types in an empty environment.
-
-On the other hand, M0 is the smallest program od type [*]A ---> [*][*]A.
-Smallest such program in Hybrid is
-lam ([*]A) (box (box (unbox_fetch w' (hyp 0))))
-- exactly the equivalent of M0 when ~ "fetch w M |->_w' box (unbox_fetch w N)"
-
-*)
 Add LoadPath "..".
 Add LoadPath "../Labeled/Lists".
 Add LoadPath "../Hybrid".
@@ -548,19 +526,11 @@ rewrite H8; auto.
 Qed.
 
 Lemma L_to_Hyb_steps:
-forall M N w,
-  L_to_Hyb_term w M N ->
-  forall M',
+forall M M' w,
   step_L (M, w) (M', w) ->
-  value_Hyb N \/
-  exists N', step_Hyb (N, w) (N', w) /\ L_to_Hyb_term w M' N'.
+  step_Hyb (L_to_Hyb_term w M, w) (L_to_Hyb_term w M', w).
 Admitted.
 
-Lemma L_to_Hyb_term_left_total:
-forall M Omega Gamma A w,
-  Omega; Gamma |- M ::: A @ w ->
-  exists N, L_to_Hyb_term (fwo w) M N.
-Admitted.
 
 Close Scope labeled_is5_scope.
 Close Scope permut_scope.
