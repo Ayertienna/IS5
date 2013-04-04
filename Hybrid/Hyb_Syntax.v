@@ -74,13 +74,13 @@ Inductive lc_t_n_Hyb : nat -> te_Hyb -> Prop :=
      lc_t_n_Hyb n (box_Hyb M)
  | lct_unbox_fetch_Hyb: forall M w n,
      lc_t_n_Hyb n M ->
-     lc_t_n_Hyb n (unbox_fetch_Hyb (fwo w) M)
+     lc_t_n_Hyb n (unbox_fetch_Hyb w M)
  | lct_get_here_Hyb: forall M w n,
      lc_t_n_Hyb n M ->
-     lc_t_n_Hyb n (get_here_Hyb (fwo w) M)
+     lc_t_n_Hyb n (get_here_Hyb w M)
  | lct_letdia_get_Hyb: forall M N w n,
      lc_t_n_Hyb (S n) N -> lc_t_n_Hyb n M ->
-     lc_t_n_Hyb n (letdia_get_Hyb (fwo w) M N)
+     lc_t_n_Hyb n (letdia_get_Hyb w M N)
 .
 
 Definition lc_t_Hyb M := lc_t_n_Hyb 0 M.
