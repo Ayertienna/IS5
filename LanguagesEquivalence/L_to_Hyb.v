@@ -723,14 +723,27 @@ unfold open_w_Hyb; unfold open_t_Hyb; simpl; repeat case_if;
 constructor; auto.
 Qed.
 
+Fixpoint has_fetch_L (M0: te_L) :=
+match M0 with
+| hyp_L v => False
+| lam_L A M => has_fetch_L M
+| appl_L M N => has_fetch_L M \/ has_fetch_L N
+| box_L M => has_fetch_L M
+| unbox_L M => has_fetch_L M
+| here_L M => has_fetch_L M
+| letd_L M N  => has_fetch_L M \/ has_fetch_L M
+| get_L w M => has_fetch_L M
+| fetch_L w M => True
+end.
+
 Lemma L_to_Hyb_steps:
 forall M M' N N' w,
+  ~ has_fetch_L M ->
   step_L (M, w) (M', w) ->
   L_to_Hyb_term_R M N ->
   L_to_Hyb_term_R M' N' ->
   step_Hyb (N, w) (N', w).
-
-
+Admitted.
 
 Close Scope labeled_is5_scope.
 Close Scope permut_scope.
