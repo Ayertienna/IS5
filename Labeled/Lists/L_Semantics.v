@@ -116,7 +116,7 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
 | red_get_L: forall w M M' w' (HRed: (M, w) |-> (M', w)),
    lc_t_L M -> lc_w_L M ->
    (get_L w M, w') |-> (get_L w M', w')
-| red_get_val_L: forall w M w' w'',
+| red_get_val_L: forall w M w' w'', value_L (get_L w' M) ->
    (get_L w (get_L w' M), w'') |-> (get_L w' M, w'')
 where " M |-> N " := (step_L M N ) : labeled_is5_scope.
 
