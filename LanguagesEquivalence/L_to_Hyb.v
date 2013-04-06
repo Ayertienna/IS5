@@ -271,6 +271,7 @@ Qed.
    unbox fetch w M --> unbox_fetch w M
    and possibly simmilar for get
 *)
+
 Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
 | hyp_L_Hyb:
     forall v, L_to_Hyb_term_R (hyp_L v) (hyp_Hyb v)
@@ -287,10 +288,18 @@ Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
     forall M N,
       L_to_Hyb_term_R M N ->
       L_to_Hyb_term_R (box_L M) (box_Hyb N)
+| unbox_fetch_L_Hyb:
+    forall M N,
+      L_to_Hyb_term_R M N ->
+      forall w, L_to_Hyb_term_R (unbox_L (fetch_L w M)) (unbox_fetch_Hyb w N)
 | unbox_L_Hyb:
     forall M N,
       L_to_Hyb_term_R M N ->
       forall w, L_to_Hyb_term_R (unbox_L M) (unbox_fetch_Hyb w N)
+| get_here_L_Hyb:
+    forall M N,
+      L_to_Hyb_term_R M N ->
+      forall w, L_to_Hyb_term_R (get_L w (here_L M)) (get_here_Hyb w N)
 | here_L_Hyb:
     forall M N,
       L_to_Hyb_term_R M N ->
@@ -300,6 +309,12 @@ Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term_R M1 N1 ->
       L_to_Hyb_term_R M2 N2 ->
       forall w, L_to_Hyb_term_R (letd_L M1 M2) (letdia_get_Hyb w N1 N2)
+| letd_get_L_Hyb:
+    forall M1 M2 N1 N2,
+      L_to_Hyb_term_R M1 N1 ->
+      L_to_Hyb_term_R M2 N2 ->
+      forall w, L_to_Hyb_term_R (letd_L (get_L w M1) M2)
+                                (letdia_get_Hyb w N1 N2)
 | fetch_L_Hyb:
     forall M N w,
       L_to_Hyb_term_R M N ->
@@ -320,10 +335,10 @@ match M0 with
 | lam_L A M => lam_Hyb A (L_to_Hyb_term w M)
 | appl_L M1 M2 => appl_Hyb (L_to_Hyb_term w M1) (L_to_Hyb_term w M2)
 | box_L M => box_Hyb (L_to_Hyb_term (bwo 0) M)
-| unbox_L M => unbox_fetch_Hyb w (L_to_Hyb_term w M)
+| unbox_L M =>  unbox_fetch_Hyb w (L_to_Hyb_term w M)
 | here_L M => get_here_Hyb w (L_to_Hyb_term w M)
 | letd_L M1 M2 => letdia_get_Hyb w (L_to_Hyb_term w M1)
-                                 (L_to_Hyb_term (shift_vwo w) M2)
+                          (L_to_Hyb_term (shift_vwo w) M2)
 | fetch_L w' M => letdia_get_Hyb w' (get_here_Hyb w' (L_to_Hyb_term w' M))
                           (box_Hyb (unbox_fetch_Hyb (bwo 1) (hyp_Hyb (bte 0))))
 | get_L w' M => letdia_get_Hyb w' (L_to_Hyb_term w' M)
@@ -335,10 +350,12 @@ forall M M' C1 C2 v,
   L_to_Hyb_term_R C1 C2 ->
   L_to_Hyb_term_R M M' ->
   L_to_Hyb_term_R (subst_t_L C1 v M) (subst_t_Hyb C2 v M').
-induction M; intros; simpl in *; inversion H0; subst; simpl in *;
-repeat case_if; try constructor;
-try eapply IHM || (eapply IHM1; try eapply IHM2); eauto;
-destruct v0; simpl in *; inversion H1.
+intros;
+generalize dependent C1; generalize dependent C2; generalize dependent v.
+induction H0; intros; simpl;
+try (apply letd_get_L_Hyb; auto);
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
 Qed.
 
 Lemma L_to_Hyb_term_subst_t:
@@ -357,9 +374,9 @@ forall M M',
   forall w0 w1,
     L_to_Hyb_term_R (subst_w_L M w1 w0)
                     (subst_w_Hyb w1 w0 M').
-induction M; intros; inversion H; subst; simpl in *; auto;
-repeat case_if; try constructor;
-try eapply IHM || (eapply IHM1; try eapply IHM2); eauto;
+intros M M' H; induction H; intros; simpl;
+try (apply letd_get_L_Hyb; auto);
+repeat case_if; try constructor; auto;
 destruct w0; simpl in *; inversion H0 || inversion H1.
 Qed.
 
@@ -717,11 +734,14 @@ forall M M' n,
   lc_t_n_L n M ->
   L_to_Hyb_term_R M M' ->
   lc_t_n_Hyb n M'.
-induction M; intros; simpl in *; inversion H; inversion H0; subst; constructor;
-eauto; try omega.
+intros; generalize dependent n; induction H0;
+intros; inversion H; subst; constructor; eauto.
+inversion H3; eauto.
+inversion H3; eauto.
+inversion H4; eauto.
+constructor; constructor; constructor; omega.
+constructor; eauto.
 constructor; constructor; omega.
-constructor; constructor; constructor;  omega.
-constructor; eapply IHM; auto.
 Qed.
 
 Hint Resolve L_to_Hyb_term_lc_t L_to_Hyb_term_R_lc_t.
@@ -829,7 +849,6 @@ induction H4; intros; inversion HeqM1; inversion HeqM0; subst;
 [constructor; constructor; auto |].
 inversion H0; subst; constructor; try omega; auto.
 constructor; auto.
-
 apply multi_step_Hyb with (M':= letdia_get_Hyb w2 M' (get_here_Hyb w0 M0));
 [ constructor | eapply IHsteps_Hyb ]; eauto.
 inversion H0; subst; constructor; try omega; auto.
@@ -848,6 +867,17 @@ intros; generalize dependent M'; induction H1; intros;
 inversion H2; subst.
 left; constructor.
 left; constructor.
+inversion H; subst; try (elim H8; omega);
+inversion H0; subst; try (elim H8; omega);
+destruct IHvalue_L with (M':=N); auto.
+left; constructor; auto.
+right; intros; destruct H3 with (fwo w0); destruct H4;
+exists (get_here_Hyb (fwo w0) x); split;
+[apply steps_Hyb_here | constructor]; auto.
+left; constructor; auto.
+right; intros; destruct H3 with (bwo m); destruct H4;
+exists (get_here_Hyb (bwo m) x); split;
+[apply steps_Hyb_here | constructor]; auto.
 inversion H6; subst; right; intros;
 assert (lc_w_Hyb N0)
  by (inversion H; inversion H10; subst; auto);
@@ -1070,6 +1100,7 @@ apply L_to_Hyb_value with (M':= L_to_Hyb_term (fwo v0) M2) in HT;
 [| eapply L_to_Hyb_term_lc_w | eapply L_to_Hyb_term_lc_t |
  apply L_to_Hyb_term_L_to_Hyb_term_R]; eauto; destruct HT.
 (* value *)
+
 assert (step_Hyb ((letdia_get_Hyb (fwo v0)
            (get_here_Hyb (fwo v0) (L_to_Hyb_term (fwo v0) M2))
            (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))), fwo v)
@@ -1111,7 +1142,6 @@ Note: make special case in the function (and relation) for get-get?
 *)
 skip.
 (* letdia-here *)
-
 inversion H; inversion H0; subst;
 destruct w'; inversion H12; inversion H17; try omega; subst;
 inversion H5; inversion H18; subst;
