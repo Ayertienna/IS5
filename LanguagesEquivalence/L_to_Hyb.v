@@ -265,6 +265,12 @@ Qed.
 
 (* Term conversion *)
 
+(* Idea: fetch limits us in terms of reductions; we may want to
+   add cases like:
+   box fetch M --> box M
+   unbox fetch w M --> unbox_fetch w M
+   and possibly simmilar for get
+*)
 Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
 | hyp_L_Hyb:
     forall v, L_to_Hyb_term_R (hyp_L v) (hyp_Hyb v)
@@ -307,7 +313,6 @@ Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
                     (letdia_get_Hyb w N (get_here_Hyb (bwo 0)
                                                       (hyp_Hyb (bte 0))))
 .
-
 
 Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb :=
 match M0 with
@@ -707,6 +712,20 @@ constructor; constructor; constructor;  omega.
 constructor; eapply IHM; auto.
 Qed.
 
+Lemma L_to_Hyb_term_R_lc_t:
+forall M M' n,
+  lc_t_n_L n M ->
+  L_to_Hyb_term_R M M' ->
+  lc_t_n_Hyb n M'.
+induction M; intros; simpl in *; inversion H; inversion H0; subst; constructor;
+eauto; try omega.
+constructor; constructor; omega.
+constructor; constructor; constructor;  omega.
+constructor; eapply IHM; auto.
+Qed.
+
+Hint Resolve L_to_Hyb_term_lc_t L_to_Hyb_term_R_lc_t.
+
 (* !!!!!! *)
 
 Lemma lc_w_step_Hyb_preserv:
@@ -787,6 +806,37 @@ forall M N w0 w1 w M',
    (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
    ((M' ^w^ w0) ^t^ N, w1).
 Admitted.
+
+Lemma steps_Hyb_get:
+forall M M'' w0 w1 w M' w'0,
+  (w0 = fwo w'0 \/ w0 = bwo 0) ->
+  lc_w_Hyb M' -> lc_t_Hyb M' ->
+  lc_w_n_Hyb 1 M -> lc_t_n_Hyb 1 M ->
+  steps_Hyb (M', w) (M'', w) ->
+  steps_Hyb
+    (letdia_get_Hyb w M' (get_here_Hyb w0 M), w1)
+    (letdia_get_Hyb w M'' (get_here_Hyb w0 M), w1).
+intros.
+remember (M', w) as M0; remember (M'', w) as M1;
+generalize dependent M;
+generalize dependent M';
+generalize dependent M''.
+generalize dependent w;
+generalize dependent w0;
+generalize dependent w'0;
+generalize dependent w1.
+induction H4; intros; inversion HeqM1; inversion HeqM0; subst;
+[constructor; constructor; auto |].
+inversion H0; subst; constructor; try omega; auto.
+constructor; auto.
+
+apply multi_step_Hyb with (M':= letdia_get_Hyb w2 M' (get_here_Hyb w0 M0));
+[ constructor | eapply IHsteps_Hyb ]; eauto.
+inversion H0; subst; constructor; try omega; auto.
+constructor; auto.
+eapply lc_w_step_Hyb_preserv in H1; eauto.
+eapply lc_t_step_Hyb_preserv in H2; eauto.
+Qed.
 
 Lemma L_to_Hyb_value:
 forall M M',
@@ -922,6 +972,21 @@ inversion H1; subst; constructor; apply IHM with M2 k; eauto.
 inversion H1; subst; constructor; apply IHM with M2 k; eauto.
 Qed.
 
+Lemma lc_w_L_subst_t_rev:
+forall M n k w,
+n >= k ->
+lc_w_n_L n (subst_w_L M w (bwo k)) ->
+lc_w_n_L (S n) M.
+induction M; intros; simpl in *; try case_if; try constructor;
+try (inversion H0; subst; eauto); try omega.
+eauto; apply IHM with (k:=S k) (w:=shift_vwo w); eauto; try omega.
+constructor; eapply IHM; eauto.
+constructor; try omega; apply IHM with (w:=w) (k:=k); eauto.
+apply IHM2 with (k:=S k) (w:=shift_vwo w); eauto; try omega.
+constructor; eapply IHM; eauto.
+constructor; try omega; apply IHM with (k:=k)(w:=w); eauto.
+Qed.
+
 (* Note: first try to prove the silly version, then make it useful *)
 Lemma L_to_Hyb_steps:
 forall M M' w,
@@ -929,20 +994,20 @@ forall M M' w,
   ~ has_fetch_L M ->
   step_L (M, fwo w) (M', fwo w) ->
   exists N,
-    L_to_Hyb_term_R M N /\
+    L_to_Hyb_term_R M N /\ lc_w_Hyb N /\
     exists N',
       L_to_Hyb_term_R M' N' /\
-      exists w',
-        steps_Hyb (N, fwo w') (N', fwo w').
+      steps_Hyb (N, fwo w) (N', fwo w).
 induction M; intros; inversion H2; subst.
 (* appl-lam *)
-exists (L_to_Hyb_term (fwo w) (appl_L (lam_L A M) M2)); split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R | simpl ].
+exists (L_to_Hyb_term (fwo w) (appl_L (lam_L A M) M2)); repeat split;
+[apply L_to_Hyb_term_L_to_Hyb_term_R |
+ eapply L_to_Hyb_term_lc_w; eauto | simpl ];
 exists (open_t_Hyb (L_to_Hyb_term (fwo w) M) (L_to_Hyb_term (fwo w) M2)); split.
 unfold open_t_L; unfold open_t_Hyb;
 apply L_to_Hyb_term_R_subst_t;
 apply L_to_Hyb_term_L_to_Hyb_term_R.
-exists w; constructor; constructor.
+constructor; constructor.
 eapply L_to_Hyb_term_lc_w; eauto; right; split; eauto; omega.
 eapply L_to_Hyb_term_lc_t; eauto;
 unfold open_t_L in *; apply lc_t_L_subst_t_rev in H8; auto.
@@ -950,22 +1015,170 @@ eapply L_to_Hyb_term_lc_w; eauto; right; split; eauto; omega.
 eapply L_to_Hyb_term_lc_t; eauto;
 unfold open_t_L in *; apply lc_t_L_subst_t_rev in H8; auto.
 (* appl *)
-
+simpl in *.
+destruct IHM1 with (M':=M'0) (w:=w); auto.
+destruct H3; destruct H4; destruct H5; destruct H5.
+exists (appl_Hyb x (L_to_Hyb_term (fwo w) M2));
+repeat split; [constructor | constructor | ]; auto;
+[apply L_to_Hyb_term_L_to_Hyb_term_R | ];
+exists (appl_Hyb x0 (L_to_Hyb_term (fwo w) M2));
+split; [constructor | ]; auto;
+[apply L_to_Hyb_term_L_to_Hyb_term_R | ].
+apply steps_Hyb_appl; auto.
 (* unbox-box *)
-exists (L_to_Hyb_term w (unbox_L (box_L M0))); split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R | simpl ].
-exists (open_w_Hyb (L_to_Hyb_term (bwo 0) M0) w); split.
+exists (L_to_Hyb_term (fwo w) (unbox_L (box_L M0))); repeat split;
+[apply L_to_Hyb_term_L_to_Hyb_term_R |
+ eapply L_to_Hyb_term_lc_w; eauto | simpl ];
+exists (open_w_Hyb (L_to_Hyb_term (bwo 0) M0) (fwo w)); split.
 unfold open_w_L; unfold open_w_Hyb;
 apply L_to_Hyb_term_R_subst_w;
 apply L_to_Hyb_term_L_to_Hyb_term_R.
-exists w; constructor; constructor. skip. skip.
-Focus 2.
+constructor; constructor.
+eapply L_to_Hyb_term_lc_w; eauto;
+unfold open_w_L in *; apply lc_w_L_subst_t_rev in H7; auto.
+eapply L_to_Hyb_term_lc_t; eauto.
 (* unbox *)
 simpl in *; destruct IHM with (M':=M'0) (w:=w); auto;
-destruct H1; destruct H2; destruct H2; destruct H3;
-exists (unbox_fetch_Hyb x1 x); split; [constructor | ]; auto;
-exists (unbox_fetch_Hyb x1 x0); split; [constructor | ]; auto;
-exists x1; apply steps_Hyb_unbox; auto.
+destruct H3; destruct H4; destruct H5; destruct H5.
+exists (unbox_fetch_Hyb (fwo w) x);
+repeat split; [constructor | constructor |]; auto;
+exists (unbox_fetch_Hyb (fwo w) x0);
+split; [constructor | ]; auto;
+apply steps_Hyb_unbox; eauto.
+eapply L_to_Hyb_term_R_lc_t; eauto.
+(* get *)
+destruct v; inversion H; subst; try omega; simpl in *.
+destruct IHM with (M'0) v; auto.
+destruct H3 as (H3, (H4, (x0, (H9, H10)))).
+exists (letdia_get_Hyb (fwo v)
+        x (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
+repeat split; [constructor | constructor |]; auto;
+[constructor; constructor; try omega |].
+exists (letdia_get_Hyb (fwo v)
+        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
+split; [constructor | ]; auto.
+eapply steps_Hyb_get; eauto.
+eapply L_to_Hyb_term_R_lc_t; eauto.
+constructor; auto. constructor; auto.
+(* get-get *)
+(*
+destruct v; inversion H; subst; try omega; simpl in *;
+destruct w'; inversion H6; subst; try omega; simpl in *;
+inversion H0; inversion H8; inversion H4; subst;
+inversion H7; inversion H12; subst.
+apply L_to_Hyb_value with (M':= L_to_Hyb_term (fwo v0) M2) in HT;
+[| eapply L_to_Hyb_term_lc_w | eapply L_to_Hyb_term_lc_t |
+ apply L_to_Hyb_term_L_to_Hyb_term_R]; eauto; destruct HT.
+(* value *)
+assert (step_Hyb ((letdia_get_Hyb (fwo v0)
+           (get_here_Hyb (fwo v0) (L_to_Hyb_term (fwo v0) M2))
+           (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))), fwo v)
+    (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))) ^w^ (fwo v0)) ^t^
+        (L_to_Hyb_term (fwo v0) M2), fwo v)).
+  constructor.
+  eapply L_to_Hyb_term_lc_w; eauto.
+  eapply L_to_Hyb_term_lc_t; eauto.
+  constructor; [constructor | omega].
+  constructor; constructor; omega.
+  auto.
+unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
+repeat case_if.
+apply red_letdia_get_Hyb with (ctx':=fwo w)
+  (N:=(get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))))in H5.
+Focus 2.
+constructor; constructor; try omega; try constructor;
+eapply L_to_Hyb_term_lc_w; eauto.
+Focus 2.
+constructor; constructor; try constructor; try omega;
+eapply L_to_Hyb_term_lc_t; eauto.
+Focus 2.
+constructor; constructor.
+Focus 2.
+constructor; constructor; omega.
+exists (L_to_Hyb_term (fwo w) (get_L (fwo v) (get_L (fwo v0) (here_L M2))));
+repeat split;
+[apply L_to_Hyb_term_L_to_Hyb_term_R | eapply L_to_Hyb_term_lc_w; eauto |];
+simpl.
+exists (letdia_get_Hyb (fwo v)
+              (get_here_Hyb (fwo v0) (L_to_Hyb_term (fwo v0) M2))
+              (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))); split.
+Focus 2. constructor; auto.
+constructor; constructor; apply L_to_Hyb_term_L_to_Hyb_term_R.
+exists (L_to_Hyb_term (fwo v0) (get_L (fwo v0) (here_L M2)));
+split; [apply L_to_Hyb_term_L_to_Hyb_term_R | ].
+simpl.
+Note: make special case in the function (and relation) for get-get?
+*)
+skip.
+(* letdia-here *)
+
+inversion H; inversion H0; subst;
+destruct w'; inversion H12; inversion H17; try omega; subst;
+inversion H5; inversion H18; subst;
+exists (L_to_Hyb_term (fwo w) (letd_L (get_L (fwo v) (here_L M)) M2));
+repeat split;
+[apply L_to_Hyb_term_L_to_Hyb_term_R |
+ eapply L_to_Hyb_term_lc_w; eauto | simpl ].
+exists (((L_to_Hyb_term (fwo v) M2) ^w^ (fwo v)) ^t^ (L_to_Hyb_term (fwo v) M));
+split.
+unfold open_w_L; unfold open_w_Hyb; unfold open_t_L; unfold open_t_Hyb;
+apply L_to_Hyb_term_R_subst_t; [apply L_to_Hyb_term_L_to_Hyb_term_R |];
+apply L_to_Hyb_term_R_subst_w; apply L_to_Hyb_term_L_to_Hyb_term_R.
+apply L_to_Hyb_value with (M':= L_to_Hyb_term (fwo v) M) in H11;
+[| eapply L_to_Hyb_term_lc_w | eapply L_to_Hyb_term_lc_t |
+ apply L_to_Hyb_term_L_to_Hyb_term_R]; eauto; destruct H11.
+(* value *)
+assert ((letdia_get_Hyb (fwo v)
+           (get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M))
+           (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))), fwo w) |->
+        (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))^w^ (fwo v)) ^t^
+          (L_to_Hyb_term (fwo v) M), fwo w)).
+constructor. skip. skip. skip. skip. auto.
+unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
+repeat case_if.
+assert (
+    (letdia_get_Hyb (fwo w) (get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M))
+                     (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))), fwo w) |->
+     (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))) ^w^ (fwo v)) ^t^
+      (L_to_Hyb_term (fwo v) M),
+      fwo w)).
+constructor. skip. skip. skip. skip. auto.
+unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
+repeat case_if.
+assert ((get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M), fwo w) |->
+        j
+
+
+
+
+
+
+exists (letdia_get_Hyb (fwo v0)
+        (L_to_Hyb_term (fwo v) (get_L (fwo v0) M0))
+        (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))).
+assert (L_to_Hyb_term_R (get_L (fwo v0) M0)
+
+repeat split; simpl. constructor. | constructor |]; auto.
+[constructor; constructor; try omega |];
+exists (letdia_get_Hyb (fwo v0)
+        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
+split; [constructor | ]; auto;
+eapply steps_Hyb_get; eauto;
+[eapply L_to_Hyb_term_R_lc_t in H3; eauto | |];
+constructor; auto.
+inversion H2.
+destruct IHM with M0 v; auto.
+destruct H3 as (H3, (H4, (x0, (H9, H10))));
+exists (letdia_get_Hyb (fwo v0)
+        x (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
+repeat split; [constructor | constructor |]; auto;
+[constructor; constructor; try omega |];
+exists (letdia_get_Hyb (fwo v0)
+        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
+split; [constructor | ]; auto;
+eapply steps_Hyb_get; eauto;
+[eapply L_to_Hyb_term_R_lc_t in H3; eauto | |];
+constructor; auto.
 
 (*
 forall M N,
