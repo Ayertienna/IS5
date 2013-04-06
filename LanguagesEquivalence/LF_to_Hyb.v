@@ -127,14 +127,12 @@ Inductive LF_to_Hyb_rel: (* bg_LF  -> *) ctx_LF  -> te_LF  -> ty ->
       LF_to_Hyb_rel Gamma (here_LF M) (<*>A)
                     ((w', Gamma')::G') w (get_here_Hyb (fwo w') N)
 
-(*Note: letdia is done without subst_t and subst_w, just to see
-if this is better than with - as is done in lam and box *)
 | letdia_LF_Hyb:
     forall Lt Lw G Gamma G' w A B M1 M2 N1 N2,
       types_LF G Gamma (letdia_LF M1 N1) B ->
       LF_to_Hyb_rel Gamma M1 (<*>A) G' w M2 ->
       (forall w'0 v', w'0 \notin Lw -> v' \notin Lt ->
-                     LF_to_Hyb_rel Gamma (open_LF (hyp_LF (fte v')) N1) B
+                     LF_to_Hyb_rel Gamma (open_LF N1 (hyp_LF (fte v'))) B
                                    ((w'0, (v', A) :: nil ) :: G') w
                                    ((N2 ^w^ fwo w'0 ) ^t^ hyp_Hyb (fte v'))) ->
       LF_to_Hyb_ctx (Gamma::G) ((w, Gamma)::G') ->
@@ -147,7 +145,7 @@ if this is better than with - as is done in lam and box *)
       LF_to_Hyb_rel Gamma' M1 (<*>A)
                     ((w, Gamma)::G') w' M2 ->
       (forall w'0 v', w'0 \notin Lw -> v' \notin Lt ->
-         LF_to_Hyb_rel Gamma (open_LF (hyp_LF (fte v')) N1) B
+         LF_to_Hyb_rel Gamma (open_LF N1 (hyp_LF (fte v'))) B
                        (((w'0, (v', A) :: nil ) :: (w', Gamma')::G'))
                        w ((N2 ^w^ fwo w'0 ) ^t^ hyp_Hyb (fte v'))) ->
       LF_to_Hyb_ctx (Gamma::Gamma'::G) ((w, Gamma)::(w', Gamma')::G') ->
@@ -431,6 +429,114 @@ try rewrite IHM;
 try rewrite IHM1; try rewrite IHM2; eauto.
 Qed.
 
+(* Fixme: rename if this works and stays *)
+Inductive R: te_LF -> te_Hyb -> Prop :=
+| hyp_R: forall v, R (hyp_LF v) (hyp_Hyb v)
+| lam_R: forall A M N, R M N -> R (lam_LF A M) (lam_Hyb A N)
+| appl_R: forall M1 M2 N1 N2, R M1 N1 -> R M2 N2 ->
+                              R (appl_LF M1 M2) (appl_Hyb N1 N2)
+| box_R: forall M N, R M N -> R (box_LF M) (box_Hyb N)
+| unbox_R: forall M N w, R M N -> R (unbox_LF M) (unbox_fetch_Hyb w N)
+| here_R: forall M N w, R M N -> R (here_LF M) (get_here_Hyb w N)
+| letdia_R: forall M M' N N' w, R M M' -> R N N' ->
+                          R (letdia_LF M N) (letdia_get_Hyb w M' N')
+.
+
+Lemma R_subst_t:
+forall M1 M2 C1 C2 v,
+  R M1 M2 -> R C1 C2 -> R (subst_t_LF C1 v M1) (subst_t_Hyb C2 v M2).
+induction M1; intros; inversion H; subst; simpl in *;
+repeat case_if; try constructor; eauto.
+Qed.
+
+Lemma R_subst_t_rev:
+forall M1 M2 v v',
+  v' \notin used_vars_te_LF M1 \u free_vars_Hyb M2 ->
+  R (subst_t_LF (hyp_LF (fte v')) (bte v) M1)
+    (subst_t_Hyb (hyp_Hyb (fte v')) (bte v) M2) ->
+  R M1 M2.
+induction M1; intros; simpl in *; try case_if.
+destruct M2; simpl in *; try case_if; try inversion H0; subst;
+try rewrite notin_union in *;
+[constructor | destruct H; rewrite notin_singleton in *; elim H2; auto].
+destruct M2; simpl in *; try case_if; try inversion H0; subst;
+try rewrite notin_union in *;
+[destruct H; rewrite notin_singleton in *; elim H; auto | constructor].
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+eapply IHM1; eauto.
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+[eapply IHM1_1 | eapply IHM1_2]; eauto; rewrite notin_union in *; destruct H;
+split; eauto.
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+eapply IHM1; eauto.
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+eapply IHM1; eauto.
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+eapply IHM1; eauto.
+destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
+[eapply IHM1_1 | eapply IHM1_2]; eauto; rewrite notin_union in *; destruct H;
+split; auto.
+Qed.
+
+Lemma R_subst_w_rev:
+forall M N w w',
+  R M ({{w//w'}}N) <-> R M N.
+split;
+generalize dependent w';
+generalize dependent w;
+generalize dependent N;
+generalize dependent M.
+induction M; intros; inversion H; destruct N; simpl in *;
+inversion H2; subst; inversion H; subst; constructor; eauto.
+induction M; intros; inversion H; subst; simpl in *; repeat case_if;
+constructor; eauto.
+Qed.
+
+(* This simply states that LF_to_Hyb_rel is one realisation of R *)
+Lemma LF_to_Hyb_rel_R:
+forall M1 Gamma A G' w M2,
+  LF_to_Hyb_rel Gamma M1 A G' w M2 ->
+  R M1 M2.
+intros; induction H; constructor; auto.
+(* lam *)
+assert (exists x, x\notin L \u  used_vars_te_LF M \u free_vars_Hyb M')
+  by apply Fresh; destruct H3;
+specialize H2 with x;
+unfold open_LF in *; unfold open_t_Hyb in *; apply R_subst_t_rev in H2; auto.
+(* box *)
+assert (exists x, x\notin L) by apply Fresh; destruct H3;
+unfold open_w_Hyb in *. eapply R_subst_w_rev; eauto.
+(* letdia *)
+assert (exists x, x\notin Lw) by apply Fresh.
+destruct H4.
+assert (exists x0, x0 \notin Lt \u used_vars_te_LF N1 \u
+                              free_vars_Hyb {{fwo x // bwo 0}}N2)
+  by apply Fresh; destruct H5.
+specialize H2 with x x0.
+unfold open_LF in *; unfold open_t_Hyb in *;
+unfold open_w_Hyb in *.
+apply H2 in H4; auto.
+assert (R N1 ({{fwo x // bwo 0}} N2)).
+apply R_subst_t_rev with (v:=0) (v':=x0); eauto;
+apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0).
+apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0); auto.
+(* letdia - get *)
+assert (exists x, x\notin Lw) by apply Fresh.
+destruct H4.
+assert (exists x0, x0 \notin Lt \u used_vars_te_LF N1 \u
+                              free_vars_Hyb {{fwo x // bwo 0}}N2)
+  by apply Fresh; destruct H5.
+specialize H2 with x x0.
+unfold open_LF in *; unfold open_t_Hyb in *;
+unfold open_w_Hyb in *.
+apply H2 in H4; auto.
+assert (R N1 ({{fwo x // bwo 0}} N2)).
+apply R_subst_t_rev with (v:=0) (v':=x0); eauto;
+apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0).
+apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0); auto.
+Qed.
+
+(*
 Lemma LF_to_Hyb_subst_t:
 forall Gamma C2 C1 M1 M2 v A B G' w,
   lc_t_LF C1 -> lc_t_Hyb C2 ->
@@ -463,6 +569,73 @@ destruct H3 with x; auto.
 exists (lam_Hyb A
 
 Admitted.
+*)
+
+Lemma R_lc_t:
+forall M N n,
+  R M N -> lc_t_n_LF n M -> lc_t_n_Hyb n N.
+induction M; intros; inversion H; inversion H0; subst; constructor; auto.
+Qed.
+
+(* Alt:
+forall M M' N N' w,
+  R M N -> R M' N' -> step_LF M M' -> step_Hyb (N, w) (N', w).
+Basically requires this relation to be a function.
+** Maybe ** this would work with LF_to_Hyb_rel..
+*)
+
+Lemma R_value:
+forall M N,
+  R M N -> value_LF M -> value_Hyb N.
+intros; induction H; simpl;
+inversion H0; subst; constructor; eauto.
+Qed.
+
+Lemma R_step:
+forall M M' N w,
+  lc_w_Hyb N ->
+  R M N -> step_LF M M' ->
+  exists N', R M' N' /\ step_Hyb (N, w) (N', w).
+(* ind: M *)
+induction M; intros; inversion H0; inversion H1; subst.
+(* appl - lam *)
+inversion H4; inversion H; inversion H8; subst.
+exists (subst_t_Hyb N2 (bte 0) N); split.
+apply R_subst_t; auto.
+constructor; try eapply R_lc_t; eauto; inversion H13; auto.
+(* appl *)
+inversion H; subst.
+destruct IHM1 with M'0 N1 w; auto.
+destruct H2.
+exists (appl_Hyb x N2); split; constructor; auto;
+try eapply R_lc_t; eauto.
+(* unbox - box *)
+inversion H; inversion H3; subst; try omega;
+exists (open_w_Hyb N (w)); split;
+[unfold open_w_Hyb; apply R_subst_w_rev; auto |
+ constructor; try eapply R_lc_t; eauto; inversion H5; auto].
+(* unbox *)
+inversion H; subst; try omega;
+destruct IHM with M'0 N0 (fwo w1); auto; destruct H2;
+exists (unbox_fetch_Hyb (fwo w1) x); split;
+constructor; auto; try eapply R_lc_t; eauto.
+(* here *)
+inversion H; subst; try omega;
+destruct IHM with M'0 N0 (fwo w1); auto; destruct H2;
+exists (get_here_Hyb (fwo w1) x); split;
+constructor; auto; try eapply R_lc_t; eauto.
+(* letdia-here *)
+inversion H; inversion H4; subst; try omega; inversion H11; subst; try omega.
+exists ((N' ^w^ (fwo w0) ) ^t^ N0); split.
+unfold open_w_Hyb; unfold open_t_Hyb; eapply R_subst_t; auto;
+apply R_subst_w_rev; auto.
+constructor; try eapply R_lc_t; eauto; eapply R_value; eauto.
+(* letdia *)
+destruct w0; inversion H; subst; try omega.
+destruct IHM1 with M'1 M'0 (fwo v); auto; destruct H2;
+exists (letdia_get_Hyb (fwo v) x N'); split; constructor; auto;
+try eapply R_lc_t; eauto.
+Qed.
 
 Lemma LF_to_Hyb_step:
 forall M G' Gamma A w M' N N',
