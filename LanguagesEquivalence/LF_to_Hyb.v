@@ -34,6 +34,20 @@ forall G G' w,
   LF_to_Hyb_ctx G G'.
 Admitted.
 
+Lemma LF_to_Hyb_ctx_extend2_t:
+forall G G' w Gamma A,
+LF_to_Hyb_ctx (Gamma::G) ((w, Gamma)::G') ->
+forall v, v \notin \{} ->
+LF_to_Hyb_ctx (((v,A)::Gamma)::G) ((w, (v,A)::Gamma)::G').
+Admitted.
+
+Lemma LF_to_Hyb_ctx_extend2_w:
+forall G G',
+  LF_to_Hyb_ctx G G' ->
+  forall w, w \notin \{} ->
+  LF_to_Hyb_ctx (nil::G) ((w, nil)::G').
+Admitted.
+
 Add Morphism LF_to_Hyb_ctx: LF_to_Hyb_ctx_LF.
 Admitted.
 
@@ -536,53 +550,11 @@ apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0).
 apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0); auto.
 Qed.
 
-(*
-Lemma LF_to_Hyb_subst_t:
-forall Gamma C2 C1 M1 M2 v A B G' w,
-  lc_t_LF C1 -> lc_t_Hyb C2 ->
-  LF_to_Hyb_rel Gamma M1 A G' w M2 ->
-  LF_to_Hyb_rel Gamma C1 B G' w C2 ->
-  LF_to_Hyb_rel Gamma (subst_t_LF C1 (bte v) M1) A G' w ([C2//(bte v)]M2).
-intros; generalize dependent C1; generalize dependent C2;
-generalize dependent B. generalize dependent v.
-induction H1; intros; simpl in *.
-repeat case_if; [inversion H | econstructor; eauto].
-econstructor; unfold open_LF in *; unfold open_t_Hyb in *.
-inversion H; subst; econstructor; eauto;
-intros; unfold open_LF in *; simpl.
-specialize H2 with v0 (S v) B C2 C1; apply H2 with (S v) B C2 C1 in H6; auto.
-rewrite <- subst_t_comm2_LF; try omega; auto.
-inversion H6; subst; auto.
-
-Lemma LF_to_Hyb_subst_t_rev:
-forall Gamma C2 C1 M1 M2 k A G' w,
-  LF_to_Hyb_rel Gamma (subst_t_LF C1 (bte k) M1) A G' w M2 ->
-  LF_to_Hyb_rel Gamma C1 A G' w C2 ->
-  exists M2',
-    M2 = subst_t_Hyb C2 (bte k) M2'.
-intros. induction H; simpl in *.
-(* hyp *)
-inversion H; subst; exists (hyp_Hyb (fte v0)); simpl; case_if; auto.
-(* lam *)
-assert (exists x, x \notin L) by apply Fresh; destruct H4.
-destruct H3 with x; auto.
-exists (lam_Hyb A
-
-Admitted.
-*)
-
 Lemma R_lc_t:
 forall M N n,
   R M N -> lc_t_n_LF n M -> lc_t_n_Hyb n N.
 induction M; intros; inversion H; inversion H0; subst; constructor; auto.
 Qed.
-
-(* Alt:
-forall M M' N N' w,
-  R M N -> R M' N' -> step_LF M M' -> step_Hyb (N, w) (N', w).
-Basically requires this relation to be a function.
-** Maybe ** this would work with LF_to_Hyb_rel..
-*)
 
 Lemma R_value:
 forall M N,
@@ -637,31 +609,197 @@ exists (letdia_get_Hyb (fwo v) x N'); split; constructor; auto;
 try eapply R_lc_t; eauto.
 Qed.
 
-Lemma LF_to_Hyb_step:
-forall M G' Gamma A w M' N N',
-  LF_to_Hyb_rel Gamma M A G' w M' ->
-  LF_to_Hyb_rel Gamma N A G' w N' ->
-  step_LF M N ->
-  step_Hyb (M', fwo w) (N', fwo w).
-intros. generalize dependent N; generalize dependent N'.
-induction H; intros.
-inversion H2.
-inversion H4; subst.
-(* appl *)
-inversion H4; subst.
-inversion H0; subst.
-assert (LF_to_Hyb_rel Gamma (subst_t_LF N1 (bte 0) M) B G' w N') as NN by auto.
-apply LF_to_Hyb_subst_t_rev with (M1:=M) (M2:=N') (k:=0) in NN.
+Lemma R_total_L:
+forall M, exists N, R M N.
+induction M; try destruct IHM || (destruct IHM1; destruct IHM2);
+eexists; constructor; eauto.
+Grab Existential Variables.
+exact (bwo 0).
+exact (bwo 0).
+exact (bwo 0).
+Qed.
 
+Fixpoint subst_in_ctx_LF (v1: var) (v2: var) (Gamma: ctx_LF) : ctx_LF :=
+match Gamma with
+| nil => nil
+| (v, A) :: Gamma' =>
+  let v' := if (eq_var_dec v v2) then v1 else v in
+  (v', A):: subst_in_ctx_LF v1 v2 Gamma'
+end.
 
+Definition subst_in_ctx_Hyb v1 v2 (Gamma: ctx_Hyb) :=
+(fst_ Gamma, subst_in_ctx_LF v1 v2 (snd_ Gamma)).
 
+Lemma LF_to_Hyb_rel_rename_vars:
+forall Gamma M B G w N v,
+  LF_to_Hyb_rel Gamma M B G w N ->
+  forall v0 Gamma' G' M' N',
+    v0 \notin \{} ->
+    Gamma' = subst_in_ctx_LF v0 v Gamma ->
+    G' = map (subst_in_ctx_Hyb v0 v) G ->
+    M' = subst_t_LF (hyp_LF (fte v0)) (fte v) M ->
+    N' = subst_t_Hyb (hyp_Hyb (fte v0)) (fte v) N ->
+    LF_to_Hyb_rel Gamma' M' B G' w N'.
+Admitted.
 
+Definition subst_w_in_ctx_Hyb w1 w2 (Gamma: ctx_Hyb) :=
+let w' :=  if eq_var_dec (fst_ Gamma) w2 then w1 else (fst_ Gamma)
+in (w', snd_ Gamma).
 
-(* ind: M
-induction M; intros; inversion H; inversion H1; subst.
-(* appl_lam *)
-inversion H5; subst.
+Lemma LF_to_Hyb_rel_rename_worlds:
+forall Gamma M B G N w w'',
+  LF_to_Hyb_rel Gamma M B G w N ->
+  forall w' G' N' w0,
+    w' \notin \{} ->
+    G' = map (subst_w_in_ctx_Hyb w' w'') G ->
+    N' = subst_w_Hyb (fwo w') (fwo w'') N ->
+    (w0 = if (eq_var_dec w w'') then w' else w) ->
+    LF_to_Hyb_rel Gamma M B G' w0 N'.
+Admitted.
+
+Lemma LF_to_Hyb_rel_subst_t_rev:
+forall N Gamma M v N' A B G w M',
+  LF_to_Hyb_rel Gamma (subst_t_LF M v N) A G w N' ->
+  LF_to_Hyb_rel Gamma M B G w M' ->
+  exists N0,
+    N' = subst_t_Hyb M' v N0.
+induction N; intros; simpl in *; repeat case_if.
+Admitted.
+
+Lemma R_te_vars:
+forall N1 N2,
+  R N1 N2 -> used_vars_te_LF N1 = free_vars_Hyb N2.
+intros; induction H; simpl in *;
+try rewrite IHR || (rewrite IHR1; rewrite IHR2); eauto.
+Qed.
+
+Lemma LF_to_Hyb_rel_te_vars:
+forall N1 N2 Gamma A G w,
+  LF_to_Hyb_rel Gamma N1 A G w N2 ->
+  used_vars_te_LF N1 = free_vars_Hyb N2.
+intros; apply R_te_vars; eapply LF_to_Hyb_rel_R; eauto.
+Qed.
+
+Lemma LF_to_Hyb_rel_total_L:
+forall M Gamma A G' w,
+  types_LF (map snd_ G') Gamma M A ->
+  LF_to_Hyb_ctx (Gamma::(map snd_ G')) ((w, Gamma)::G') ->
+  exists M',
+    LF_to_Hyb_rel Gamma M A G' w M'.
+intros; generalize dependent w;
+remember (map snd_ G') as G;
+generalize dependent G';
+induction H; intros; subst.
+(* hyp *)
+exists (hyp_Hyb (fte v)); econstructor; eauto using types_LF.
+(* lam *)
+assert (exists v, v \notin L \u used_vars_te_LF M)
+  as HF by apply Fresh; destruct HF;
+destruct H0 with x G' w; auto; [eapply LF_to_Hyb_ctx_extend2_t; eauto | ];
+unfold open_LF in *;
+assert (LF_to_Hyb_rel ((x, A) :: Gamma)
+         (subst_t_LF (hyp_LF (fte x)) (bte 0) M) B G' w x0) by auto;
+apply LF_to_Hyb_rel_subst_t_rev with (M:=hyp_LF (fte x)) (M':=hyp_Hyb (fte x))
+                                                         (B:=A)
+ in H3.
+destruct H3; exists (lam_Hyb A x1);
+apply lam_LF_Hyb with (L:=L)(G:=map snd_ G');
+[ apply t_lam_LF with (L:=L) | |]; eauto;
+intros; subst; unfold open_LF; unfold open_t_Hyb;
+replace ((v0, A) :: Gamma) with (subst_in_ctx_LF v0 x ((x,A)::Gamma)).
+replace (subst_t_LF (hyp_LF (fte v0)) (bte 0) M) with
+   (subst_t_LF (hyp_LF (fte v0)) (fte x)
+               (subst_t_LF (hyp_LF (fte x)) (bte 0) M)).
+replace G' with (map (subst_in_ctx_Hyb v0 x) G').
+replace ([hyp_Hyb (fte v0) // bte 0]x1) with
+  ([hyp_Hyb (fte v0) // fte x] ([hyp_Hyb (fte x) // bte 0] x1)).
+apply LF_to_Hyb_rel_rename_vars with ((x,A)::Gamma)
+      (subst_t_LF (hyp_LF (fte x)) (bte 0) M) G' ([hyp_Hyb (fte x) // bte 0]x1)
+      x v0; auto.
+rewrite notin_union in H2; destruct H2; rewrite <- subst_t_Hyb_neutral_free;
+auto. skip. (* We will find a way, maybe including :
+erewrite <- LF_to_Hyb_rel_te_vars with
+  (N1:=open_t_LF (hyp_LF (fte x)) M); eauto.
+OR we can just say that x is fresher than vars from Gamma and G' -
+and prove a (true by design!) lemma that what we want is a subset of what we
+have
+-- but for this we will need reversed subst_t lemma (R subst M N => R M N)
 *)
+skip. (* separate lemma *)
+rewrite <- subst_t_neutral_free_LF; eauto.
+simpl; case_if. skip. (* separate lemma *)
+skip. (* Later *)
+(* appl *)
+destruct IHtypes_LF1 with G' w; auto;
+destruct IHtypes_LF2 with G' w; auto;
+exists (appl_Hyb x x0); econstructor; eauto; econstructor; eauto.
+(* box *)
+assert (exists (w: var), w \notin \{}) by apply Fresh; destruct H1.
+destruct IHtypes_LF with (G' & (w, Gamma)) x; auto.
+rew_map; auto.
+apply LF_to_Hyb_ctx_extend2_w; eauto. skip. (* permut *)
+exists (box_Hyb x0); econstructor; eauto.
+econstructor; eauto.
+intros; unfold open_w_Hyb.
+replace ((w, Gamma) :: G') with (G' & (w, Gamma)) by skip. (* such rewrite
+will require additional lemma *)
+replace (G' & (w, Gamma)) with (map (subst_w_in_ctx_Hyb w0 x) (G' & (w, Gamma))).
+replace ({{fwo w0 // bwo 0}}x0) with ({{fwo w0//fwo x}}{{fwo x // bwo 0}}x0).
+apply LF_to_Hyb_rel_rename_worlds with (G' & (w, Gamma)) ({{fwo x // bwo 0}} x0)
+                                       x x w0; eauto.
+skip. (* really, x0 is of the form {{fwo x//bwo 0}} x1, but how can we know it
+for cerain; maybe we can add lc_w to assumptions (or just conclude it from
+typing) and then say that it's closed. so whatevs *)
+case_if; auto.
+rewrite subst_w_Hyb_neutral_free; auto. skip. (* again, just x notin any
+known worlds from G' and (w, Gamma) + it's a subset *)
+skip. (* x is free in this, separate lemma *)
+(* In general, this was the same story as with lambda -
+and with similar lemmas *)
+(* unbox *)
+destruct IHtypes_LF with G' w; auto.
+exists (unbox_fetch_Hyb (fwo w) x); econstructor; eauto; constructor; auto.
+(* unbox-fetch *)
+assert (exists (G0: bg_Hyb), G = map snd_ G0) by skip. destruct H2 as (G0).
+assert (exists w',
+          PPermut_Hyb (G0 & (w', Gamma)) G'0) by skip. (* from H0 *)
+destruct H3 as (w').
+destruct IHtypes_LF with (G0 & (w, Gamma')) w'; auto.
+rew_map; simpl; subst; auto.
+subst. skip.
+exists (unbox_fetch_Hyb (fwo w') x).
+replace G'0 with ((w', Gamma) :: G0) by skip. (* lemma mentioned earlier *)
+apply unbox_fetch_LF_Hyb with (G:=G); eauto. skip (* from ok + rel on ctxts *).
+apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma); auto. PPermut_LF_simpl.
+skip. (* permuts *)
+replace ((w, Gamma')::G0) with (G0 & (w, Gamma')) by skip. auto.
+(* here *)
+destruct IHtypes_LF with G' w; auto.
+exists (get_here_Hyb (fwo w) x); econstructor; eauto; constructor; auto.
+(* get-here *)
+assert (exists (G0: bg_Hyb), G = map snd_ G0) by skip. destruct H2 as (G0).
+assert (exists w',
+          PPermut_Hyb (G0 & (w', Gamma)) G'0) by skip. (* from H0 *)
+destruct H3 as (w').
+destruct IHtypes_LF with (G0 & (w, Gamma')) w'; auto.
+rew_map; simpl; subst; auto.
+subst. skip.
+exists (get_here_Hyb (fwo w') x).
+replace G'0 with ((w', Gamma) :: G0) by skip. (* lemma mentioned earlier *)
+apply get_here_LF_Hyb with (G:=G); eauto. skip (* from ok + rel on ctxts *).
+apply t_get_here_LF with (G:=G) (Gamma:=Gamma); auto. PPermut_LF_simpl.
+skip. (* permuts *)
+replace ((w, Gamma')::G0) with (G0 & (w, Gamma')) by skip. auto.
+(* letdia *)
+assert (exists x, x \notin L) by apply Fresh; destruct H2.
+destruct H0 with (((x,A)::nil) :: map snd_ G') x ((x, (x,A)::nil)::G') w; auto.
+skip.
+assert ( LF_to_Hyb_rel Gamma (open_LF N (hyp_LF (fte x))) B
+         ((x, (x, A) :: nil) :: G') w x0) by auto.
+skip. (*combination of lambda and box *)
+(* letdia-get *)
+skip. (* combin. of lambda, box and unbox *)
+Qed.
 
 Close Scope hybrid_is5_scope.
 Close Scope permut_scope.
