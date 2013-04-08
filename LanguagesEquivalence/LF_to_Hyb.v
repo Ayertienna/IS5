@@ -17,6 +17,12 @@ Open Scope hybrid_is5_scope.
 Definition LF_to_Hyb_ctx (G: bg_LF) (G': bg_Hyb) :=
   map snd_ G' *=* G /\ ok_Hyb G' nil.
 
+Lemma flat_map_concat:
+forall A B G, concat (map (@snd_ A (list B)) G) = flat_map snd_ G.
+induction G; intros; try destruct a;
+rew_map; rew_flat_map; simpl; rew_concat; try rewrite IHG; eauto.
+Qed.
+
 Lemma LF_to_Hyb_ctx_Ok:
 forall G G',
   ok_Bg_LF G -> LF_to_Hyb_ctx G G' -> ok_Bg_Hyb G'.
@@ -167,6 +173,30 @@ Inductive LF_to_Hyb_rel: (* bg_LF  -> *) ctx_LF  -> te_LF  -> ty ->
                     ((w', Gamma')::G') w
                     (letdia_get_Hyb (fwo w') M2 N2)
 .
+
+Lemma LF_to_Hyb_rel_permut_G:
+forall Gamma M A G w M' G',
+  G ~=~ G' ->
+  LF_to_Hyb_rel Gamma M A G w M' ->
+  LF_to_Hyb_rel Gamma M A G' w M'.
+intros; generalize dependent G'; induction H0; intros; try econstructor; eauto;
+try rewrite <- H1 || rewrite <- H2 || rewrite <- H3; auto.
+Admitted.
+
+Lemma LF_to_Hyb_rel_permut_Gamma:
+forall Gamma M A G w M' Gamma',
+  Gamma *=* Gamma' ->
+  LF_to_Hyb_rel Gamma M A G w M' ->
+  LF_to_Hyb_rel Gamma' M A G w M'.
+Admitted.
+
+Add Morphism LF_to_Hyb_rel: LF_to_Hyb_rel_G.
+split; intros.
+apply LF_to_Hyb_rel_permut_G with (G:=x0); auto;
+apply LF_to_Hyb_rel_permut_Gamma with (Gamma:=x); auto.
+apply LF_to_Hyb_rel_permut_G with (G:=y2); auto;
+apply LF_to_Hyb_rel_permut_Gamma with (Gamma:=y); auto; symmetry; auto.
+Qed.
 
 Lemma LF_to_Hyb_types:
 forall G' Gamma M A w M',
@@ -443,7 +473,7 @@ try rewrite IHM;
 try rewrite IHM1; try rewrite IHM2; eauto.
 Qed.
 
-(* Fixme: rename if this works and stays *)
+(* Fixme: rename if this works and stays (being useful) *)
 Inductive R: te_LF -> te_Hyb -> Prop :=
 | hyp_R: forall v, R (hyp_LF v) (hyp_Hyb v)
 | lam_R: forall A M N, R M N -> R (lam_LF A M) (lam_Hyb A N)
@@ -492,7 +522,7 @@ destruct M2; simpl in *; try case_if; try inversion H0; subst; constructor;
 split; auto.
 Qed.
 
-Lemma R_subst_w_rev:
+Lemma R_subst_w:
 forall M N w w',
   R M ({{w//w'}}N) <-> R M N.
 split;
@@ -519,7 +549,7 @@ specialize H2 with x;
 unfold open_LF in *; unfold open_t_Hyb in *; apply R_subst_t_rev in H2; auto.
 (* box *)
 assert (exists x, x\notin L) by apply Fresh; destruct H3;
-unfold open_w_Hyb in *. eapply R_subst_w_rev; eauto.
+unfold open_w_Hyb in *. eapply R_subst_w; eauto.
 (* letdia *)
 assert (exists x, x\notin Lw) by apply Fresh.
 destruct H4.
@@ -531,9 +561,8 @@ unfold open_LF in *; unfold open_t_Hyb in *;
 unfold open_w_Hyb in *.
 apply H2 in H4; auto.
 assert (R N1 ({{fwo x // bwo 0}} N2)).
-apply R_subst_t_rev with (v:=0) (v':=x0); eauto;
-apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0).
-apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0); auto.
+apply R_subst_t_rev with (v:=0) (v':=x0); eauto.
+apply R_subst_w with (w:=fwo x) (w':=bwo 0); auto.
 (* letdia - get *)
 assert (exists x, x\notin Lw) by apply Fresh.
 destruct H4.
@@ -545,9 +574,8 @@ unfold open_LF in *; unfold open_t_Hyb in *;
 unfold open_w_Hyb in *.
 apply H2 in H4; auto.
 assert (R N1 ({{fwo x // bwo 0}} N2)).
-apply R_subst_t_rev with (v:=0) (v':=x0); eauto;
-apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0).
-apply R_subst_w_rev with (w:=fwo x) (w':=bwo 0); auto.
+apply R_subst_t_rev with (v:=0) (v':=x0); eauto.
+apply R_subst_w with (w:=fwo x) (w':=bwo 0); auto.
 Qed.
 
 Lemma R_lc_t:
@@ -584,7 +612,7 @@ try eapply R_lc_t; eauto.
 (* unbox - box *)
 inversion H; inversion H3; subst; try omega;
 exists (open_w_Hyb N (w)); split;
-[unfold open_w_Hyb; apply R_subst_w_rev; auto |
+[unfold open_w_Hyb; apply R_subst_w; auto |
  constructor; try eapply R_lc_t; eauto; inversion H5; auto].
 (* unbox *)
 inversion H; subst; try omega;
@@ -600,7 +628,7 @@ constructor; auto; try eapply R_lc_t; eauto.
 inversion H; inversion H4; subst; try omega; inversion H11; subst; try omega.
 exists ((N' ^w^ (fwo w0) ) ^t^ N0); split.
 unfold open_w_Hyb; unfold open_t_Hyb; eapply R_subst_t; auto;
-apply R_subst_w_rev; auto.
+apply R_subst_w; auto.
 constructor; try eapply R_lc_t; eauto; eapply R_value; eauto.
 (* letdia *)
 destruct w0; inversion H; subst; try omega.
@@ -619,6 +647,15 @@ exact (bwo 0).
 exact (bwo 0).
 Qed.
 
+Lemma R_te_vars:
+forall N1 N2,
+  R N1 N2 -> used_vars_te_LF N1 = free_vars_Hyb N2.
+intros; induction H; simpl in *;
+try rewrite IHR || (rewrite IHR1; rewrite IHR2); eauto.
+Qed.
+
+(* End of R properties *)
+
 Fixpoint subst_in_ctx_LF (v1: var) (v2: var) (Gamma: ctx_LF) : ctx_LF :=
 match Gamma with
 | nil => nil
@@ -630,6 +667,74 @@ end.
 Definition subst_in_ctx_Hyb v1 v2 (Gamma: ctx_Hyb) :=
 (fst_ Gamma, subst_in_ctx_LF v1 v2 (snd_ Gamma)).
 
+Lemma subst_in_ctx_LF_no_change:
+forall v1 v2 Gamma,
+  v2 \notin (from_list (map fst_ Gamma)) ->
+  subst_in_ctx_LF v1 v2 Gamma = Gamma.
+induction Gamma; intros; simpl in *; auto; destruct a; case_if;
+simpl in *; rew_map in *; simpl in *; rewrite from_list_cons in *;
+rewrite notin_union in *.
+destruct H; elim H; rewrite in_singleton; auto.
+rewrite IHGamma; destruct H; eauto.
+Qed.
+
+Lemma subst_in_ctx_Hyb_no_change:
+forall v1 v2 Gamma,
+  v2 \notin (from_list (map fst_ (snd_ Gamma))) ->
+  subst_in_ctx_Hyb v1 v2 Gamma = Gamma.
+intros; unfold subst_in_ctx_Hyb; destruct Gamma; simpl in *;
+rewrite subst_in_ctx_LF_no_change; eauto.
+Qed.
+
+Fixpoint vars_from_G_Hyb (G: bg_Hyb) :=
+match G with
+| nil => \{}
+| Gamma :: G' =>
+  from_list (map fst_ (snd_ Gamma)) \u vars_from_G_Hyb G'
+end.
+
+Lemma subst_in_bg_Hyb_no_change:
+forall v1 v2 G,
+  v2 \notin vars_from_G_Hyb G ->
+  G = map (subst_in_ctx_Hyb v1 v2) G.
+induction G; intros; rew_map; auto.
+destruct a. simpl in *.
+rewrite subst_in_ctx_Hyb_no_change; eauto.
+rewrite <- IHG; eauto.
+simpl; auto.
+Qed.
+
+Lemma ok_Bg_LF_subst_in_bg_subst_in_ctx:
+forall G G' Gamma w v1 v,
+LF_to_Hyb_ctx (Gamma :: G) ((w, Gamma) :: G') ->
+ok_Bg_LF (subst_in_ctx_LF v1 v Gamma ::
+                          map (subst_in_ctx_LF v1 v) G).
+Admitted.
+
+Lemma Mem_ctx_LF:
+forall v v' v0 v1 A Gamma,
+  Mem (v, A) Gamma ->
+  (v' = if (eq_var_dec v v0) then v1 else v) ->
+  Mem (v', A) (subst_in_ctx_LF v1 v0 Gamma).
+Admitted.
+
+Lemma LF_to_Hyb_ctx_subst_t:
+forall Gamma G w G' v0 v1,
+LF_to_Hyb_ctx (Gamma :: G) ((w, Gamma) :: G') ->
+LF_to_Hyb_ctx
+     (subst_in_ctx_LF v1 v0 Gamma :: map (subst_in_ctx_LF v1 v0) G)
+     ((w, subst_in_ctx_LF v1 v0 Gamma) :: map (subst_in_ctx_Hyb v1 v0) G').
+Admitted.
+
+Lemma types_renaming:
+forall G Gamma M B v0 v,
+  types_LF G Gamma M B ->
+  types_LF (map (subst_in_ctx_LF v0 v) G)
+     (subst_in_ctx_LF v0 v Gamma)
+     (subst_t_LF (hyp_LF (fte v0)) (fte v) M) B.
+intros; generalize dependent v; generalize dependent v0; induction H; intros.
+Admitted.
+
 Lemma LF_to_Hyb_rel_rename_vars:
 forall Gamma M B G w N v,
   LF_to_Hyb_rel Gamma M B G w N ->
@@ -640,11 +745,54 @@ forall Gamma M B G w N v,
     M' = subst_t_LF (hyp_LF (fte v0)) (fte v) M ->
     N' = subst_t_Hyb (hyp_Hyb (fte v0)) (fte v) N ->
     LF_to_Hyb_rel Gamma' M' B G' w N'.
+intros Gamma M B G w N v H; generalize dependent v;
+induction H; intros; subst; simpl in *; repeat case_if.
+(* hyp *)
+apply hyp_LF_Hyb with (G:=map (subst_in_ctx_LF v1 v0) G); inversion H; subst.
+constructor;
+[eapply ok_Bg_LF_subst_in_bg_subst_in_ctx |
+ apply Mem_ctx_LF with (v:=v0); auto; case_if]; eauto.
+apply LF_to_Hyb_ctx_subst_t; auto.
+apply hyp_LF_Hyb with (G:=map (subst_in_ctx_LF v1 v0) G); inversion H; subst.
+constructor;
+[eapply ok_Bg_LF_subst_in_bg_subst_in_ctx |
+ apply Mem_ctx_LF with (v:=v2); auto; case_if]; eauto.
+apply LF_to_Hyb_ctx_subst_t; auto.
+(* lam *)
+apply lam_LF_Hyb with (L:=L \u \{v}) (G:=map (subst_in_ctx_LF v0 v) G);
+inversion H; subst.
+apply t_lam_LF with (L:=L0 \u L \u \{v});
+[eapply ok_Bg_LF_subst_in_bg_subst_in_ctx | intros]; eauto.
+replace ((v1, A) :: subst_in_ctx_LF v0 v Gamma) with
+  (subst_in_ctx_LF v0 v ((v1, A)::Gamma)).
+unfold open_LF. rewrite <- subst_t_comm_LF; try constructor; eauto.
+apply types_renaming; eauto.
+simpl; case_if; auto; repeat rewrite notin_union in H4;
+rewrite notin_singleton in H4; destruct H4; destruct H5; elim H6; auto.
+apply LF_to_Hyb_ctx_subst_t; auto.
+intros. apply H2 with (v0:=v1)(v1:=v0)(v:=v); eauto; repeat case_if; auto.
+rewrite notin_union in *; destruct H4; rewrite notin_singleton in *;
+elim H5; auto.
+unfold open_LF; rewrite subst_t_comm_LF; auto; constructor.
+unfold open_t_Hyb; rewrite subst_t_Hyb_comm; auto; constructor.
+(* appl *)
 Admitted.
 
 Definition subst_w_in_ctx_Hyb w1 w2 (Gamma: ctx_Hyb) :=
 let w' :=  if eq_var_dec (fst_ Gamma) w2 then w1 else (fst_ Gamma)
 in (w', snd_ Gamma).
+
+Lemma subst_w_in_bg_Hyb_no_change:
+forall G v1 v2,
+  v2 \notin from_list (map fst_ G) ->
+  G = map (subst_w_in_ctx_Hyb v1 v2) G.
+unfold subst_w_in_ctx_Hyb in *;
+induction G; intros; rew_map; auto;
+destruct a; rew_map in *; simpl in *; case_if;
+rewrite from_list_cons in H; rewrite notin_union in H; destruct H.
+elim H; rewrite in_singleton; auto.
+rewrite <- IHG; eauto.
+Qed.
 
 Lemma LF_to_Hyb_rel_rename_worlds:
 forall Gamma M B G N w w'',
@@ -666,18 +814,136 @@ forall N Gamma M v N' A B G w M',
 induction N; intros; simpl in *; repeat case_if.
 Admitted.
 
-Lemma R_te_vars:
-forall N1 N2,
-  R N1 N2 -> used_vars_te_LF N1 = free_vars_Hyb N2.
-intros; induction H; simpl in *;
-try rewrite IHR || (rewrite IHR1; rewrite IHR2); eauto.
-Qed.
-
 Lemma LF_to_Hyb_rel_te_vars:
 forall N1 N2 Gamma A G w,
   LF_to_Hyb_rel Gamma N1 A G w N2 ->
   used_vars_te_LF N1 = free_vars_Hyb N2.
 intros; apply R_te_vars; eapply LF_to_Hyb_rel_R; eauto.
+Qed.
+
+Lemma free_vars_Hyb_subst_t:
+forall N C k,
+  free_vars_Hyb ([C // bte k] N) = free_vars_Hyb N \/
+  free_vars_Hyb ([C // bte k] N) = free_vars_Hyb C \u free_vars_Hyb N.
+induction N; intros; simpl in *.
+destruct v; case_if; simpl;
+[right; rewrite union_empty_r | left | left ]; auto.
+destruct IHN with C (S k); rewrite <- H; [left | right]; auto.
+destruct IHN1 with C k; destruct IHN2 with C k; rewrite H; rewrite H0;
+[left | right | right | right]; auto.
+rewrite <- union_comm_assoc; auto.
+rewrite union_assoc; auto.
+rewrite <- union_comm_assoc.
+rewrite <- union_assoc.
+assert (forall N,
+          free_vars_Hyb C \u free_vars_Hyb C \u N = free_vars_Hyb C \u N).
+intros; rewrite union_assoc; rewrite union_same; auto.
+rewrite H1; auto.
+destruct IHN with C k; rewrite H; [left | right]; auto.
+destruct IHN with C k; rewrite H; [left | right]; auto.
+destruct IHN with C k; rewrite H; [left | right]; auto.
+destruct IHN1 with C k; destruct IHN2 with C (S k); rewrite H; rewrite H0;
+[left | right | right | right]; auto.
+rewrite <- union_comm_assoc; auto.
+rewrite union_assoc; auto.
+rewrite <- union_comm_assoc.
+rewrite <- union_assoc.
+assert (forall N,
+          free_vars_Hyb C \u free_vars_Hyb C \u N = free_vars_Hyb C \u N).
+intros; rewrite union_assoc; rewrite union_same; auto.
+rewrite H1; auto.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_t_subst_w_Hyb:
+forall N w w' n,
+  lc_t_n_Hyb n N ->
+  lc_t_n_Hyb n (subst_w_Hyb w w' N).
+induction N; intros; inversion H; subst; simpl in *; try case_if;
+auto; constructor; try eapply IHN; eauto.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_t_subst_Hyb:
+forall M N k,
+  lc_t_n_Hyb (S k) M ->
+  lc_t_n_Hyb k N ->
+  lc_t_n_Hyb k [N // bte k] M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try constructor; eauto.
+assert (v0 <> k) by (intro; elim H1; subst; auto); omega.
+eapply IHM; eauto; apply closed_t_succ; auto.
+eapply IHM2; eauto; apply closed_t_succ; auto.
+Qed.
+(*
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_w_subst_Hyb_same_n_fwo:
+forall M w w' n,
+  lc_w_n_Hyb n M ->
+  lc_w_n_Hyb n {{fwo w // w'}} M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try destruct w;
+constructor; eauto.
+Qed.
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_w_subst_Hyb_same_n_bwo:
+forall M w' k n,
+  lc_w_n_Hyb n M ->
+  k < n ->
+  lc_w_n_Hyb n {{bwo k // w'}} M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try destruct w'; simpl;
+constructor; try (eapply IHM || eapply IHM2); try omega; auto.
+Qed.
+*)
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_t_n_Hyb_subst_w:
+forall N w w' n,
+lc_t_n_Hyb n (subst_w_Hyb w w' N) ->
+lc_t_n_Hyb n N.
+induction N; intros; simpl in *; try destruct v; constructor;
+inversion H; subst; try eapply IHN; eauto.
+Qed.
+
+
+(* FIXME: Move this to Hybrid/Hyb_Substitution *)
+Lemma lc_t_n_Hyb_subst_t:
+forall N M n,
+lc_t_n_Hyb n M ->
+lc_t_n_Hyb n (subst_t_Hyb M (bte n) N) ->
+lc_t_n_Hyb (S n) N.
+induction N; intros; simpl in *; try destruct v; constructor;
+repeat case_if; try inversion H1; subst; try omega;
+inversion H0; subst; eauto.
+apply IHN with (M:=M); eauto; apply closed_t_succ; auto.
+apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
+apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
+Qed.
+
+Lemma types_Hyb_lc_t_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H1;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H2;
+specialize H0 with x x0; apply H0 with (w':=x0) in H1; auto;
+apply lc_t_n_Hyb_subst_t in H1; try constructor;
+apply lc_t_n_Hyb_subst_w in H1; auto.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H2;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H3;
+specialize H0 with x x0; apply H0 with (w':=x0) in H2; auto;
+apply lc_t_n_Hyb_subst_t in H2; try constructor;
+apply lc_t_n_Hyb_subst_w in H2; auto.
 Qed.
 
 Lemma LF_to_Hyb_rel_total_L:
@@ -693,9 +959,36 @@ induction H; intros; subst.
 (* hyp *)
 exists (hyp_Hyb (fte v)); econstructor; eauto using types_LF.
 (* lam *)
-assert (exists v, v \notin L \u used_vars_te_LF M)
+assert (exists v, v \notin L \u used_vars_te_LF M \u vars_from_G_Hyb G' \u
+        from_list (map fst_ Gamma) \u used_vars_ctx_LF (Gamma::(map snd_ G')))
   as HF by apply Fresh; destruct HF;
-destruct H0 with x G' w; auto; [eapply LF_to_Hyb_ctx_extend2_t; eauto | ];
+destruct H0 with x G' w; auto; [eapply LF_to_Hyb_ctx_extend2_t; eauto | ].
+exists (lam_Hyb A x0); econstructor; eauto. econstructor; eauto.
+intros; unfold open_LF in *; unfold open_t_Hyb in *.
+assert (lc_t_Hyb x0).
+  apply types_Hyb_lc_t_Hyb with (G:=G') (Gamma:=(x, A)::Gamma) (A:=B) (w:=w);
+  apply LF_to_Hyb_types in H3; auto.
+rewrite closed_subst_t_Hyb_bound with (n:=0); auto; try omega.
+replace ((v0, A) :: Gamma) with (subst_in_ctx_LF v0 x ((x,A)::Gamma)).
+replace (subst_t_LF (hyp_LF (fte v0)) (bte 0) M) with
+   (subst_t_LF (hyp_LF (fte v0)) (fte x)
+               (subst_t_LF (hyp_LF (fte x)) (bte 0) M)).
+replace G' with (map (subst_in_ctx_Hyb v0 x) G').
+replace x0 with
+  ([hyp_Hyb (fte v0) // fte x] x0).
+apply LF_to_Hyb_rel_rename_vars with ((x,A)::Gamma)
+      (subst_t_LF (hyp_LF (fte x)) (bte 0) M) G' x0
+      x v0; auto.
+rewrite closed_subst_t_Hyb_free; auto.
+(* x \notin FV x0 -- this may be tricky as x is created before x0;
+also because x0 is in a relation with M ^t^ x, and FV x0 = FV (M ^t^ x).. *)
+(* This may be technical, but it should be doable with some extensions of set
+to express FV N in relation to FV [M/k]N *) skip. (* !!!!! *)
+rewrite <- subst_in_bg_Hyb_no_change; auto.
+rewrite <- subst_t_neutral_free_LF; eauto.
+simpl; case_if; rewrite subst_in_ctx_LF_no_change; auto.
+(* This is the non-cheating version:
+It requires one more lemma then the one above: LF_to_Hyb_rel_subst_t_rev
 unfold open_LF in *;
 assert (LF_to_Hyb_rel ((x, A) :: Gamma)
          (subst_t_LF (hyp_LF (fte x)) (bte 0) M) B G' w x0) by auto;
@@ -705,7 +998,7 @@ apply LF_to_Hyb_rel_subst_t_rev with (M:=hyp_LF (fte x)) (M':=hyp_Hyb (fte x))
 destruct H3; exists (lam_Hyb A x1);
 apply lam_LF_Hyb with (L:=L)(G:=map snd_ G');
 [ apply t_lam_LF with (L:=L) | |]; eauto;
-intros; subst; unfold open_LF; unfold open_t_Hyb;
+intros; subst; unfold open_LF; unfold open_t_Hyb.
 replace ((v0, A) :: Gamma) with (subst_in_ctx_LF v0 x ((x,A)::Gamma)).
 replace (subst_t_LF (hyp_LF (fte v0)) (bte 0) M) with
    (subst_t_LF (hyp_LF (fte v0)) (fte x)
@@ -717,47 +1010,51 @@ apply LF_to_Hyb_rel_rename_vars with ((x,A)::Gamma)
       (subst_t_LF (hyp_LF (fte x)) (bte 0) M) G' ([hyp_Hyb (fte x) // bte 0]x1)
       x v0; auto.
 rewrite notin_union in H2; destruct H2; rewrite <- subst_t_Hyb_neutral_free;
-auto. skip. (* We will find a way, maybe including :
-erewrite <- LF_to_Hyb_rel_te_vars with
-  (N1:=open_t_LF (hyp_LF (fte x)) M); eauto.
-OR we can just say that x is fresher than vars from Gamma and G' -
-and prove a (true by design!) lemma that what we want is a subset of what we
-have
--- but for this we will need reversed subst_t lemma (R subst M N => R M N)
-*)
-skip. (* separate lemma *)
+auto. (* x \notin FV x1 -- this is tricky as x is created before x1 *)
+(* This may be technical, but it should be doable with some extensions of set
+to express FV N in relation to FV [M/k]N *) skip. (* !!!!! *)
+rewrite <- subst_in_bg_Hyb_no_change; auto.
 rewrite <- subst_t_neutral_free_LF; eauto.
-simpl; case_if. skip. (* separate lemma *)
-skip. (* Later *)
+simpl; case_if; rewrite subst_in_ctx_LF_no_change; auto.
+apply hyp_LF_Hyb with (G:=map snd_ G').
+constructor; auto; try apply Mem_here; apply ok_Bg_LF_fresh; auto.
+apply LF_to_Hyb_ctx_extend2_t; auto.
+*)
 (* appl *)
 destruct IHtypes_LF1 with G' w; auto;
 destruct IHtypes_LF2 with G' w; auto;
 exists (appl_Hyb x x0); econstructor; eauto; econstructor; eauto.
 (* box *)
-assert (exists (w: var), w \notin \{}) by apply Fresh; destruct H1.
-destruct IHtypes_LF with (G' & (w, Gamma)) x; auto.
-rew_map; auto.
-apply LF_to_Hyb_ctx_extend2_w; eauto. skip. (* permut *)
-exists (box_Hyb x0); econstructor; eauto.
-econstructor; eauto.
-intros; unfold open_w_Hyb.
-replace ((w, Gamma) :: G') with (G' & (w, Gamma)) by skip. (* such rewrite
-will require additional lemma *)
-replace (G' & (w, Gamma)) with (map (subst_w_in_ctx_Hyb w0 x) (G' & (w, Gamma))).
-replace ({{fwo w0 // bwo 0}}x0) with ({{fwo w0//fwo x}}{{fwo x // bwo 0}}x0).
-apply LF_to_Hyb_rel_rename_worlds with (G' & (w, Gamma)) ({{fwo x // bwo 0}} x0)
-                                       x x w0; eauto.
-skip. (* really, x0 is of the form {{fwo x//bwo 0}} x1, but how can we know it
-for cerain; maybe we can add lc_w to assumptions (or just conclude it from
-typing) and then say that it's closed. so whatevs *)
-case_if; auto.
-rewrite subst_w_Hyb_neutral_free; auto. skip. (* again, just x notin any
-known worlds from G' and (w, Gamma) + it's a subset *)
-skip. (* x is free in this, separate lemma *)
-(* In general, this was the same story as with lambda -
-and with similar lemmas *)
+remember (from_list (map fst_ (G' & (w, Gamma)))) as U.
+assert (exists (w: var), w \notin U) by apply Fresh; destruct H1;
+destruct IHtypes_LF with (G' & (w, Gamma)) x; auto;
+[rew_map; auto | apply LF_to_Hyb_ctx_extend2_w; eauto | ].
+assert (PPermut_LF (map snd_ G' & Gamma) (Gamma :: map snd_ G'))
+  by PPermut_LF_simpl;
+assert (PPermut_Hyb (G' & (w, Gamma)) ((w, Gamma) :: G'))
+  by PPermut_Hyb_simpl;
+rewrite H2; rewrite H3; auto.
+assert (lc_w_Hyb x0).
+  apply types_Hyb_lc_w_Hyb with (G:=G' & (w, Gamma)) (Gamma:=nil) (A:=A) (w:=x);
+  apply LF_to_Hyb_types in H2; auto.
+exists (box_Hyb x0); econstructor; eauto;
+[econstructor; eauto | intros]; unfold open_w_Hyb.
+assert (PPermut_Hyb (G' & (w, Gamma)) ((w, Gamma) :: G'))
+  by PPermut_Hyb_simpl;
+rewrite <- H5.
+replace (G' & (w, Gamma)) with
+  (map (subst_w_in_ctx_Hyb w0 x) (G' & (w, Gamma))).
+replace ({{fwo w0 // bwo 0}}x0) with
+  ({{fwo w0//fwo x}}{{fwo x // bwo 0}}x0).
+apply LF_to_Hyb_rel_rename_worlds with
+  (G' & (w, Gamma)) ({{fwo x // bwo 0}} x0) x x w0; eauto; try (case_if; auto).
+rewrite closed_subst_w_Hyb_bound with (n:=0); auto; try omega.
+(* Q: can I do the same cheat for lambda? (With not splitting x0) *)
+rewrite subst_w_Hyb_neutral_free; auto.
+(* Just as tricky as before, x is created before x0 *) skip.
+rewrite <- subst_w_in_bg_Hyb_no_change; subst; auto.
 (* unbox *)
-destruct IHtypes_LF with G' w; auto.
+destruct IHtypes_LF with G' w; auto;
 exists (unbox_fetch_Hyb (fwo w) x); econstructor; eauto; constructor; auto.
 (* unbox-fetch *)
 assert (exists (G0: bg_Hyb), G = map snd_ G0) by skip. destruct H2 as (G0).
