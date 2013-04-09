@@ -206,11 +206,11 @@ match L with
 | nil => N
 end.
 
-Fixpoint subst_typing G (w: var) (L: list te_LF) (D: list (var * ty)) : Prop :=
+Fixpoint subst_typing G (L: list te_LF) (D: list (var * ty)) : Prop :=
 match L, D with
 | nil, nil => True
-| M::L', (v, A)::D' => emptyEquiv G |= (w, nil) |- M ::: A /\
-  (subst_typing G w L' D')
+| M::L', (v, A)::D' => emptyEquiv_LF G |= nil |- M ::: A /\
+  (subst_typing G L' D')
 | _, _ => False
 end.
 
@@ -219,54 +219,49 @@ end.
 Goal: We have a list of terms and their corresponding types;
 we want to express that terms are reducible at their respecive types.
 *)
-Fixpoint red_list (w: var) (L: list te_LF) (G: list (var * ty)) :=
+Fixpoint red_list (L: list te_LF) (G: list (var * ty)) :=
 match L, G with
 | nil, nil => True
-| M :: D', (v, A):: Gamma' => Reducible M A w /\ red_list w D' Gamma'
+| M :: D', (v, A):: Gamma' => Red M A /\ red_list D' Gamma'
 | _, _ => False
 end.
 
 Lemma reducible_abstraction:
-forall A w N B
-  (lc_N: lc_w_LF (lam_LF A N))
-  (lc_N': lc_t_LF (lam_LF A N))
+forall A N B
+  (lc_N: lc_t_LF (lam_LF A N))
   (HT: forall M,
-    lc_w_LF M -> lc_t_LF M ->
-    Reducible M A w ->
-    Reducible ([M// bte 0] N) B w),
-  Reducible (lam_LF A N) (A ---> B) w.
+    lc_t_LF M ->
+    Red M A ->
+    Red ([M// bte 0] N) B),
+  Red (lam_LF A N) (A ---> B).
 simpl; intros;
 apply property_3;
 repeat constructor; auto.
 inversion lc_N; auto.
 intros; inversion H; subst.
-unfold open_var; apply HT; auto.
-inversion HT0.
+apply HT; auto.
+inversion H5.
 Qed.
 
 Lemma reducible_box:
-forall L A w M
+forall A M
   (lc_M: lc_t_LF M)
-  (lc_M': forall x, x \notin L -> lc_w_LF (M ^w^ (fwo x)))
-  (HT: forall w',
-    Reducible (M ^w^ (fwo w')) A w'),
-  Reducible (box_LF M) ([*]A) w.
+  (HT: Red M A),
+  Red (box_LF M) ([*]A).
 simpl; intros;
 apply property_3;
 repeat constructor; auto.
-assert (exists w: var, w \notin L) as H1 by apply Fresh;
-destruct H1 as (w0);
-apply lcw_box_LF with (L:=L) (w:=w0); auto.
-intros; inversion H; subst.
-unfold open_var; apply HT; auto.
-inversion HT0.
+intros; inversion H; subst; auto.
+inversion H2.
 Qed.
 
 (* Extra substitution properties - FIXME: move *)
 Lemma subst_list_lam:
 forall D X A M,
   subst_list X D (lam_LF A M) = lam_LF A (subst_list (S X) D M).
-Admitted.
+induction D; intros; simpl in *; eauto;
+rewrite IHD; simpl; auto.
+Qed.
 
 Lemma subst_list_appl:
 forall D X M N,
@@ -279,26 +274,19 @@ forall D n M,
 Admitted.
 
 Lemma subst_list_unbox:
-forall D w n M,
-  subst_list n D (unbox_fetch_LF w M) = unbox_fetch_LF w (subst_list n D M).
+forall D n M,
+  subst_list n D (unbox_LF M) = unbox_LF (subst_list n D M).
 Admitted.
 
 Lemma subst_list_get:
-forall D n M w ,
-  subst_list n D (get_here_LF w M) = get_here_LF w (subst_list n D M).
+forall D n M,
+  subst_list n D (here_LF M) = here_LF (subst_list n D M).
 Admitted.
 
 Lemma subst_list_letd:
-forall D n M N w,
-  subst_list n D (letdia_get_LF w M N) =
-  letdia_get_LF w (subst_list n D M) (subst_list (S n) D M).
-Admitted.
-
-Lemma lc_w_subst_list:
-forall D k M,
-  (forall N, In N D -> lc_w_LF N) ->
-  lc_w_LF M ->
-  lc_w_LF (subst_list k D M).
+forall D n M N,
+  subst_list n D (letdia_LF M N) =
+  letdia_LF (subst_list n D M) (subst_list (S n) D M).
 Admitted.
 
 Lemma lc_t_subst_list:
@@ -306,6 +294,7 @@ forall D k M,
   (forall N, In N D -> lc_t_LF N) ->
   lc_t_LF M ->
   lc_t_LF (subst_list k D M).
+induction D; intros; simpl in *; auto.
 Admitted.
 
 Lemma subst_list_lc_t_LF:
@@ -314,32 +303,22 @@ forall M D l,
   subst_list l D M = M.
 Admitted.
 
-Lemma subst_list_subst_w:
-forall w k D l M,
-  (forall N, In N D -> lc_w_LF N) ->
-  {{fwo w // bwo k}} (subst_list l D M) = subst_list l D ({{fwo w // bwo k}} M).
-Admitted.
-
+(*
 Lemma subst_list_hyp:
 forall G Gamma D n A w M,
   G |= (w, Gamma) |- hyp_LF (bte n) ::: A ->
   nth_error D n = Some M ->
   subst_list 0 D (hyp_LF (bte n)) = M.
 Admitted.
-
-
-
-
+*)
 
 Theorem subst_types_reducible:
-forall M w G Gamma A D
-  (H_lc: lc_w_LF M)
-  (H_lc': lc_t_LF M)
-  (H_lc_D: forall N, In N D -> lc_w_LF N)
-  (H_lc_D': forall N, In N D -> lc_t_LF N)
-  (HT: G |= (w, Gamma) |- M ::: A)
-  (HRed: red_list w D Gamma),
-  Reducible (subst_list 0 D M) A w.
+forall M G Gamma A D
+  (H_lc: lc_t_LF M)
+  (H_lc_D: forall N, In N D -> lc_t_LF N)
+  (HT: G |= Gamma |- M ::: A)
+  (HRed: red_list D Gamma),
+  Red (subst_list 0 D M) A.
 induction M; intros.
 (* hyp *)
 destruct v.
