@@ -41,16 +41,27 @@ Inductive SN: te_LF -> Prop :=
              (forall N, M |-> N -> SN N) ->
              SN M.
 
-Definition cont_LF A :=
 
+Inductive cont_LF :=
+| id_cont: cont_LF
+| compose_cont: te_LF -> cont_LF -> cont_LF
+.
+
+
+(* FIXME: There is a notion of reducibility for continuations
+   and we will probably need that in some of the proofs *)
+
+Fixpoint appl_cont (K: cont_LF) (M: te_LF) : te_LF :=
+match K with
+| id_cont => M
+| compose_cont N K' =>
+  appl_cont K' (letdia_LF M N)
+end.
 
 (*
 Continuation K accepting terms of type T A is reducible if for all
-reducible V of type A, the application K @ [V ] is strongly normalising.
+reducible V of type A, the application K @ [V] is strongly normalising.
 *)
-Definition RedCont (K: cont_LF) (A: ty) : Prop :=
-forall V A, Red V A -> SN (appl_cont K V).
-
 Fixpoint Red (M: te_LF) (A: ty) : Prop :=
 match A with
 | tvar => SN M
@@ -63,9 +74,10 @@ match A with
 | tbox A1 => Red (unbox_LF M) A1
 | tdia A1 =>
   forall K
-         (HRC: RedCont K A1),
+    (HRC: forall V, Red V A1 -> SN (appl_cont K (here_LF V))),
     SN (appl_cont K M)
 end.
+
 
 Lemma closed_t_succ_LF:
 forall M n,
@@ -170,8 +182,14 @@ constructor; auto.
 constructor; auto.
 (* box type *)
 apply IHA with (M:=unbox_LF M); auto; constructor; eauto.
-(* dia type - we ommit it *)
-auto.
+(* dia type *)
+specialize HRed with K;
+apply HRed in HRC;
+destruct K; simpl in *.
+inversion HRC; subst; auto;
+apply value_no_step with (N:=M') in H; contradiction.
+inversion HRC; subst.
+
 Qed.
 
 (* FIXME: diamond type needs to be removed *)
