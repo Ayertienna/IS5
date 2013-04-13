@@ -1,7 +1,7 @@
 Add LoadPath "..".
-Add LoadPath "../LabelFree/SingleUnbox".
+Add LoadPath "../LabelFree/SingleUnbox/NoDiamond".
 Require Import Shared.
-Require Import LabelFree.
+Require Import LabelFreeNoDia.
 
 Open Scope is5_scope.
 Open Scope permut_scope.
@@ -12,8 +12,6 @@ Inductive neutral_LF: te_LF -> Prop :=
 | nHyp: forall n, neutral_LF (hyp_LF n)
 | nAppl: forall M N, neutral_LF (appl_LF M N)
 | nUnbox: forall M, neutral_LF (unbox_LF M)
-| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
-| nLetd: forall M N, neutral_LF (letdia_LF M N)
 .
 
 Lemma value_no_step:
@@ -52,7 +50,6 @@ match A with
            (HRed: Red N A1),
       Red (appl_LF M N) A2
 | tbox A1 => Red (unbox_LF M) A1
-| tdia A1 => False
 end.
 
 Lemma closed_t_succ_LF:
@@ -72,7 +69,6 @@ induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
 try constructor; eauto.
 assert (n <> v0) by (intro; subst; elim H1; auto); omega.
 eapply IHM; auto; apply closed_t_succ_LF; auto.
-eapply IHM2; auto; apply closed_t_succ_LF; auto.
 Qed.
 
 Lemma lc_t_subst_t_LF_free:
@@ -83,7 +79,6 @@ forall M N n v,
 induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
 try constructor; eauto.
 eapply IHM; eauto; apply closed_t_succ_LF; auto.
-eapply IHM2; eauto; apply closed_t_succ_LF; auto.
 Qed.
 
 Lemma lc_t_step_LF:
@@ -95,9 +90,6 @@ induction M; intros; inversion H0; inversion H; subst; try constructor; eauto.
 apply lc_t_subst_t_LF_bound; auto.
 eapply IHM1; eauto.
 eapply IHM; eauto.
-eapply IHM; eauto.
-unfold open_LF; apply lc_t_subst_t_LF_bound; auto.
-eapply IHM1; eauto.
 Qed.
 
 Lemma SN_appl:
@@ -158,8 +150,6 @@ constructor; auto.
 constructor; auto.
 (* box type *)
 apply IHA with (M:=unbox_LF M); auto; constructor; eauto.
-(* dia type - we ommit it *)
-auto.
 Qed.
 
 (* FIXME: diamond type needs to be removed *)
@@ -204,9 +194,6 @@ constructor; auto.
 apply IHA; [constructor | ]; auto.
 intros; apply IHA; try constructor; auto; intros;
 inversion H2; subst; [inversion H0 | ]; apply H1; auto.
-(* dia type *)
-intro; contradiction.
-skip. (* Create a sublanguage? *)
 Grab Existential Variables.
 auto.
 Qed.
@@ -360,21 +347,6 @@ induction D; intros; simpl in *; eauto;
 destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
 Qed.
 
-Lemma subst_free_vars_here:
-forall D L M,
-  subst_free_vars D L (here_LF M) = here_LF (subst_free_vars D L M).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
-Qed.
-
-Lemma subst_free_vars_letdia:
-forall D L M N,
-  subst_free_vars D L (letdia_LF M N) =
-  letdia_LF (subst_free_vars D L M) (subst_free_vars D L N) .
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
-Qed.
-
 (* !!! *)
 Lemma lc_t_subst_free_vars:
 forall L D k M,
@@ -480,6 +452,4 @@ rewrite subst_free_vars_unbox; eapply IHHT; eauto.
 rewrite subst_free_vars_unbox; apply IHHT; auto.
 rewrite <- HPermut; rew_concat; permut_simpl;
 apply PPermut_concat_permut in H; rewrite <- H; rew_concat; permut_simpl.
-(* here and letdia cases - skip *)
-skip. skip. skip. skip.
 Qed.

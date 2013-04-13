@@ -16,24 +16,11 @@ Inductive ty :=
 | tvar: ty
 | tarrow: ty -> ty -> ty
 | tbox: ty -> ty
-| tdia: ty -> ty
 .
 Notation " A '--->' B " := (tarrow A B)
   (at level 30, right associativity) : is5_scope.
 Notation " '[*]' A " := (tbox A)
   (at level 30) : is5_scope.
-Notation " '<*>' A " := (tdia A)
-  (at level 30) : is5_scope.
-
-Inductive ty2 :=
-| tvar2: ty2
-| tarrow2: ty2 -> ty2 -> ty2
-| tbox2: ty2 -> ty2
-.
-Notation " A '--->' B " := (tarrow2 A B)
-  (at level 30, right associativity) : is5nodia_scope.
-Notation " '[*]' A " := (tbox2 A)
-  (at level 30) : is5nodia_scope.
 
 (*
 Variables for worlds - bound and free
@@ -148,7 +135,3 @@ Definition ctx_L := list (prod var (prod var ty)).
 (* Background and context for label-free language *)
 Definition ctx_LF := list (var * ty).
 Definition bg_LF := list ctx_LF.
-
-(* Background and context for label-free language without diamond *)
-Definition ctx_LFND := list (var * ty2).
-Definition bg_LFND := list ctx_LFND.
