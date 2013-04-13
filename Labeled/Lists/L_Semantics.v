@@ -733,3 +733,132 @@ rewrite notin_singleton in H3; auto.
 apply types_L_Mem_Omega in HT; auto.
 inversion HT; auto.
 Qed.
+
+Lemma lc_t_step_L_preserv:
+forall M N w,
+  lc_t_L M ->
+  step_L (M, w) (N, w) ->
+  lc_t_L N.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_L in *; unfold open_w_L in *.
+constructor; [eapply IHM1 |]; eauto.
+apply lc_t_n_L_subst_w; auto.
+constructor; eapply IHM; eauto.
+constructor; eapply IHM; eauto.
+inversion H; subst; inversion H4; subst; constructor; auto.
+inversion H; subst; inversion H9; subst.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
+apply lc_t_subst_L; auto;
+apply lc_t_n_L_subst_w; auto.
+inversion H; subst; constructor; auto; eapply IHM1; eauto.
+constructor; eapply IHM; eauto.
+inversion H; subst; repeat constructor; auto.
+inversion H; subst; constructor; eapply IHM; eauto.
+Qed.
+
+Lemma lc_w_step_L_preserv:
+forall M N w,
+  lc_w_L M ->
+  step_L (M, fwo w) (N, fwo w) ->
+  lc_w_L N.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_L in *; unfold open_w_L in *; simpl in *.
+eapply lc_w_n_L_subst_t; auto.
+constructor; [eapply IHM1 |]; eauto.
+constructor; eapply IHM; eauto.
+destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
+inversion H; subst; try omega; auto.
+inversion H; subst; try omega;
+apply lc_w_n_L_subst_t; auto;
+apply lc_w_n_L_subst_w; auto.
+constructor; inversion H; subst; auto; eapply IHM1; eauto.
+constructor; eapply IHM; eauto.
+constructor; auto.
+destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
+Qed.
+
+Lemma lc_t_steps_L_preserv:
+forall M N w,
+  lc_t_L M ->
+  steps_L M N w ->
+  lc_t_L N.
+intros; induction H0.
+apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
+apply IHsteps_L;
+apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
+Qed.
+
+Lemma lc_w_steps_L_preserv:
+forall M N w,
+  lc_w_L M ->
+  steps_L M N (fwo w) ->
+  lc_w_L N.
+intros. remember (fwo w) as w'; generalize dependent w.
+induction H0; intros; subst.
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
+apply IHsteps_L with (w:=w0); auto;
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
+Qed.
+
+Lemma steps_L_appl_L:
+forall M M' N w,
+  lc_t_L M -> lc_t_L N -> lc_w_L M -> lc_w_L N ->
+  steps_L M M' (fwo w) ->
+  steps_L (appl_L M N) (appl_L M' N) (fwo w).
+intros. remember (fwo w) as w'. generalize dependent w.
+induction H3; intros;
+[constructor; constructor; auto | ];
+apply stepm_L with (M':=appl_L M' N);
+[constructor; auto | eapply IHsteps_L]; eauto.
+apply lc_t_step_L_preserv with (M:=M) (w:= w); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=w0); subst; eauto.
+Qed.
+
+Lemma steps_L_unbox_L_fetch_L:
+forall M M' w v,
+  lc_t_L M -> lc_w_L M ->
+  steps_L M M' (fwo v) ->
+  steps_L (unbox_L (fetch_L (fwo v) M)) (unbox_L (fetch_L (fwo v) M')) w.
+intros; remember (fwo v) as v'; generalize dependent v.
+induction H1; intros; subst.
+repeat constructor; auto.
+apply stepm_L with (M':=unbox_L (fetch_L (fwo v) M'));
+[repeat constructor | eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.
+
+Lemma steps_L_get_L_here_L:
+forall M M' w v,
+  lc_t_L M -> lc_w_L M ->
+  steps_L M M' (fwo v) ->
+  steps_L (get_L (fwo v) (here_L M)) (get_L (fwo v) (here_L M')) w.
+intros; remember (fwo v) as v'; generalize dependent v.
+induction H1; intros; subst.
+repeat constructor; auto.
+apply stepm_L with (M':=get_L (fwo v) (here_L M'));
+[repeat constructor | eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.
+
+Lemma steps_L_letd_L_get_L:
+forall M M' N w v,
+  lc_t_L M -> lc_t_n_L 1 N -> lc_w_L M -> lc_w_n_L 1 N ->
+  steps_L M M' (fwo v) ->
+  steps_L (letd_L (get_L (fwo v) M) N) (letd_L (get_L (fwo v) M') N) (fwo w).
+intros; remember (fwo v) as v'; generalize dependent v.
+remember (fwo w) as w'; generalize dependent w.
+induction H3; intros; subst.
+repeat constructor; unfold open_t_L; unfold open_w_L; auto;
+[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]; auto.
+apply stepm_L with (M':=letd_L (get_L (fwo v) M') N);
+[repeat constructor; unfold open_t_L; unfold open_w_L; auto;
+[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]
+| eapply IHsteps_L ]; auto.
+apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
+apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
+Qed.

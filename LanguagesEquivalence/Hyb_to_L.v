@@ -27,37 +27,6 @@ Definition Hyb_to_L_ctx (G: bg_Hyb) (Ctx: ctx_Hyb) :
     (Ctx :: G) in
   (Omega, Delta, fst Ctx).
 
-(* FIXME: Move this to Hybrid/Hyb_OkLib *)
-Lemma ok_Hyb_not_Mem_fst:
-forall (G: bg_Hyb) U w,
-  ok_Hyb G U -> Mem w U ->
-  ~ Mem w (map fst_ G) .
-induction G; intros; simpl in *.
-rewrite Mem_nil_eq; auto.
-destruct a; rew_map; simpl; rewrite Mem_cons_eq; intro; destruct H1; subst.
-inversion H; subst; auto; inversion H; subst. apply IHG in H0;
-[ contradiction | ]; inversion H; subst; apply ok_Hyb_used_weakening in H7;
-auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_PPermutLib *)
-Lemma PPermut_Hyb_map_fst:
-forall G G',
-  G ~=~ G' ->
-  map fst_ G *=* map fst_ G'.
-induction G; intros.
-apply PPermut_Hyb_nil_impl in H; subst; auto.
-assert (a::G ~=~ G') by auto;
-destruct a; apply PPermut_Hyb_split_head in H;
-destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
-rew_map; simpl; permut_simpl;
-replace (map fst_ hd ++ map fst_ tl) with (map fst_ (hd++tl))
-  by (rew_map; auto);
-apply IHG.
-apply PPermut_Hyb_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
-auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_Hyb_simpl.
-Qed.
-
 Lemma annotate_worlds_Hyb_app:
 forall l1 l2 x,
   annotate_worlds_Hyb x (l1++l2) =
@@ -476,168 +445,6 @@ Qed.
 
 Hint Resolve Hyb_to_L_term_lc_w Hyb_to_L_term_lc_t.
 
-(* FIXME: Move these & rename *)
-Lemma lc_t_n_L_subst_w:
-forall M w w' n,
-  lc_t_n_L n M ->
-  lc_t_n_L n (subst_w_L M w w').
-induction M; intros; simpl in *; auto;
-constructor; inversion H; subst; eauto.
-Qed.
-
-Lemma lc_w_n_L_subst_t:
-forall M N x n,
-  lc_w_n_L n M -> lc_w_L N ->
-  lc_w_n_L n (subst_t_L N x M).
-induction M; intros; simpl in *; auto; repeat case_if; simpl;
-unfold shift_vte in *; unfold shift_vwo in *;
-try destruct x; simpl in *; auto;
-try (inversion H; econstructor; eauto).
-replace n with (0+n) by omega; apply closed_w_addition_L; auto.
-replace n with (0+n) by omega; apply closed_w_addition_L; auto.
-Qed.
-
-Lemma lc_w_n_L_subst_w:
-forall M w1 w2 n,
-  lc_w_n_L n M ->
-  lc_w_n_L n (subst_w_L M (fwo w1) (fwo w2)).
-induction M; intros; simpl in *; auto; repeat case_if;
-try econstructor; inversion H; subst; eauto.
-constructor; apply IHM; auto.
-constructor; auto; apply IHM; auto.
-constructor; apply IHM; auto.
-constructor; auto; apply IHM; auto.
-Qed.
-
-Lemma lc_t_step_L_preserv:
-forall M N w,
-  lc_t_L M ->
-  step_L (M, w) (N, w) ->
-  lc_t_L N.
-induction M; intros; inversion H0; subst; auto;
-unfold open_t_L in *; unfold open_w_L in *.
-constructor; [eapply IHM1 |]; eauto.
-apply lc_t_n_L_subst_w; auto.
-constructor; eapply IHM; eauto.
-constructor; eapply IHM; eauto.
-inversion H; subst; inversion H3; subst; constructor; auto.
-inversion H; subst; inversion H9; subst.
-apply lc_t_subst_L; auto;
-apply lc_t_n_L_subst_w; auto.
-apply lc_t_subst_L; auto;
-apply lc_t_n_L_subst_w; auto.
-apply lc_t_subst_L; auto;
-apply lc_t_n_L_subst_w; auto.
-inversion H; subst; constructor; auto; eapply IHM1; eauto.
-constructor; eapply IHM; eauto.
-inversion H; subst; repeat constructor; auto.
-inversion H; subst; constructor; eapply IHM; eauto.
-Qed.
-
-Lemma lc_w_step_L_preserv:
-forall M N w,
-  lc_w_L M ->
-  step_L (M, fwo w) (N, fwo w) ->
-  lc_w_L N.
-induction M; intros; inversion H0; subst; auto;
-unfold open_t_L in *; unfold open_w_L in *; simpl in *.
-eapply lc_w_n_L_subst_t; auto.
-constructor; [eapply IHM1 |]; eauto.
-constructor; eapply IHM; eauto.
-destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
-inversion H; subst; try omega; auto.
-inversion H; subst; try omega;
-apply lc_w_n_L_subst_t; auto;
-apply lc_w_n_L_subst_w; auto.
-constructor; inversion H; subst; auto; eapply IHM1; eauto.
-constructor; eapply IHM; eauto.
-constructor; auto.
-destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
-Qed.
-
-Lemma lc_t_steps_L_preserv:
-forall M N w,
-  lc_t_L M ->
-  steps_L M N w ->
-  lc_t_L N.
-intros; induction H0.
-apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
-apply IHsteps_L;
-apply lc_t_step_L_preserv with (M:=M) (w:=w); auto.
-Qed.
-
-Lemma lc_w_steps_L_preserv:
-forall M N w,
-  lc_w_L M ->
-  steps_L M N (fwo w) ->
-  lc_w_L N.
-intros. remember (fwo w) as w'; generalize dependent w.
-induction H0; intros; subst.
-apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
-apply IHsteps_L with (w:=w0); auto;
-apply lc_w_step_L_preserv with (M:=M) (w:=w0); auto.
-Qed.
-
-Lemma steps_L_appl_L:
-forall M M' N w,
-  lc_t_L M -> lc_t_L N -> lc_w_L M -> lc_w_L N ->
-  steps_L M M' (fwo w) ->
-  steps_L (appl_L M N) (appl_L M' N) (fwo w).
-intros. remember (fwo w) as w'. generalize dependent w.
-induction H3; intros;
-[constructor; constructor; auto | ];
-apply stepm_L with (M':=appl_L M' N);
-[constructor; auto | eapply IHsteps_L]; eauto.
-apply lc_t_step_L_preserv with (M:=M) (w:= w); eauto.
-apply lc_w_step_L_preserv with (M:=M) (w:=w0); subst; eauto.
-Qed.
-
-Lemma steps_L_unbox_L_fetch_L:
-forall M M' w v,
-  lc_t_L M -> lc_w_L M ->
-  steps_L M M' (fwo v) ->
-  steps_L (unbox_L (fetch_L (fwo v) M)) (unbox_L (fetch_L (fwo v) M')) w.
-intros; remember (fwo v) as v'; generalize dependent v.
-induction H1; intros; subst.
-repeat constructor; auto.
-apply stepm_L with (M':=unbox_L (fetch_L (fwo v) M'));
-[repeat constructor | eapply IHsteps_L ]; auto.
-apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
-apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
-Qed.
-
-Lemma steps_L_get_L_here_L:
-forall M M' w v,
-  lc_t_L M -> lc_w_L M ->
-  steps_L M M' (fwo v) ->
-  steps_L (get_L (fwo v) (here_L M)) (get_L (fwo v) (here_L M')) w.
-intros; remember (fwo v) as v'; generalize dependent v.
-induction H1; intros; subst.
-repeat constructor; auto.
-apply stepm_L with (M':=get_L (fwo v) (here_L M'));
-[repeat constructor | eapply IHsteps_L ]; auto.
-apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
-apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
-Qed.
-
-Lemma steps_L_letd_L_get_L:
-forall M M' N w v,
-  lc_t_L M -> lc_t_n_L 1 N -> lc_w_L M -> lc_w_n_L 1 N ->
-  steps_L M M' (fwo v) ->
-  steps_L (letd_L (get_L (fwo v) M) N) (letd_L (get_L (fwo v) M') N) (fwo w).
-intros; remember (fwo v) as v'; generalize dependent v.
-remember (fwo w) as w'; generalize dependent w.
-induction H3; intros; subst.
-repeat constructor; unfold open_t_L; unfold open_w_L; auto;
-[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]; auto.
-apply stepm_L with (M':=letd_L (get_L (fwo v) M') N);
-[repeat constructor; unfold open_t_L; unfold open_w_L; auto;
-[ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]
-| eapply IHsteps_L ]; auto.
-apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
-apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
-Qed.
-
 Lemma Hyb_to_L_value:
 forall M,
   value_Hyb M -> value_L (Hyb_to_L_term M).
@@ -673,16 +480,16 @@ apply lc_w_subst_L; auto.
 destruct v; inversion H; subst; try omega;
 apply steps_L_unbox_L_fetch_L; unfold lc_w_L in *; unfold lc_t_L in *; auto.
 (* get_here *)
-destruct v; inversion H0; subst;
+destruct v; inversion H; subst; try omega;
 apply steps_L_get_L_here_L; unfold lc_w_L in *; unfold lc_t_L in *; auto;
 inversion H1; subst.
 (* letd_here*)
 clear IHM2;
-destruct v; destruct ctx''; inversion H; inversion H12; subst; try omega.
+destruct v; destruct ctx''; inversion H; inversion H12; subst; try omega;
 apply stepm_L with
   (M':=letd_L (get_L (fwo v0) (here_L (Hyb_to_L_term M)))
               (Hyb_to_L_term M2)).
-repeat constructor; auto;
+repeat constructor; auto; try (apply Hyb_to_L_value; auto);
 unfold open_t_L; unfold open_w_L;
 unfold open_w_L; unfold open_t_L;
 [ apply lc_t_subst_L | apply lc_w_subst_L]; auto; repeat constructor; auto.
@@ -691,7 +498,7 @@ unfold lc_t_L in *; unfold lc_w_L in *; auto;
 unfold open_t_L; unfold open_w_L;
 [apply lc_t_subst_L | apply lc_w_subst_L | apply Hyb_to_L_value]; auto.
 (* letd_get *)
-destruct v; inversion H0; subst;
+destruct v; inversion H; subst; try omega;
 apply steps_L_letd_L_get_L; unfold lc_w_L in *; unfold lc_t_L in *; auto.
 Qed.
 

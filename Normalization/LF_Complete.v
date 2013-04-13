@@ -6,35 +6,6 @@ Require Import LabelFree.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
-Definition normal_form (M: te_LF) := value_LF M.
-
-Inductive neutral_LF: te_LF -> Prop :=
-| nHyp: forall n, neutral_LF (hyp_LF n)
-| nAppl: forall M N, neutral_LF (appl_LF M N)
-| nUnbox: forall M, neutral_LF (unbox_LF M)
-| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
-| nLetd: forall M N, neutral_LF (letdia_LF M N)
-.
-
-Lemma value_no_step:
-forall M,
-  value_LF M ->
-  forall N , ~ M |-> N.
-induction M; intros; intro;
-try inversion H; inversion H0; subst;
-eapply IHM; eauto.
-Qed.
-
-Lemma neutral_or_value:
-forall M,
-  neutral_LF M \/ value_LF M.
-induction M; intros;
-try (destruct IHM; [left | right]; constructor; auto);
-try (left; constructor);
-right;
-constructor.
-Qed.
-
 Inductive SN: te_LF -> Prop :=
 | val_SN: forall M, value_LF M -> SN M
 | step_SN: forall M,
@@ -46,7 +17,6 @@ Inductive cont_LF :=
 | id_cont: cont_LF
 | compose_cont: te_LF -> cont_LF -> cont_LF
 .
-
 
 (* FIXME: There is a notion of reducibility for continuations
    and we will probably need that in some of the proofs *)
@@ -135,7 +105,7 @@ generalize dependent M;
 generalize dependent N;
 induction H0; intros; subst;
 [ inversion H0 |
-  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value];
+  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value_LF];
 destruct H2;
 [ inversion H; subst |
   constructor; auto];
@@ -155,7 +125,7 @@ intros; remember (unbox_LF M) as T;
 generalize dependent M;
 induction H0; intros; subst;
 [ inversion H0 |
-  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value];
+  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value_LF];
 destruct H2; [ inversion H; subst | constructor; auto];
 apply step_SN; intros;
 apply H1 with (N := unbox_LF N).
@@ -174,7 +144,7 @@ forall A M M'
 induction A; intros; simpl in *; intros.
 (* base type *)
 inversion HRed; subst;
-[apply value_no_step with (N:=M') in H; contradiction | apply H; auto].
+[apply value_no_step_LF with (N:=M') in H; contradiction | apply H; auto].
 (* arrow type *)
 apply IHA2 with (M:=appl_LF M N); auto.
 eapply HRed; eauto.
@@ -187,10 +157,9 @@ specialize HRed with K;
 apply HRed in HRC;
 destruct K; simpl in *.
 inversion HRC; subst; auto;
-apply value_no_step with (N:=M') in H; contradiction.
+apply value_no_step_LF with (N:=M') in H; contradiction.
 inversion HRC; subst.
-
-Qed.
+Admitted.
 
 (* FIXME: diamond type needs to be removed *)
 (* CR1 + CR3 *)

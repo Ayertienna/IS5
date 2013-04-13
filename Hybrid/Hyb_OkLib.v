@@ -826,4 +826,17 @@ Hint Resolve ok_Bg_Hyb_permut_no_last ok_Bg_Hyb_permut_no_last_spec2
   ok_Bg_Hyb_last_last2_neq : ok_bg_hyb_rew.
 Hint Resolve ok_Bg_Hyb_swap_worlds.
 
+Lemma ok_Hyb_not_Mem_fst:
+forall (G: bg_Hyb) U w,
+  ok_Hyb G U -> Mem w U ->
+  ~ Mem w (map fst_ G) .
+induction G; intros; simpl in *.
+rewrite Mem_nil_eq; auto.
+destruct a; rew_map; simpl; rewrite Mem_cons_eq; intro; destruct H1; subst.
+inversion H; subst; auto; inversion H; subst. apply IHG in H0;
+[ contradiction | ]; inversion H; subst; apply ok_Hyb_used_weakening in H7;
+auto.
+Qed.
+
+
 Close Scope permut_scope.

@@ -38,13 +38,6 @@ induction Gamma; intros; try destruct a; constructor;
 inversion H; subst; auto.
 Qed.
 
-(* FIXME: Move this to ListLib.v *)
-Lemma flat_map_concat:
-forall A B G, concat (map (@snd_ A (list B)) G) = flat_map snd_ G.
-induction G; intros; try destruct a;
-rew_map; rew_flat_map; simpl; rew_concat; try rewrite IHG; eauto.
-Qed.
-
 Lemma ok_Bg_Hyb_to_LF_ctx_ok_Bg_LF:
 forall G Gamma G' Gamma',
   ok_Bg_Hyb (Gamma :: G) ->

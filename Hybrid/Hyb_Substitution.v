@@ -2,6 +2,7 @@ Add LoadPath "..".
 Require Export Hyb_Syntax.
 Require Export LibTactics. (* case_if *)
 Require Import Gt.
+Require Import Arith.
 
 
 (* Notation for term substitution *)
@@ -301,5 +302,153 @@ induction N; intros; simpl in *;
 repeat case_if; try destruct c;
 simpl; auto.
 Qed.
+
+Lemma lc_w_subst_t_Hyb:
+forall N M v n,
+  lc_w_n_Hyb n M ->
+  lc_w_n_Hyb n N ->
+  lc_w_n_Hyb n (subst_t_Hyb M v N).
+induction N; intros; inversion H0; subst; simpl in *; try case_if;
+auto; constructor; try eapply IHN; eauto. apply closed_w_succ; auto.
+eapply IHN2; [apply closed_w_succ | ]; auto.
+eapply IHN2; [apply closed_w_succ | ]; auto.
+Qed.
+
+Lemma lc_w_subst_Hyb:
+forall M w k,
+  lc_w_n_Hyb (S k) M ->
+  lc_w_n_Hyb k {{fwo w // bwo k}} M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try destruct w;
+constructor; eauto.
+destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
+destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
+destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
+Qed.
+
+Lemma lc_w_subst_Hyb_same_n_fwo:
+forall M w w' n,
+  lc_w_n_Hyb n M ->
+  lc_w_n_Hyb n {{fwo w // w'}} M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try destruct w;
+constructor; eauto.
+Qed.
+
+Lemma lc_w_subst_Hyb_same_n_bwo:
+forall M w' k n,
+  lc_w_n_Hyb n M ->
+  k < n ->
+  lc_w_n_Hyb n {{bwo k // w'}} M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try destruct w'; simpl;
+constructor; try (eapply IHM || eapply IHM2); try omega; auto.
+Qed.
+
+Lemma lc_w_n_Hyb_subst_t:
+forall N M v n,
+lc_w_n_Hyb n (subst_t_Hyb M v N) ->
+lc_w_n_Hyb n N.
+induction N; intros; simpl in *; try destruct v; constructor;
+inversion H; subst; try eapply IHN; eauto.
+Qed.
+
+Lemma lc_w_n_Hyb_subst_w:
+forall N w n,
+lc_w_n_Hyb n (subst_w_Hyb (fwo w) (bwo n) N) ->
+lc_w_n_Hyb (S n) N.
+induction N; intros; simpl in *; try destruct v; constructor;
+inversion H; subst; try eapply IHN; eauto;
+repeat case_if; inversion H0; subst; try inversion H1; subst;
+try omega.
+Qed.
+
+Lemma subst_w_Hyb_comm2:
+forall M w w' m n
+  (Neq: m <> n)
+  (Neq': w <> bwo m),
+  {{fwo w'//bwo m }}({{w//bwo n}}M) =
+  {{w//bwo n}}({{fwo w'//bwo m}}M).
+induction M; intros; simpl; destruct w;
+repeat case_if; subst; simpl; auto;
+rewrite IHM || (rewrite IHM1; try rewrite IHM2);
+auto; intro nn; elim Neq'; inversion nn; subst; auto.
+Qed.
+
+Lemma lc_t_subst_w_Hyb:
+forall N w w' n,
+  lc_t_n_Hyb n N ->
+  lc_t_n_Hyb n (subst_w_Hyb w w' N).
+induction N; intros; inversion H; subst; simpl in *; try case_if;
+auto; constructor; try eapply IHN; eauto.
+Qed.
+
+Lemma lc_t_subst_Hyb:
+forall M N k,
+  lc_t_n_Hyb (S k) M ->
+  lc_t_n_Hyb k N ->
+  lc_t_n_Hyb k [N // bte k] M.
+induction M; intros; simpl in *; repeat case_if;
+inversion H; subst; try constructor; eauto.
+assert (v0 <> k) by (intro; elim H1; subst; auto); omega.
+eapply IHM; eauto; apply closed_t_succ; auto.
+eapply IHM2; eauto; apply closed_t_succ; auto.
+Qed.
+
+Lemma lc_t_n_Hyb_subst_w:
+forall N w w' n,
+lc_t_n_Hyb n (subst_w_Hyb w w' N) ->
+lc_t_n_Hyb n N.
+induction N; intros; simpl in *; try destruct v; constructor;
+inversion H; subst; try eapply IHN; eauto.
+Qed.
+
+Lemma lc_t_n_Hyb_subst_t:
+forall N M n,
+lc_t_n_Hyb n M ->
+lc_t_n_Hyb n (subst_t_Hyb M (bte n) N) ->
+lc_t_n_Hyb (S n) N.
+induction N; intros; simpl in *; try destruct v; constructor;
+repeat case_if; try inversion H1; subst; try omega;
+inversion H0; subst; eauto.
+apply IHN with (M:=M); eauto; apply closed_t_succ; auto.
+apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
+apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
+Qed.
+
+Lemma double_subst_w_Hyb_bwo:
+forall N w w' n,
+ w' <> bwo n ->
+ {{w // bwo n}}({{w' // bwo n}}N) = {{w' // bwo n}}N.
+induction N; destruct w'; simpl in *; intros; repeat case_if;
+try rewrite IHN;
+try (rewrite IHN1; try rewrite IHN2); auto; intro nn; inversion nn;
+subst; elim H; auto.
+Qed.
+
+Lemma subst_t_comm2_Hyb:
+forall M v' m n N
+  (Neq: m <> n)
+  (Lc: lc_t_Hyb N),
+  subst_t_Hyb N (bte m) (subst_t_Hyb (hyp_Hyb (fte v')) (bte n) M) =
+  subst_t_Hyb (hyp_Hyb (fte v')) (bte n) (subst_t_Hyb N (bte m) M).
+induction M; intros; subst; simpl;
+repeat (case_if; subst; simpl); auto;
+try rewrite IHM; eauto; try omega.
+rewrite closed_subst_t_Hyb_bound with (n:=0); auto; omega.
+rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
+rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
+Qed.
+
+Lemma reorder_subst_w_Hyb_eq:
+forall M w w' w'',
+  subst_w_Hyb w w' (subst_w_Hyb w w'' M) =
+  subst_w_Hyb w w'' (subst_w_Hyb w w' M).
+induction M; intros; simpl; repeat case_if;
+try rewrite IHM;
+try rewrite IHM1; try rewrite IHM2; eauto.
+Qed.
+
+
 
 Close Scope hybrid_is5_scope.

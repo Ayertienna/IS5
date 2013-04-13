@@ -17,12 +17,6 @@ Open Scope hybrid_is5_scope.
 Definition LF_to_Hyb_ctx (G: bg_LF) (G': bg_Hyb) :=
   map snd_ G' *=* G /\ ok_Hyb G' nil.
 
-Lemma flat_map_concat:
-forall A B G, concat (map (@snd_ A (list B)) G) = flat_map snd_ G.
-induction G; intros; try destruct a;
-rew_map; rew_flat_map; simpl; rew_concat; try rewrite IHG; eauto.
-Qed.
-
 Lemma LF_to_Hyb_ctx_Ok:
 forall G G',
   ok_Bg_LF G -> LF_to_Hyb_ctx G G' -> ok_Bg_Hyb G'.
@@ -320,159 +314,6 @@ intros; induction H; simpl;
 inversion H0; subst; constructor; eauto.
 Qed.
 
-(* Things to be moved into language definitions *)
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_t_Hyb:
-forall N M v n,
-  lc_w_n_Hyb n M ->
-  lc_w_n_Hyb n N ->
-  lc_w_n_Hyb n (subst_t_Hyb M v N).
-induction N; intros; inversion H0; subst; simpl in *; try case_if;
-auto; constructor; try eapply IHN; eauto. apply closed_w_succ; auto.
-eapply IHN2; [apply closed_w_succ | ]; auto.
-eapply IHN2; [apply closed_w_succ | ]; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_Hyb:
-forall M w k,
-  lc_w_n_Hyb (S k) M ->
-  lc_w_n_Hyb k {{fwo w // bwo k}} M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try destruct w;
-constructor; eauto.
-destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
-destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
-destruct (eq_nat_dec m k); subst; [elim H0 |]; auto; omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_Hyb_same_n_fwo:
-forall M w w' n,
-  lc_w_n_Hyb n M ->
-  lc_w_n_Hyb n {{fwo w // w'}} M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try destruct w;
-constructor; eauto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_Hyb_same_n_bwo:
-forall M w' k n,
-  lc_w_n_Hyb n M ->
-  k < n ->
-  lc_w_n_Hyb n {{bwo k // w'}} M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try destruct w'; simpl;
-constructor; try (eapply IHM || eapply IHM2); try omega; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_n_Hyb_subst_t:
-forall N M v n,
-lc_w_n_Hyb n (subst_t_Hyb M v N) ->
-lc_w_n_Hyb n N.
-induction N; intros; simpl in *; try destruct v; constructor;
-inversion H; subst; try eapply IHN; eauto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_n_Hyb_subst_w:
-forall N w n,
-lc_w_n_Hyb n (subst_w_Hyb (fwo w) (bwo n) N) ->
-lc_w_n_Hyb (S n) N.
-induction N; intros; simpl in *; try destruct v; constructor;
-inversion H; subst; try eapply IHN; eauto;
-repeat case_if; inversion H0; subst; try inversion H1; subst;
-try omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Semantics *)
-Lemma types_Hyb_lc_w_Hyb:
-forall G Gamma M A w,
-  G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
-intros; induction H; constructor; try apply IHHT;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *;
-auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_t in H0; auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_w in H0; auto.
-assert (exists x, x \notin L_t) by apply Fresh; destruct H1;
-assert (exists x, x \notin L_w) by apply Fresh; destruct H2;
-specialize H0 with x x0; apply H0 with (w':=x0) in H1; auto;
-apply lc_w_n_Hyb_subst_t in H1; apply lc_w_n_Hyb_subst_w in H1; auto.
-assert (exists x, x \notin L_t) by apply Fresh; destruct H2;
-assert (exists x, x \notin L_w) by apply Fresh; destruct H3;
-specialize H0 with x x0; apply H0 with (w':=x0) in H2; auto;
-apply lc_w_n_Hyb_subst_t in H2; apply lc_w_n_Hyb_subst_w in H2; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma subst_w_Hyb_comm2:
-forall M w w' m n
-  (Neq: m <> n)
-  (Neq': w <> bwo m),
-  {{fwo w'//bwo m }}({{w//bwo n}}M) =
-  {{w//bwo n}}({{fwo w'//bwo m}}M).
-induction M; intros; simpl; destruct w;
-repeat case_if; subst; simpl; auto;
-rewrite IHM || (rewrite IHM1; try rewrite IHM2);
-auto; intro nn; elim Neq'; inversion nn; subst; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma double_subst_w_Hyb_bwo:
-forall N w w' n,
- w' <> bwo n ->
- {{w // bwo n}}({{w' // bwo n}}N) = {{w' // bwo n}}N.
-induction N; destruct w'; simpl in *; intros; repeat case_if;
-try rewrite IHN;
-try (rewrite IHN1; try rewrite IHN2); auto; intro nn; inversion nn;
-subst; elim H; auto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma subst_t_comm2_Hyb:
-forall M v' m n N
-  (Neq: m <> n)
-  (Lc: lc_t_Hyb N),
-  subst_t_Hyb N (bte m) (subst_t_Hyb (hyp_Hyb (fte v')) (bte n) M) =
-  subst_t_Hyb (hyp_Hyb (fte v')) (bte n) (subst_t_Hyb N (bte m) M).
-induction M; intros; subst; simpl;
-repeat (case_if; subst; simpl); auto;
-try rewrite IHM; eauto; try omega.
-rewrite closed_subst_t_Hyb_bound with (n:=0); auto; omega.
-rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
-rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma subst_t_comm2_LF:
-forall M v' m n N
-  (Neq: m <> n)
-  (Lc: lc_t_LF N),
-  subst_t_LF N (bte m) (subst_t_LF (hyp_LF (fte v')) (bte n) M) =
-  subst_t_LF (hyp_LF (fte v')) (bte n) (subst_t_LF N (bte m) M).
-induction M; intros; subst; simpl;
-repeat (case_if; subst; simpl); auto;
-try rewrite IHM; eauto; try omega.
-rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
-rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
-rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma reorder_subst_w_Hyb_eq:
-forall M w w' w'',
-  subst_w_Hyb w w' (subst_w_Hyb w w'' M) =
-  subst_w_Hyb w w'' (subst_w_Hyb w w' M).
-induction M; intros; simpl; repeat case_if;
-try rewrite IHM;
-try rewrite IHM1; try rewrite IHM2; eauto.
-Qed.
-
 (* Fixme: rename if this works and stays (being useful) *)
 Inductive R: te_LF -> te_Hyb -> Prop :=
 | hyp_R: forall v, R (hyp_LF v) (hyp_Hyb v)
@@ -710,99 +551,6 @@ LF_to_Hyb_ctx (Gamma :: G) ((w, Gamma) :: G') ->
 ok_Bg_LF (subst_in_ctx_LF v1 v Gamma ::
                           map (subst_in_ctx_LF v1 v) G).
 Admitted.
-
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_t_subst_w_Hyb:
-forall N w w' n,
-  lc_t_n_Hyb n N ->
-  lc_t_n_Hyb n (subst_w_Hyb w w' N).
-induction N; intros; inversion H; subst; simpl in *; try case_if;
-auto; constructor; try eapply IHN; eauto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_t_subst_Hyb:
-forall M N k,
-  lc_t_n_Hyb (S k) M ->
-  lc_t_n_Hyb k N ->
-  lc_t_n_Hyb k [N // bte k] M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try constructor; eauto.
-assert (v0 <> k) by (intro; elim H1; subst; auto); omega.
-eapply IHM; eauto; apply closed_t_succ; auto.
-eapply IHM2; eauto; apply closed_t_succ; auto.
-Qed.
-(*
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_Hyb_same_n_fwo:
-forall M w w' n,
-  lc_w_n_Hyb n M ->
-  lc_w_n_Hyb n {{fwo w // w'}} M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try destruct w;
-constructor; eauto.
-Qed.
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_w_subst_Hyb_same_n_bwo:
-forall M w' k n,
-  lc_w_n_Hyb n M ->
-  k < n ->
-  lc_w_n_Hyb n {{bwo k // w'}} M.
-induction M; intros; simpl in *; repeat case_if;
-inversion H; subst; try destruct w'; simpl;
-constructor; try (eapply IHM || eapply IHM2); try omega; auto.
-Qed.
-*)
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_t_n_Hyb_subst_w:
-forall N w w' n,
-lc_t_n_Hyb n (subst_w_Hyb w w' N) ->
-lc_t_n_Hyb n N.
-induction N; intros; simpl in *; try destruct v; constructor;
-inversion H; subst; try eapply IHN; eauto.
-Qed.
-
-
-(* FIXME: Move this to Hybrid/Hyb_Substitution *)
-Lemma lc_t_n_Hyb_subst_t:
-forall N M n,
-lc_t_n_Hyb n M ->
-lc_t_n_Hyb n (subst_t_Hyb M (bte n) N) ->
-lc_t_n_Hyb (S n) N.
-induction N; intros; simpl in *; try destruct v; constructor;
-repeat case_if; try inversion H1; subst; try omega;
-inversion H0; subst; eauto.
-apply IHN with (M:=M); eauto; apply closed_t_succ; auto.
-apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
-apply IHN2 with (M:=M); eauto; apply closed_t_succ; auto.
-Qed.
-
-Lemma types_Hyb_lc_t_Hyb:
-forall G Gamma M A w,
-  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
-intros; induction H; constructor; try apply IHHT;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *;
-auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0;
-apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0;
-apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
-assert (exists x, x \notin L_t) by apply Fresh; destruct H1;
-assert (exists x, x \notin L_w) by apply Fresh; destruct H2;
-specialize H0 with x x0; apply H0 with (w':=x0) in H1; auto;
-apply lc_t_n_Hyb_subst_t in H1; try constructor;
-apply lc_t_n_Hyb_subst_w in H1; auto.
-assert (exists x, x \notin L_t) by apply Fresh; destruct H2;
-assert (exists x, x \notin L_w) by apply Fresh; destruct H3;
-specialize H0 with x x0; apply H0 with (w':=x0) in H2; auto;
-apply lc_t_n_Hyb_subst_t in H2; try constructor;
-apply lc_t_n_Hyb_subst_w in H2; auto.
-Qed.
 
 Lemma Mem_ctx_LF:
 forall v v' v0 v1 A Gamma,
@@ -1046,6 +794,7 @@ assert (~ Mem x (concat (map (fun x => map fst_ (snd_ x))
 intro. apply free_vars_subset with G' w (Gamma) x1 B x in H7.
 contradiction.
 apply LF_to_Hyb_types in H4.
+
 (* PROBLEM:
 This does not type (it's open, d'uh..); for [hyp_Hyb (fte x) // bte 0]x1 version
 we cannot cheat like this (b/c x actually is in the context variables)
@@ -1059,7 +808,6 @@ simpl; case_if; rewrite subst_in_ctx_LF_no_change; auto.
 apply hyp_LF_Hyb with (G:=map snd_ G').
 constructor; auto; try apply Mem_here; apply ok_Bg_LF_fresh; auto.
 apply LF_to_Hyb_ctx_extend2_t; auto.
-*)
 (* appl *)
 destruct IHtypes_LF1 with G' w; auto;
 destruct IHtypes_LF2 with G' w; auto;

@@ -23,6 +23,8 @@ where " [ M // x ] N " := (subst_t_LF M x N).
 Definition open_LF (M: te_LF) (t: te_LF) := subst_t_LF t (bte 0) M.
 Notation " M '^t^' t " := (open_LF M t) (at level 67).
 
+
+
 Lemma closed_subst_t_free_LF:
 forall M v0 N
   (H_lc: v0 \notin used_vars_te_LF N),
@@ -73,4 +75,18 @@ induction M; intros; simpl in *;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto);
 repeat (case_if; simpl); subst; auto;
 assert (v0 <> v0) as Neq by eauto; elim Neq; auto.
+Qed.
+
+Lemma subst_t_comm2_LF:
+forall M v' m n N
+  (Neq: m <> n)
+  (Lc: lc_t_LF N),
+  subst_t_LF N (bte m) (subst_t_LF (hyp_LF (fte v')) (bte n) M) =
+  subst_t_LF (hyp_LF (fte v')) (bte n) (subst_t_LF N (bte m) M).
+induction M; intros; subst; simpl;
+repeat (case_if; subst; simpl); auto;
+try rewrite IHM; eauto; try omega.
+rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
+rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
+rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
 Qed.

@@ -25,16 +25,6 @@ Notation " '[*]' A " := (tbox A)
 Notation " '<*>' A " := (tdia A)
   (at level 30) : is5_scope.
 
-Inductive ty2 :=
-| tvar2: ty2
-| tarrow2: ty2 -> ty2 -> ty2
-| tbox2: ty2 -> ty2
-.
-Notation " A '--->' B " := (tarrow2 A B)
-  (at level 30, right associativity) : is5nodia_scope.
-Notation " '[*]' A " := (tbox2 A)
-  (at level 30) : is5nodia_scope.
-
 (*
 Variables for worlds - bound and free
   We are using locally nameless representation for world variables.

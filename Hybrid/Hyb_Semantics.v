@@ -2189,6 +2189,128 @@ assert (emptyEquiv_Hyb G = G) by
 rewrite emptyEquiv_Hyb_rewrite; simpl; rewrite H1; reflexivity.
 Qed.
 
+Lemma types_Hyb_lc_w_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_t in H0; auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_w in H0; auto.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H1;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H2;
+specialize H0 with x x0; apply H0 with (w':=x0) in H1; auto;
+apply lc_w_n_Hyb_subst_t in H1; apply lc_w_n_Hyb_subst_w in H1; auto.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H2;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H3;
+specialize H0 with x x0; apply H0 with (w':=x0) in H2; auto;
+apply lc_w_n_Hyb_subst_t in H2; apply lc_w_n_Hyb_subst_w in H2; auto.
+Qed.
+
+Lemma types_Hyb_lc_t_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H1;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H2;
+specialize H0 with x x0; apply H0 with (w':=x0) in H1; auto;
+apply lc_t_n_Hyb_subst_t in H1; try constructor;
+apply lc_t_n_Hyb_subst_w in H1; auto.
+assert (exists x, x \notin L_t) by apply Fresh; destruct H2;
+assert (exists x, x \notin L_w) by apply Fresh; destruct H3;
+specialize H0 with x x0; apply H0 with (w':=x0) in H2; auto;
+apply lc_t_n_Hyb_subst_t in H2; try constructor;
+apply lc_t_n_Hyb_subst_w in H2; auto.
+Qed.
+
+Lemma lc_w_step_Hyb_preserv:
+forall M M' w,
+  lc_w_Hyb M ->
+  step_Hyb (M, w) (M', w) ->
+  lc_w_Hyb M'.
+Admitted.
+
+Lemma lc_t_step_Hyb_preserv:
+forall M M' w,
+  lc_t_Hyb M ->
+  step_Hyb (M, w) (M', w) ->
+  lc_t_Hyb M'.
+Admitted.
+
+Lemma lc_w_steps_Hyb_preserv:
+forall M M' w,
+  lc_w_Hyb M ->
+  steps_Hyb (M, w) (M', w) ->
+  lc_w_Hyb M'.
+Admitted.
+
+Lemma lc_t_steps_Hyb_preserv:
+forall M M' w,
+  lc_t_Hyb M ->
+  steps_Hyb (M, w) (M', w) ->
+  lc_t_Hyb M'.
+Admitted.
+
+
+Lemma steps_Hyb_unbox:
+forall M w' w M',
+ lc_w_Hyb M -> lc_t_Hyb M ->
+ steps_Hyb (M, w') (M', w') ->
+ steps_Hyb
+   (unbox_fetch_Hyb w' M, w)
+   (unbox_fetch_Hyb w' M', w).
+intros; remember (M, w') as M0; remember (M', w') as M1;
+generalize dependent M;
+generalize dependent M';
+generalize dependent w';
+generalize dependent w;
+induction H1; intros; inversion HeqM1; inversion HeqM0; subst;
+[constructor; constructor; auto | ];
+apply multi_step_Hyb with (M':=unbox_fetch_Hyb w' M');
+[ constructor | eapply IHsteps_Hyb ]; eauto;
+[eapply lc_w_step_Hyb_preserv | eapply lc_t_step_Hyb_preserv]; eauto.
+Qed.
+
+Lemma steps_Hyb_get:
+forall M M'' w0 w1 w M' w'0,
+  (w0 = fwo w'0 \/ w0 = bwo 0) ->
+  lc_w_Hyb M' -> lc_t_Hyb M' ->
+  lc_w_n_Hyb 1 M -> lc_t_n_Hyb 1 M ->
+  steps_Hyb (M', w) (M'', w) ->
+  steps_Hyb
+    (letdia_get_Hyb w M' (get_here_Hyb w0 M), w1)
+    (letdia_get_Hyb w M'' (get_here_Hyb w0 M), w1).
+intros.
+remember (M', w) as M0; remember (M'', w) as M1;
+generalize dependent M;
+generalize dependent M';
+generalize dependent M''.
+generalize dependent w;
+generalize dependent w0;
+generalize dependent w'0;
+generalize dependent w1.
+induction H4; intros; inversion HeqM1; inversion HeqM0; subst;
+[constructor; constructor; auto |].
+inversion H0; subst; constructor; try omega; auto.
+constructor; auto.
+apply multi_step_Hyb with (M':= letdia_get_Hyb w2 M' (get_here_Hyb w0 M0));
+[ constructor | eapply IHsteps_Hyb ]; eauto.
+inversion H0; subst; constructor; try omega; auto.
+constructor; auto.
+eapply lc_w_step_Hyb_preserv in H1; eauto.
+eapply lc_t_step_Hyb_preserv in H2; eauto.
+Qed.
+
 Close Scope hybrid_is5_scope.
 Close Scope is5_scope.
 Close Scope permut_scope.

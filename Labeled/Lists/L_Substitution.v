@@ -194,3 +194,73 @@ forall M w,
 induction M; intros; simpl in *; repeat case_if;
 try rewrite IHM; try rewrite IHM1; try rewrite IHM2; auto.
 Qed.
+
+Lemma lc_t_n_L_subst_w:
+forall M w w' n,
+  lc_t_n_L n M ->
+  lc_t_n_L n (subst_w_L M w w').
+induction M; intros; simpl in *; auto;
+constructor; inversion H; subst; eauto.
+Qed.
+
+Lemma lc_w_n_L_subst_t:
+forall M N x n,
+  lc_w_n_L n M -> lc_w_L N ->
+  lc_w_n_L n (subst_t_L N x M).
+induction M; intros; simpl in *; auto; repeat case_if; simpl;
+unfold shift_vte in *; unfold shift_vwo in *;
+try destruct x; simpl in *; auto;
+try (inversion H; econstructor; eauto).
+replace n with (0+n) by omega; apply closed_w_addition_L; auto.
+replace n with (0+n) by omega; apply closed_w_addition_L; auto.
+Qed.
+
+Lemma lc_w_n_L_subst_w:
+forall M w1 w2 n,
+  lc_w_n_L n M ->
+  lc_w_n_L n (subst_w_L M (fwo w1) (fwo w2)).
+induction M; intros; simpl in *; auto; repeat case_if;
+try econstructor; inversion H; subst; eauto.
+constructor; apply IHM; auto.
+constructor; auto; apply IHM; auto.
+constructor; apply IHM; auto.
+constructor; auto; apply IHM; auto.
+Qed.
+
+Lemma lc_t_L_subst_t_rev:
+forall M M2 n k,
+lc_t_n_L n M2 -> n >= k ->
+lc_t_n_L n (subst_t_L M2 (bte k) M) ->
+lc_t_n_L (S n) M.
+induction M; intros; simpl in *; try case_if.
+constructor; omega.
+apply closed_t_succ_L; auto.
+inversion H1; subst; constructor;
+apply IHM with (M2:=M2) (k:=S k);
+[apply closed_t_succ_L; auto | omega | auto].
+inversion H1; subst; constructor;
+[apply IHM1 with M0 k | apply IHM2 with M0 k]; eauto.
+inversion H1; subst; constructor; apply IHM with M2 k; eauto.
+inversion H1; subst; constructor; apply IHM with M2 k; eauto.
+inversion H1; subst; constructor; apply IHM with M2 k; eauto.
+inversion H1; subst; constructor;
+[apply IHM2 with M0 (S k) | apply IHM1 with M0 k]; eauto; try omega;
+apply closed_t_succ_L; auto.
+inversion H1; subst; constructor; apply IHM with M2 k; eauto.
+inversion H1; subst; constructor; apply IHM with M2 k; eauto.
+Qed.
+
+Lemma lc_w_L_subst_t_rev:
+forall M n k w,
+n >= k ->
+lc_w_n_L n (subst_w_L M w (bwo k)) ->
+lc_w_n_L (S n) M.
+induction M; intros; simpl in *; try case_if; try constructor;
+try (inversion H0; subst; eauto); try omega.
+eauto; apply IHM with (k:=S k) (w:=shift_vwo w); eauto; try omega.
+constructor; eapply IHM; eauto.
+constructor; try omega; apply IHM with (w:=w) (k:=k); eauto.
+apply IHM2 with (k:=S k) (w:=shift_vwo w); eauto; try omega.
+constructor; eapply IHM; eauto.
+constructor; try omega; apply IHM with (k:=k)(w:=w); eauto.
+Qed.

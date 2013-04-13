@@ -746,7 +746,6 @@ Qed.
 
 Hint Resolve L_to_Hyb_term_lc_t L_to_Hyb_term_R_lc_t.
 
-(* !!!!!! *)
 
 Lemma lc_w_step_Hyb_preserv:
 forall M M' w,
@@ -776,13 +775,6 @@ forall M M' w,
   lc_t_Hyb M'.
 Admitted.
 
-Lemma steps_Hyb_appl:
-forall M N w M',
- steps_Hyb (M, w) (N, w) ->
- steps_Hyb
-   (appl_Hyb M M', w)
-   (appl_Hyb N M', w).
-Admitted.
 
 Lemma steps_Hyb_unbox:
 forall M w' w M',
@@ -802,30 +794,6 @@ apply multi_step_Hyb with (M':=unbox_fetch_Hyb w' M');
 [ constructor | eapply IHsteps_Hyb ]; eauto;
 [eapply lc_w_step_Hyb_preserv | eapply lc_t_step_Hyb_preserv]; eauto.
 Qed.
-
-Lemma steps_Hyb_here:
-forall M w' w M',
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (get_here_Hyb w' M, w)
-   (get_here_Hyb w' M', w).
-Admitted.
-
-Lemma steps_Hyb_letdia:
-forall M w' w M' N,
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (letdia_get_Hyb w' M N, w)
-   (letdia_get_Hyb w' M' N, w).
-Admitted.
-
-Lemma steps_Hyb_letdia_here:
-forall M N w0 w1 w M',
- steps_Hyb (M, w0) (N, w0) ->
- steps_Hyb
-   (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
-   ((M' ^w^ w0) ^t^ N, w1).
-Admitted.
 
 Lemma steps_Hyb_get:
 forall M M'' w0 w1 w M' w'0,
@@ -856,6 +824,38 @@ constructor; auto.
 eapply lc_w_step_Hyb_preserv in H1; eauto.
 eapply lc_t_step_Hyb_preserv in H2; eauto.
 Qed.
+
+Lemma steps_Hyb_appl:
+forall M N w M',
+ steps_Hyb (M, w) (N, w) ->
+ steps_Hyb
+   (appl_Hyb M M', w)
+   (appl_Hyb N M', w).
+Admitted.
+
+Lemma steps_Hyb_here:
+forall M w' w M',
+ steps_Hyb (M, w') (M', w') ->
+ steps_Hyb
+   (get_here_Hyb w' M, w)
+   (get_here_Hyb w' M', w).
+Admitted.
+
+Lemma steps_Hyb_letdia:
+forall M w' w M' N,
+ steps_Hyb (M, w') (M', w') ->
+ steps_Hyb
+   (letdia_get_Hyb w' M N, w)
+   (letdia_get_Hyb w' M' N, w).
+Admitted.
+
+Lemma steps_Hyb_letdia_here:
+forall M N w0 w1 w M',
+ steps_Hyb (M, w0) (N, w0) ->
+ steps_Hyb
+   (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
+   ((M' ^w^ w0) ^t^ N, w1).
+Admitted.
 
 Lemma L_to_Hyb_value:
 forall M M',
@@ -978,44 +978,6 @@ forall M N M' N' w,
    as we cannot conclude
    R M N /\ R M N' -> N = N' and this is what we are actually asking for.
 *)
-
-Lemma lc_t_L_subst_t_rev:
-forall M M2 n k,
-lc_t_n_L n M2 -> n >= k ->
-lc_t_n_L n (subst_t_L M2 (bte k) M) ->
-lc_t_n_L (S n) M.
-induction M; intros; simpl in *; try case_if.
-constructor; omega.
-apply closed_t_succ_L; auto.
-inversion H1; subst; constructor;
-apply IHM with (M2:=M2) (k:=S k);
-[apply closed_t_succ_L; auto | omega | auto].
-inversion H1; subst; constructor;
-[apply IHM1 with M0 k | apply IHM2 with M0 k]; eauto.
-inversion H1; subst; constructor; apply IHM with M2 k; eauto.
-inversion H1; subst; constructor; apply IHM with M2 k; eauto.
-inversion H1; subst; constructor; apply IHM with M2 k; eauto.
-inversion H1; subst; constructor;
-[apply IHM2 with M0 (S k) | apply IHM1 with M0 k]; eauto; try omega;
-apply closed_t_succ_L; auto.
-inversion H1; subst; constructor; apply IHM with M2 k; eauto.
-inversion H1; subst; constructor; apply IHM with M2 k; eauto.
-Qed.
-
-Lemma lc_w_L_subst_t_rev:
-forall M n k w,
-n >= k ->
-lc_w_n_L n (subst_w_L M w (bwo k)) ->
-lc_w_n_L (S n) M.
-induction M; intros; simpl in *; try case_if; try constructor;
-try (inversion H0; subst; eauto); try omega.
-eauto; apply IHM with (k:=S k) (w:=shift_vwo w); eauto; try omega.
-constructor; eapply IHM; eauto.
-constructor; try omega; apply IHM with (w:=w) (k:=k); eauto.
-apply IHM2 with (k:=S k) (w:=shift_vwo w); eauto; try omega.
-constructor; eapply IHM; eauto.
-constructor; try omega; apply IHM with (k:=k)(w:=w); eauto.
-Qed.
 
 (* Note: first try to prove the silly version, then make it useful *)
 Lemma L_to_Hyb_steps:
@@ -1175,14 +1137,7 @@ assert (
 constructor. skip. skip. skip. skip. auto.
 unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
 repeat case_if.
-assert ((get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M), fwo w) |->
-        j
-
-
-
-
-
-
+(*
 exists (letdia_get_Hyb (fwo v0)
         (L_to_Hyb_term (fwo v) (get_L (fwo v0) M0))
         (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))).
@@ -1316,6 +1271,8 @@ simpl in *.
 (* try: induction on R M N *)
 Admitted.
 *)
+*)
+Admitted.
 
 Close Scope labeled_is5_scope.
 Close Scope permut_scope.

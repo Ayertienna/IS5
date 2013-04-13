@@ -98,3 +98,9 @@ rew_flat_map; simpl; permut_simpl; transitivity (flat_map snd_ (hd++tl));
 [ apply IHG | rew_flat_map]; auto; apply permut_cons_inv with (a:=(a,l));
 rewrite H; permut_simpl.
 Qed.
+
+Lemma flat_map_concat:
+forall A B G, concat (map (@snd_ A (list B)) G) = flat_map snd_ G.
+induction G; intros; try destruct a;
+rew_map; rew_flat_map; simpl; rew_concat; try rewrite IHG; eauto.
+Qed.

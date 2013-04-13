@@ -2,6 +2,7 @@ Add LoadPath "..".
 Require Import Setoid.
 Require Export LibTactics.
 Require Export Shared.
+Require Export ListLib.
 Require Export PermutLib.
 
 Open Scope permut_scope.
@@ -550,5 +551,23 @@ intros. induction H; auto.
 transitivity y; auto.
 inversion H. PPermut_Hyb_simpl.
 Qed.
+
+Lemma PPermut_Hyb_map_fst:
+forall G G',
+  G ~=~ G' ->
+  map fst_ G *=* map fst_ G'.
+induction G; intros.
+apply PPermut_Hyb_nil_impl in H; subst; auto.
+assert (a::G ~=~ G') by auto;
+destruct a; apply PPermut_Hyb_split_head in H;
+destruct H as (l', (hd, (tl, (Ha, Hb)))); subst;
+rew_map; simpl; permut_simpl;
+replace (map fst_ hd ++ map fst_ tl) with (map fst_ (hd++tl))
+  by (rew_map; auto);
+apply IHG.
+apply PPermut_Hyb_last_rev with (w:=v) (Gamma:=l) (Gamma':=l);
+auto; transitivity ((v,l)::G); [ | rewrite H0]; PPermut_Hyb_simpl.
+Qed.
+
 
 Close Scope permut_scope.
