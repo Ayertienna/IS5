@@ -12,26 +12,41 @@ Inductive SN: te_LF -> Prop :=
              (forall N, M |-> N -> SN N) ->
              SN M.
 
-
-Inductive cont_LF :=
-| id_cont: cont_LF
-| compose_cont: te_LF -> cont_LF -> cont_LF
+Inductive Cont :=
+| IdK: ty -> Cont
+| ConsK: Cont -> te_LF -> ty -> ty -> Cont
 .
 
-(* FIXME: There is a notion of reducibility for continuations
-   and we will probably need that in some of the proofs *)
+(* continuation - type it takes (without <*>) - type it returns *)
+Inductive ContTyping: Cont -> ty -> ty -> Prop:=
+| IdKT: forall A, ContTyping (IdK A) A A
+| ConsKT:
+    forall K A B,
+      ContTyping K A B ->
+      forall N C,
+        ContTyping (ConsK K N B C) A C
+.
 
-Fixpoint appl_cont (K: cont_LF) (M: te_LF) : te_LF :=
+Fixpoint ContAppl (K: Cont) (M: te_LF) : te_LF :=
 match K with
-| id_cont => M
-| compose_cont N K' =>
-  appl_cont K' (letdia_LF M N)
+| IdK A => here_LF M
+| ConsK K' N A B => ContAppl K' (here_LF (letdia_LF M N))
 end.
 
-(*
-Continuation K accepting terms of type T A is reducible if for all
-reducible V of type A, the application K @ [V] is strongly normalising.
-*)
+Definition ContReduction (K1: Cont) (K2: Cont) :=
+forall M, ContAppl K1 M |-> ContAppl K2 M.
+
+Inductive ContSN: Cont -> Prop :=
+| contSN: forall M,
+         (forall N, ContReduction M N -> ContSN N) ->
+         ContSN M.
+
+Inductive ContLC: Cont -> Prop :=
+| ContLC_nil: forall A, ContLC (IdK A)
+| ContLC_step: forall K N A B,
+                 ContLC K -> lc_t_n_LF 1 N -> ContLC (ConsK K N A B)
+.
+
 Fixpoint Red (M: te_LF) (A: ty) : Prop :=
 match A with
 | tvar => SN M
@@ -43,11 +58,14 @@ match A with
     Red (appl_LF M N) A2
 | tbox A1 => Red (unbox_LF M) A1
 | tdia A1 =>
-  forall K
-    (HRC: forall V, Red V A1 -> SN (appl_cont K (here_LF V))),
-    SN (appl_cont K M)
+  forall K B,
+    ContLC K ->
+    (* Definition of reducible continuation is embedded *)
+    (ContTyping K A1 B ->
+     forall V, Red V A1 ->
+               SN (ContAppl K (here_LF V))) ->
+    SN (ContAppl K M)
 end.
-
 
 Lemma closed_t_succ_LF:
 forall M n,
@@ -134,6 +152,53 @@ apply lc_t_step_LF with (M:=unbox_LF M0); auto; constructor; auto.
 auto.
 Qed.
 
+Lemma SN_letdia:
+forall M N,
+  lc_t_LF (letdia_LF M N) ->
+  SN (letdia_LF M N) ->
+  SN M.
+intros;
+remember (letdia_LF M N) as T;
+generalize dependent M;
+generalize dependent N;
+induction H0; intros; subst;
+[ inversion H0 |
+  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value_LF];
+destruct H2;
+[ inversion H; subst |
+  constructor; auto].
+apply step_SN; intros;
+apply H1 with (N0:=letdia_LF N0 N) (N:=N).
+constructor; eauto.
+apply lc_t_step_LF with (M:=letdia_LF M0 N); auto; constructor; auto.
+auto.
+Qed.
+
+Theorem SN_step:
+forall M M',
+  SN M ->
+  M |-> M' ->
+  SN M'.
+intros; inversion H; subst.
+apply value_no_step_LF with (N:=M') in H1; contradiction.
+apply H1; auto.
+Qed.
+
+Lemma Step_KApplStep:
+forall K M M',
+  ContLC K ->
+  lc_t_LF M ->
+  M |-> M' ->
+  ContAppl K M |-> ContAppl K M'.
+induction K; intros; simpl in *.
+constructor; auto.
+inversion H; subst.
+assert (here_LF (letdia_LF M t) |-> here_LF (letdia_LF M' t)).
+   constructor; constructor; auto.
+apply IHK in H2; auto.
+constructor; constructor; auto.
+Qed.
+
 (* CR 2 base *)
 Theorem property_2:
 forall A M M'
@@ -153,13 +218,12 @@ constructor; auto.
 (* box type *)
 apply IHA with (M:=unbox_LF M); auto; constructor; eauto.
 (* dia type *)
-specialize HRed with K;
-apply HRed in HRC;
-destruct K; simpl in *.
-inversion HRC; subst; auto;
-apply value_no_step_LF with (N:=M') in H; contradiction.
-inversion HRC; subst.
-Admitted.
+specialize HRed with K B.
+assert (ContLC K) by auto;
+apply HRed in H; auto.
+apply SN_step with (M:=ContAppl K M); auto.
+apply Step_KApplStep; auto.
+Qed.
 
 (* FIXME: diamond type needs to be removed *)
 (* CR1 + CR3 *)
