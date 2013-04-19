@@ -62,7 +62,7 @@ match A with
     ContLC K ->
     (* Definition of reducible continuation is embedded *)
     (ContTyping K A1 B ->
-     forall V, Red V A1 ->
+     forall V, Red V A1 -> lc_t_LF V ->
                SN (ContAppl K (here_LF V))) ->
     SN (ContAppl K M)
 end.
@@ -152,25 +152,24 @@ apply lc_t_step_LF with (M:=unbox_LF M0); auto; constructor; auto.
 auto.
 Qed.
 
-Lemma SN_letdia:
-forall M N,
-  lc_t_LF (letdia_LF M N) ->
-  SN (letdia_LF M N) ->
+Lemma SN_here:
+forall M,
+  lc_t_LF (here_LF M) ->
+  SN (here_LF M) ->
   SN M.
 intros;
-remember (letdia_LF M N) as T;
+remember (here_LF M) as T;
 generalize dependent M;
-generalize dependent N;
-induction H0; intros; subst;
-[ inversion H0 |
-  assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value_LF];
+induction H0; intros; subst.
+inversion H0; subst; constructor; auto.
+assert (neutral_LF M0 \/ value_LF M0) by apply neutral_or_value_LF.
 destruct H2;
 [ inversion H; subst |
   constructor; auto].
 apply step_SN; intros;
-apply H1 with (N0:=letdia_LF N0 N) (N:=N).
+apply H1 with (N:=here_LF N).
 constructor; eauto.
-apply lc_t_step_LF with (M:=letdia_LF M0 N); auto; constructor; auto.
+apply lc_t_step_LF with (M:=here_LF M0); auto; constructor; auto.
 auto.
 Qed.
 
@@ -225,7 +224,6 @@ apply SN_step with (M:=ContAppl K M); auto.
 apply Step_KApplStep; auto.
 Qed.
 
-(* FIXME: diamond type needs to be removed *)
 (* CR1 + CR3 *)
 Theorem reducibility_props:
 forall A M
@@ -268,8 +266,51 @@ apply IHA; [constructor | ]; auto.
 intros; apply IHA; try constructor; auto; intros;
 inversion H2; subst; [inversion H0 | ]; apply H1; auto.
 (* dia type *)
-intro; contradiction.
-skip. (* Create a sublanguage? *)
+intros.
+assert (SN (ContAppl (IdK A) M)).
+apply H0 with (B:=A).
+constructor.
+intros. simpl.
+apply IHA in H2.
+(* SN V -> SN (here_LF (here_LF N)) *)
+Lemma SN_here':
+forall N,
+  SN N -> SN (here_LF N).
+intros; induction H; subst.
+constructor; constructor; auto.
+apply step_SN; intros.
+inversion H1; subst.
+apply H0 in H4; auto.
+Qed.
+apply SN_here'; apply SN_here'; auto.
+(* end *)
+auto.
+simpl in H1.
+apply SN_here.
+constructor; auto.
+auto.
+intros.
+
+assert (forall x B, nil |= (x, B) :: nil |- hyp_LF (fte x) ::: B).
+intros; constructor.
+unfold ok_Bg_LF; rew_concat; constructor;
+[rewrite Mem_nil_eq | constructor]; auto.
+apply Mem_here.
+assert (forall x, neutral_LF (hyp_LF x)) by (intros; constructor).
+assert (forall x, SN (hyp_LF x))
+  by (intros; apply step_SN; intros; inversion H3).
+assert (forall x B, Red (hyp_LF (fte x)) B).
+  intros; eapply IHA; auto.
+  constructor.
+  intros; inversion H4.
+assert (forall x, Red (appl_LF M (hyp_LF (fte x))) A2).
+intros; eapply H0; auto; constructor.
+assert (forall x, SN (appl_LF M (hyp_LF (fte x)))).
+intros; eapply IHA2; eauto; constructor; auto; constructor.
+
+apply SN_letdia with (.
+
+
 Grab Existential Variables.
 auto.
 Qed.
