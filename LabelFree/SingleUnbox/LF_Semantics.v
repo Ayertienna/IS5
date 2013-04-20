@@ -1649,32 +1649,3 @@ subst.
 rewrite <- H2. rewrite <- H0.
 apply HT2; eauto.
 Qed.
-
-Definition normal_form (M: te_LF) := value_LF M.
-
-Inductive neutral_LF: te_LF -> Prop :=
-| nHyp: forall n, neutral_LF (hyp_LF n)
-| nAppl: forall M N, neutral_LF (appl_LF M N)
-| nUnbox: forall M, neutral_LF (unbox_LF M)
-| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
-| nLetd: forall M N, neutral_LF (letdia_LF M N)
-.
-
-Lemma value_no_step_LF:
-forall M,
-  value_LF M ->
-  forall N , ~ M |-> N.
-induction M; intros; intro;
-try inversion H; inversion H0; subst;
-eapply IHM; eauto.
-Qed.
-
-Lemma neutral_or_value_LF:
-forall M,
-  neutral_LF M \/ value_LF M.
-induction M; intros;
-try (destruct IHM; [left | right]; constructor; auto);
-try (left; constructor);
-right;
-constructor.
-Qed.

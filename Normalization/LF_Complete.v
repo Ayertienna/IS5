@@ -6,6 +6,54 @@ Require Import LabelFree.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
+Lemma closed_t_succ_LF:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
+Qed.
+
+Lemma lc_t_subst_t_LF_free:
+forall M N n v,
+  lc_t_n_LF n N ->
+  lc_t_n_LF n M ->
+  lc_t_n_LF n ([N//fte v] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+eapply IHM; eauto; apply closed_t_succ_LF; auto.
+eapply IHM2; eauto; apply closed_t_succ_LF; auto.
+Qed.
+
+Definition normal_form (M: te_LF) := value_LF M.
+
+Inductive neutral_LF: te_LF -> Prop :=
+| nHyp: forall n, neutral_LF (hyp_LF n)
+| nAppl: forall M N, neutral_LF (appl_LF M N)
+| nUnbox: forall M, neutral_LF (unbox_LF M)
+| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
+| nLetd: forall M N, neutral_LF (letdia_LF M N)
+.
+
+Lemma value_no_step_LF:
+forall M,
+  value_LF M ->
+  forall N , ~ M |-> N.
+induction M; intros; intro;
+try inversion H; inversion H0; subst;
+eapply IHM; eauto.
+Qed.
+
+Lemma neutral_or_value_LF:
+forall M,
+  neutral_LF M \/ value_LF M.
+induction M; intros;
+try (destruct IHM; [left | right]; constructor; auto);
+try (left; constructor);
+right;
+constructor.
+Qed.
+
 Inductive SN: te_LF -> Prop :=
 | val_SN: forall M, value_LF M -> SN M
 | step_SN: forall M,
@@ -37,9 +85,9 @@ Definition ContReduction (K1: Cont) (K2: Cont) :=
 forall M, ContAppl K1 M |-> ContAppl K2 M.
 
 Inductive ContSN: Cont -> Prop :=
-| contSN: forall M,
-         (forall N, ContReduction M N -> ContSN N) ->
-         ContSN M.
+| contSN: forall K1,
+         (forall K2, ContReduction K1 K2 -> ContSN K2) ->
+         ContSN K1.
 
 Inductive ContLC: Cont -> Prop :=
 | ContLC_nil: forall A, ContLC (IdK A)
@@ -60,20 +108,19 @@ match A with
 | tdia A1 =>
   forall K B,
     ContLC K ->
-    (* Definition of reducible continuation is embedded *)
-    (ContTyping K A1 B ->
-     forall V, Red V A1 -> lc_t_LF V ->
+    ContTyping K A1 B ->
+(* Definition of reducible continuation is embedded *)
+    (forall V, Red V A1 -> lc_t_LF V ->
                SN (ContAppl K (here_LF V))) ->
     SN (ContAppl K M)
 end.
 
-Lemma closed_t_succ_LF:
-forall M n,
-  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_LF.
-Qed.
+
+Definition ContReducible K A B:=
+  ContTyping K A B ->
+    (forall V, Red V A -> lc_t_LF V ->
+               SN (ContAppl K (here_LF V))).
+
 
 Lemma lc_t_subst_t_LF_bound:
 forall M N n,
@@ -85,17 +132,6 @@ try constructor; eauto.
 assert (n <> v0) by (intro; subst; elim H1; auto); omega.
 eapply IHM; auto; apply closed_t_succ_LF; auto.
 eapply IHM2; auto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma lc_t_subst_t_LF_free:
-forall M N n v,
-  lc_t_n_LF n N ->
-  lc_t_n_LF n M ->
-  lc_t_n_LF n ([N//fte v] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-eapply IHM; eauto; apply closed_t_succ_LF; auto.
-eapply IHM2; eauto; apply closed_t_succ_LF; auto.
 Qed.
 
 Lemma lc_t_step_LF:
@@ -270,6 +306,7 @@ intros.
 assert (SN (ContAppl (IdK A) M)).
 apply H0 with (B:=A).
 constructor.
+constructor.
 intros. simpl.
 apply IHA in H2.
 (* SN V -> SN (here_LF (here_LF N)) *)
@@ -282,33 +319,96 @@ apply step_SN; intros.
 inversion H1; subst.
 apply H0 in H4; auto.
 Qed.
-apply SN_here'; apply SN_here'; auto.
+apply SN_here'; apply SN_here'; destruct H2; auto.
 (* end *)
-auto.
 simpl in H1.
 apply SN_here.
 constructor; auto.
 auto.
-intros.
 
-assert (forall x B, nil |= (x, B) :: nil |- hyp_LF (fte x) ::: B).
+intros.
+assert (ContSN K).
+  skip.
+induction K.
+simpl in *; inversion H5; subst.
+
+apply step_SN; intros.
+Lemma lc_ContAppl:
+forall K M,
+  ContLC K-> lc_t_LF M -> lc_t_LF (ContAppl K M).
+induction K; intros; simpl in *.
+constructor; auto.
+inversion H; subst.
+apply IHK with (M:=(here_LF (letdia_LF M t))) in H3; auto;
+constructor; constructor; auto.
+Qed.
+Lemma neutral_ContAppl:
+forall K M,
+  neutral_LF M ->
+  neutral_LF (ContAppl K M).
+induction K; intros; simpl in *.
+constructor; auto.
+apply IHK; constructor; constructor.
+Qed.
+simpl.
+Lemma step_neutral_ContAppl:
+forall K M N,
+  neutral_LF M ->
+  ContAppl K M |-> N ->
+  (exists K', N = ContAppl K' M /\ ContReduction K K') \/
+  (exists M', N = ContAppl K M' /\ M |-> M').
+Admitted.
+simpl.
+apply step_neutral_ContAppl in H5; auto; destruct H5.
+destruct H5 as (K'); unfold ContReduction in *; destruct H5; subst.
+assert (ContReducible K' A B). unfold ContReducible; intros.
+assert (SN (ContAppl K (here_LF V))).
+  apply H4; auto.
+specialize H6 with (here_LF V).
+inversion H9; subst.
+apply value_no_step_LF with (N:=ContAppl K' (here_LF V)) in H10; contradiction.
+apply H10; auto.
+unfold ContReducible in *. clear H1.
+apply IHA. skip.
+apply IHA. skip. skip. intros.
+
+
+
+
+induction K; intros; simpl in *.
+inversion H; subst; right; eexists; eauto.
+destruct IHK with (M:=here_LF (letdia_LF M t)) (N:=N); auto.
+destruct H0 as (K', (H0a, H0b)); subst.
+inversion H0b; inversion H1.
+destruct H0 as (M', (H0a, H0b)); subst;
+inversion H0b; subst; inversion H2; subst; unfold open_LF in *.
+left. exists (ConsK K t t0 t1); split.
+simpl.
+destruct IHK with (M:=M) (N:=ContAppl K' M); auto.
+
+
+assert (forall M', M |-> M' -> Red M' (<*>A))
+  by (simpl; intros; eapply H1; eauto).
+assert (forall x, nil |= (x, A) :: nil |- hyp_LF (fte x) ::: A).
 intros; constructor.
 unfold ok_Bg_LF; rew_concat; constructor;
 [rewrite Mem_nil_eq | constructor]; auto.
 apply Mem_here.
 assert (forall x, neutral_LF (hyp_LF x)) by (intros; constructor).
-assert (forall x, SN (hyp_LF x))
-  by (intros; apply step_SN; intros; inversion H3).
-assert (forall x B, Red (hyp_LF (fte x)) B).
-  intros; eapply IHA; auto.
+assert (forall x, SN (hyp_LF x)).
+  (intros; apply step_SN; intros; inversion H8).
+assert (forall x, Red (hyp_LF (fte x)) A).
+  intros; apply IHA; auto.
   constructor.
-  intros; inversion H4.
-assert (forall x, Red (appl_LF M (hyp_LF (fte x))) A2).
-intros; eapply H0; auto; constructor.
-assert (forall x, SN (appl_LF M (hyp_LF (fte x)))).
-intros; eapply IHA2; eauto; constructor; auto; constructor.
+  intros; inversion H9.
+assert (forall x, SN (ContAppl K (here_LF (hyp_LF (fte x))))).
+intros; apply H4; auto; constructor.
+assert (ContSN K); constructor; intros.
+  unfold ContReduction in *.
 
-apply SN_letdia with (.
+
+
+
 
 
 Grab Existential Variables.
