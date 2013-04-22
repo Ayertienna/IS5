@@ -465,6 +465,21 @@ eapply IHL0; eauto; intro; rew_map in *; simpl in *; elim H;
 rewrite Mem_cons_eq; right; auto.
 Qed.
 
+Lemma used_vars_te_LF_open_hyp:
+forall M v0 v k,
+  v0 <> v ->
+  v0 \in used_vars_te_LF [hyp_LF (fte v) // bte k] M ->
+  v0 \in used_vars_te_LF M.
+induction M; intros; simpl in *; repeat case_if; simpl in *.
+elim H; subst; rewrite in_singleton in H0; subst; auto.
+destruct v; simpl in *; auto.
+eapply IHM with (v:=v) (k:=S k); auto.
+rewrite in_union in *; destruct H0;
+[left; eapply IHM1 | right; eapply IHM2]; eauto.
+eapply IHM; eauto.
+eapply IHM; eauto.
+Qed.
+
 Theorem SL_types_reducible:
 forall M G Gamma A,
   G |= Gamma |- M ::: A ->
@@ -477,7 +492,9 @@ apply Red_SL_hyp; auto. apply H2; simpl; auto;
 [rewrite in_singleton | rew_concat ];
 auto; rewrite Mem_app_or_eq; left; auto.
 (* lam *)
-assert (exists v, v \notin L \u  used_vars_te_LF (SL L0 M) \u
+assert (exists v, v \notin L \u from_list (map fst_ (concat (Gamma::G))) \u
+                    used_vars_te_LF M \u
+                    used_vars_te_LF (SL L0 M) \u
        from_list (map fst_ (map fst_ L0)))
   as HF by apply Fresh; destruct HF as (v);
 rewrite SL_lam; apply reducible_abstraction.
@@ -485,7 +502,30 @@ rewrite <- SL_lam; apply SL_lc_t_LF; auto;
 specialize H with v; apply types_LF_lc_t_LF in H; eauto;
 unfold open_LF in *; constructor;
 apply lc_t_n_LF_subst_t in H; auto; constructor.
-intros;
+intros.
+Import Arith.
+Fixpoint contains_bte_k (M: te_LF)(k: nat): Prop :=
+match M with
+| hyp_LF (bte n) => if (eq_nat_dec n k) then True else False
+| hyp_LF (fte v) => False
+| lam_LF A M' => contains_bte_k M' (S k)
+| appl_LF M' N' => contains_bte_k M' k \/ contains_bte_k N' k
+| box_LF M' => contains_bte_k M' k
+| unbox_LF M' => contains_bte_k M' k
+end.
+Lemma contains_bte_dec:
+forall M k,
+  { contains_bte_k M k} + {~ contains_bte_k M k}.
+induction M; intros.
+induction v; simpl; [destruct (eq_nat_dec n k); auto | right; tauto].
+specialize IHM with (S k); destruct IHM; simpl; auto.
+specialize IHM1 with k; specialize IHM2 with k; simpl in *;
+destruct IHM1; destruct IHM2; auto; try tauto.
+specialize IHM with k; destruct IHM; simpl; auto.
+specialize IHM with k; destruct IHM; simpl; auto.
+Qed.
+simpl.
+destruct (contains_bte_dec M 0).
 rewrite subst_t_neutral_free_LF with (v:=v); auto.
 rewrite SL_subst_bte; auto.
 Focus 2.
@@ -495,13 +535,109 @@ replace ([M0 // fte v](SL L0 [hyp_LF (fte v) // bte 0]M))
   by (simpl; auto); unfold open_LF in *.
 apply H0; simpl; try split; eauto.
 constructor; eauto; apply notin_Mem; eauto.
-intros; rew_map in *; rew_concat in *; simpl;
-rewrite Mem_cons_eq in *;
-destruct H11; [left | right]; auto; apply H3; simpl.
-(* from v0 \in used_vars_te_LF [hyp_LF (fte v) // bte 0]M
-   get v0 \in used_vars_te_LF M *)
-skip. auto.
-unfold NotBadL in *; intros;
+intros; rew_map in *; rew_concat in *; simpl.
+destruct (eq_var_dec v0 v).
+subst; rewrite Mem_cons_eq in *; destruct H11.
+left; auto.
+repeat rewrite notin_union in H6; destruct H6; destruct H12;
+destruct H13; destruct H14.
+apply notin_Mem in H12.
+Lemma Mem_map_fst:
+forall A B L (v:A) (w:B),
+  Mem (v, w) L ->
+  Mem v (map fst_ L).
+induction L; intros; simpl in *.
+rewrite Mem_nil_eq in H; contradiction.
+destruct a; rew_map; simpl; rewrite Mem_cons_eq in *;
+destruct H; [inversion H; subst |]; [left | right]; auto.
+eapply IHL; eauto.
+Qed.
+simpl.
+apply Mem_map_fst in H11; elim H12; auto.
+subst; rewrite Mem_cons_eq in *; destruct H11.
+inversion H11; subst; elim n; auto.
+right; apply H3; simpl; auto.
+apply used_vars_te_LF_open_hyp in H10; auto.
+unfold NotBadL in *; intros.
+rewrite  Mem_cons_eq in *; destruct H10.
+inversion H10; subst.
+Lemma opening_used_vars_contains:
+forall M v k,
+  contains_bte_k M k ->
+  v \in used_vars_te_LF [hyp_LF (fte v) // bte k] M.
+induction M; intros; simpl in *; repeat case_if; simpl; eauto.
+rewrite in_singleton; auto.
+destruct v; simpl in *; repeat case_if; try contradiction.
+destruct H; rewrite in_union; [left| right]; eauto.
+Qed.
+apply opening_used_vars_contains; auto.
+simpl in *.
+Lemma used_vars_subst:
+forall M N k v,
+  v \in used_vars_te_LF M ->
+  v \in used_vars_te_LF [N // bte k] M.
+induction M; intros; simpl in *; repeat case_if; auto.
+rewrite in_empty in H; contradiction.
+rewrite in_union in *; destruct H; [left|right];auto.
+Qed.
+apply used_vars_subst; eapply H4; eauto.
+(* when M does not contain bte 0 *)
+assert (lc_t_LF (SL L0 M)).
+apply SL_lc_t_LF; auto.
+Lemma lc_t_contains_bte:
+forall M k,
+  lc_t_n_LF (S k) M ->
+  ~ contains_bte_k M k ->
+  lc_t_n_LF k M.
+induction M; intros; simpl in *; repeat case_if; try destruct v;
+constructor.
+case_if; [elim H0 | ]; auto. inversion H; subst; omega.
+inversion H; apply IHM; auto.
+inversion H; apply IHM1; auto.
+inversion H; apply IHM2; auto.
+inversion H; apply IHM; auto.
+inversion H; apply IHM; auto.
+Qed.
+apply lc_t_contains_bte; auto.
+assert (lc_t_LF (lam_LF A M)).
+  apply types_LF_lc_t_LF with (G:=G) (Gamma:=Gamma)(A:=A ---> B).
+  eapply t_lam_LF; eauto.
+inversion H10; subst; auto.
+rewrite closed_subst_t_bound_LF with (n:=0); auto.
+unfold open_LF in *.
+clear dependent M0.
+assert (exists x, x \notin L \u used_vars_te_LF M) by apply Fresh; destruct H7.
+rewrite <- closed_subst_t_bound_LF with (v0:=0)(N:=M)(M:=hyp_LF (fte x))(n:=0);
+auto.
+Focus 2.
+apply lc_t_contains_bte; auto.
+assert (lc_t_LF (lam_LF A M)).
+  apply types_LF_lc_t_LF with (G:=G) (Gamma:=Gamma)(A:=A ---> B).
+  eapply t_lam_LF; eauto.
+inversion H8; subst; auto.
+assert (lc_t_LF M).
+apply lc_t_contains_bte; auto.
+assert (lc_t_LF (lam_LF A M)).
+  apply types_LF_lc_t_LF with (G:=G) (Gamma:=Gamma)(A:=A ---> B).
+  eapply t_lam_LF; eauto.
+inversion H8; subst; auto.
+apply H0; auto.
+rewrite closed_subst_t_bound_LF with (n:=0); auto; intros.
+apply H3; simpl; auto.
+rew_concat in H11; rewrite Mem_cons_eq in H11; destruct H11; auto;
+inversion H11; subst; rewrite notin_union in H7; destruct H7; contradiction.
+unfold NotBadL in *; intros.
+rewrite closed_subst_t_bound_LF with (n:=0); auto; intros. simpl in *;
+eapply H4; eauto.
+(* appl *)
+
+
+
+
+
+
+
+(*
 (* This assumes that bte 0 actually was present in M
  -- we need to add a case where it was not! *)
 skip.
@@ -527,7 +663,9 @@ forall M G A,
 Admitted.
 
 
-Lemma types_LF_lc_t_LF:
+Lemma apply lc_t_contains_bte; auto.
+apply lc_t_contains_bte; auto.
+types_LF_lc_t_LF:
 forall G Gamma M A,
   G |= Gamma |- M ::: A -> lc_t_LF M.
 intros; induction H; constructor; try apply IHHT;
