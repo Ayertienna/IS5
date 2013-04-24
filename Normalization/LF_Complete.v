@@ -99,9 +99,8 @@ Fixpoint Red (M: te_LF) (A: ty) : Prop :=
 match A with
 | tvar => SN M
 | tarrow A1 A2 =>
-  forall N G Gamma
+  forall N
          (H_lc: lc_t_LF N)
-         (HT: G |= Gamma |- N ::: A1)
          (HRed: Red N A1),
     Red (appl_LF M N) A2
 | tbox A1 => Red (unbox_LF M) A1
@@ -234,7 +233,7 @@ apply IHK in H2; auto.
 constructor; constructor; auto.
 Qed.
 
-(* CR 2 base *)
+(* CR 2 *)
 Theorem property_2:
 forall A M M'
   (HRed: Red M A)
@@ -247,7 +246,6 @@ inversion HRed; subst;
 [apply value_no_step_LF with (N:=M') in H; contradiction | apply H; auto].
 (* arrow type *)
 apply IHA2 with (M:=appl_LF M N); auto.
-eapply HRed; eauto.
 constructor; auto.
 constructor; auto.
 (* box type *)
@@ -258,6 +256,60 @@ assert (ContLC K) by auto;
 apply HRed in H; auto.
 apply SN_step with (M:=ContAppl K M); auto.
 apply Step_KApplStep; auto.
+Qed.
+
+Lemma SN_N_SN_here:
+forall N,
+  SN N -> SN (here_LF N).
+intros; induction H; subst.
+constructor; constructor; auto.
+apply step_SN; intros.
+inversion H1; subst.
+apply H0 in H4; auto.
+Qed.
+
+Lemma lc_ContAppl:
+forall K M,
+  ContLC K-> lc_t_LF M -> lc_t_LF (ContAppl K M).
+induction K; intros; simpl in *.
+constructor; auto.
+inversion H; subst.
+apply IHK with (M:=(here_LF (letdia_LF M t))) in H3; auto;
+constructor; constructor; auto.
+Qed.
+
+Lemma neutral_ContAppl:
+forall K M,
+  neutral_LF M ->
+  neutral_LF (ContAppl K M).
+induction K; intros; simpl in *.
+constructor; auto.
+apply IHK; constructor; constructor.
+Qed.
+
+Lemma neutral_not_value:
+forall M,
+  neutral_LF M -> ~ value_LF M.
+induction M; intros; intro; try inversion H0; subst; inversion H; subst.
+apply IHM in H3; contradiction.
+Qed.
+
+Lemma step_neutral_ContAppl:
+forall K M N,
+  neutral_LF M ->
+  ContAppl K M |-> N ->
+  (exists M', N = ContAppl K M' /\ M |-> M').
+induction K; intros; simpl in *.
+inversion H0; subst; eexists; split; eauto.
+destruct IHK with (M:=(here_LF (letdia_LF M t))) (N:=N).
+constructor; constructor.
+auto.
+destruct H1.
+inversion H2; subst; inversion H5; subst.
+inversion H; subst; apply neutral_not_value in H3; contradiction.
+inversion H5; subst.
+inversion H; subst; apply neutral_not_value in H3; contradiction.
+eexists; split; eauto.
 Qed.
 
 (* CR1 + CR3 *)
@@ -309,108 +361,15 @@ constructor.
 constructor.
 intros. simpl.
 apply IHA in H2.
-(* SN V -> SN (here_LF (here_LF N)) *)
-Lemma SN_here':
-forall N,
-  SN N -> SN (here_LF N).
-intros; induction H; subst.
-constructor; constructor; auto.
-apply step_SN; intros.
-inversion H1; subst.
-apply H0 in H4; auto.
-Qed.
-apply SN_here'; apply SN_here'; destruct H2; auto.
-(* end *)
+apply SN_N_SN_here; apply SN_N_SN_here; destruct H2; auto.
 simpl in H1.
 apply SN_here.
 constructor; auto.
 auto.
-
 intros.
-assert (ContSN K).
-  skip.
-induction K.
-simpl in *; inversion H5; subst.
-
-apply step_SN; intros.
-Lemma lc_ContAppl:
-forall K M,
-  ContLC K-> lc_t_LF M -> lc_t_LF (ContAppl K M).
-induction K; intros; simpl in *.
-constructor; auto.
-inversion H; subst.
-apply IHK with (M:=(here_LF (letdia_LF M t))) in H3; auto;
-constructor; constructor; auto.
-Qed.
-Lemma neutral_ContAppl:
-forall K M,
-  neutral_LF M ->
-  neutral_LF (ContAppl K M).
-induction K; intros; simpl in *.
-constructor; auto.
-apply IHK; constructor; constructor.
-Qed.
-simpl.
-Lemma step_neutral_ContAppl:
-forall K M N,
-  neutral_LF M ->
-  ContAppl K M |-> N ->
-  (exists K', N = ContAppl K' M /\ ContReduction K K') \/
-  (exists M', N = ContAppl K M' /\ M |-> M').
-Admitted.
-simpl.
-apply step_neutral_ContAppl in H5; auto; destruct H5.
-destruct H5 as (K'); unfold ContReduction in *; destruct H5; subst.
-assert (ContReducible K' A B). unfold ContReducible; intros.
-assert (SN (ContAppl K (here_LF V))).
-  apply H4; auto.
-specialize H6 with (here_LF V).
-inversion H9; subst.
-apply value_no_step_LF with (N:=ContAppl K' (here_LF V)) in H10; contradiction.
-apply H10; auto.
-unfold ContReducible in *. clear H1.
-apply IHA. skip.
-apply IHA. skip. skip. intros.
-
-
-
-
-induction K; intros; simpl in *.
-inversion H; subst; right; eexists; eauto.
-destruct IHK with (M:=here_LF (letdia_LF M t)) (N:=N); auto.
-destruct H0 as (K', (H0a, H0b)); subst.
-inversion H0b; inversion H1.
-destruct H0 as (M', (H0a, H0b)); subst;
-inversion H0b; subst; inversion H2; subst; unfold open_LF in *.
-left. exists (ConsK K t t0 t1); split.
-simpl.
-destruct IHK with (M:=M) (N:=ContAppl K' M); auto.
-
-
-assert (forall M', M |-> M' -> Red M' (<*>A))
-  by (simpl; intros; eapply H1; eauto).
-assert (forall x, nil |= (x, A) :: nil |- hyp_LF (fte x) ::: A).
-intros; constructor.
-unfold ok_Bg_LF; rew_concat; constructor;
-[rewrite Mem_nil_eq | constructor]; auto.
-apply Mem_here.
-assert (forall x, neutral_LF (hyp_LF x)) by (intros; constructor).
-assert (forall x, SN (hyp_LF x)).
-  (intros; apply step_SN; intros; inversion H8).
-assert (forall x, Red (hyp_LF (fte x)) A).
-  intros; apply IHA; auto.
-  constructor.
-  intros; inversion H9.
-assert (forall x, SN (ContAppl K (here_LF (hyp_LF (fte x))))).
-intros; apply H4; auto; constructor.
-assert (ContSN K); constructor; intros.
-  unfold ContReduction in *.
-
-
-
-
-
-
+apply step_SN; intros; apply step_neutral_ContAppl in H5; auto;
+destruct H5; destruct H5;
+subst; apply H1 with B; auto.
 Grab Existential Variables.
 auto.
 Qed.
@@ -461,229 +420,353 @@ intros; inversion H; subst; auto.
 inversion H2.
 Qed.
 
-(* Idea: gather all free variables from a term,
-         substitute them with reducible terms of appropriate type
-         conclude that the resulting term is reducible *)
 
-Fixpoint subst_free_vars (D: list (var*ty))
-         (L: list (bg_LF * ctx_LF * te_LF)) N :=
-match D, L with
-| nil, _ => N
-| _, nil => N
-| (v, _ )::V', (_, _, l)::L' => [l // fte v] (subst_free_vars V' L' N)
+Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
+                     option (var * ty * te_LF) :=
+match L with
+| nil => None
+| (v, A, M) :: L' =>
+  if (eq_var_dec x v) then Some (v, A, M) else find_var L' x
 end.
 
-Fixpoint subst_typing (L: list (bg_LF * ctx_LF * te_LF)) (D: list (var * ty)) :=
-match L, D with
-| nil, nil => True
-| (G, Gamma, M) ::L', (v, A) :: D' =>
-  G |= Gamma |- M ::: A /\ (subst_typing L' D')
-| _, _ => False
+Fixpoint SL (L: list (var * ty * te_LF)) M :=
+match M with
+| hyp_LF (bte v) => M
+| hyp_LF (fte v) =>
+  let x := find_var L v in
+  match x with
+    | Some (v, A, M) => M
+    | None => hyp_LF (fte v)
+  end
+| lam_LF A M => lam_LF A (SL L M)
+| appl_LF M N => appl_LF (SL L M) (SL L N)
+| box_LF M => box_LF (SL L M)
+| unbox_LF M => unbox_LF (SL L M)
+| here_LF M => here_LF (SL L M)
+| letdia_LF M N => letdia_LF (SL L M) (SL L N)
 end.
 
-Fixpoint red_list (L: list (bg_LF *ctx_LF *te_LF)) (D: list (var * ty)) :=
-match L, D with
-| nil, nil => True
-| (_, _ ,M) :: L', (v, A):: D' => Red M A /\ red_list L' D'
-| _, _ => False
-end.
-
-Lemma subst_free_vars_notin:
-forall D L,
-  red_list L D ->
-  ok_LF D nil ->
-  forall v,
-    ~ Mem v (map fst_ D) ->
-    subst_free_vars D L (hyp_LF (fte v)) = hyp_LF (fte v).
-induction D; intros; simpl in *; auto; destruct a; rew_map in *; simpl in *;
-rewrite Mem_cons_eq in *; destruct L; auto.
-destruct p; destruct p; simpl in *; destruct H.
-rewrite IHD; simpl; eauto.
-case_if; auto; inversion H3; subst. elim H1; left; auto.
-inversion H0; subst; eapply ok_LF_used_weakening in H8; auto.
-Qed.
-
-Lemma ok_LF_step:
-forall D v (A:ty) U,
-  ok_LF ((v, A) :: D) U -> ~ Mem v (map fst_ D).
-induction D; intros; rew_map.
-rewrite Mem_nil_eq; auto.
-destruct a; intro nn; rewrite Mem_cons_eq in nn; simpl in *; destruct nn; subst.
-inversion H; inversion H5; subst; elim H10; apply Mem_here.
-specialize IHD with v A (v0::U).
-apply ok_LF_permut with (G':= (v0,t) :: (v, A) :: D) in H; [|permut_simpl].
-inversion H; subst; apply IHD in H6; contradiction.
-Qed.
-
-Lemma Mem_map_fst:
-forall A B D (x:A) (t:B),
-  Mem (x, t) D -> Mem x (map fst_ D).
-induction D; intros.
+Lemma Mem_concat_mem_elem:
+forall G (e:var*ty),
+  Mem e (concat G) ->
+  exists (l: ctx_LF), Mem l G /\ Mem e l.
+induction G; intros; rew_concat in *.
 rewrite Mem_nil_eq in H; contradiction.
-destruct a; rewrite Mem_cons_eq in H; destruct H; rew_map; simpl.
+rewrite Mem_app_or_eq in H; destruct H.
+exists a; split; auto; apply Mem_here.
+destruct (IHG e); auto; destruct H0; exists x; split; auto.
+rewrite Mem_cons_eq; right; auto.
+Qed.
+
+Lemma ok_LF_Mem_Mem_eq':
+  forall (G : ctx_LF)(v : var) (A B : ty),
+    ok_LF G nil  ->
+    Mem (v, A) G -> Mem (v,B) G ->
+    A = B.
+induction G; intros.
+rewrite Mem_nil_eq in H0; contradiction.
+rewrite Mem_cons_eq in *; destruct H0; destruct H1; subst.
+inversion H1; subst; auto.
+inversion H; subst; apply Mem_split in H1; destruct H1 as (hd, (tl, H1));
+assert (hd & (v, B) ++ tl *=* (v, B) :: hd ++ tl) by permut_simpl;
+rewrite H1 in H6; apply ok_LF_permut with (G':= (v, B) :: hd ++ tl) in H6;
+auto; inversion H6; subst; elim H8; apply Mem_here.
+inversion H; subst; apply Mem_split in H0; destruct H0 as (hd, (tl, H0));
+assert (hd & (v, A) ++ tl *=* (v, A) :: hd ++ tl) by permut_simpl;
+rewrite H0 in H6; apply ok_LF_permut with (G':= (v, A) :: hd ++ tl) in H6;
+auto; inversion H6; subst; elim H8; apply Mem_here.
+eapply IHG; eauto.
+inversion H; subst; eapply ok_LF_used_weakening; eauto.
+Qed.
+
+Lemma SL_hyp:
+forall L G Gamma v A,
+  concat (Gamma::G) *=* map fst_ L ->
+  (forall a b c, Mem (a, b, c) L -> Red c b) ->
+  G |= Gamma |- hyp_LF (fte v) ::: A ->
+  Red (SL L (hyp_LF (fte v))) A.
+induction L; intros; rew_map in *.
+symmetry in H; apply permut_nil_eq in H; rew_concat in *;
+symmetry in H; apply nil_eq_app_inv in H; destruct H; subst;
+inversion H1; subst; rewrite Mem_nil_eq in *; contradiction.
+destruct a; destruct p; inversion H1; subst; simpl in *.
+case_if.
+assert (A = t0).
+unfold ok_Bg_LF in *.
+apply ok_LF_Mem_Mem_eq' with (concat (Gamma::G)) v0; auto;
+[rew_concat; rewrite Mem_app_or_eq; left; auto | ].
+apply Mem_permut with (l:=(v0,t0) :: map fst_ L); [symmetry; auto |
+apply Mem_here].
+subst; apply H0 with v0; apply Mem_here.
+assert (concat (Gamma :: G) *=* (v0, t0) :: map fst_ L) by auto;
+symmetry in H; apply permut_split_head in H;
+destruct H as (hd, (tl, H)).
+destruct Mem_concat_mem_elem with (e:=(v0, t0)) (G:=Gamma::G).
+apply Mem_permut with (l:=(v0,t0) :: map fst_ L); [symmetry; auto |];
+apply Mem_here. destruct H4.
+apply Mem_split in H4.
+apply Mem_split in H6.
+destruct H6 as (l0, (l1,H6)).
+destruct H4 as (G0, (G1, H4)); subst.
+destruct G0; rew_app in *.
+inversion H4; subst. apply IHL with G1 (l0++l1).
+rew_concat in *.
+apply permut_cons_inv with (a:=(v0,t0)).
+rewrite <- H3. permut_simpl.
+intros; apply H0 with a; rewrite Mem_cons_eq; right; auto.
+constructor.
+eapply ok_Bg_LF_permut_first_tail in Ok; eauto; permut_simpl.
+rewrite Mem_app_or_eq in *; destruct H5; auto; rewrite Mem_cons_eq in *;
+destruct H5; auto; inversion H5; subst; elim H2; auto.
+inversion H4; subst.
+apply IHL with (G0 ++ (l0 ++ l1) :: G1) c.
+rew_concat in *. apply permut_cons_inv with (a:=(v0,t0)).
+rewrite <- H3. permut_simpl.
+intros; apply H0 with a; rewrite Mem_cons_eq; right; auto.
+constructor; auto.
+assert (c :: G0 ++ (l0 ++ (v0, t0) :: l1) :: G1 ~=~
+        ((l0++(v0, t0) :: l1) :: c :: G0 ++ G1)).
+PPermut_LF_simpl; constructor; auto; permut_simpl.
+rewrite H6 in Ok.
+eapply ok_Bg_LF_permut_first_tail with (x:=v0)(A:=t0) (C':=l0++l1)in Ok; eauto.
+Focus 2. permut_simpl.
+apply ok_Bg_LF_PPermut with (G:=(l0 ++ l1) :: c :: G0 ++ G1); auto;
+PPermut_LF_simpl.
+Qed.
+
+Lemma closed_t_succ:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
+Qed.
+
+Lemma closed_t_addition:
+forall M n m,
+  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ;
+assumption.
+Qed.
+
+Lemma SL_nil:
+forall M,
+  SL nil M = M.
+induction M; intros; simpl in *;
+try erewrite IHM || (erewrite IHM1; erewrite IHM2); eauto.
+destruct v; auto.
+Qed.
+
+Lemma Mem_find_var:
+  forall L v,
+    Mem v (map fst_ (map fst_ L)) ->
+    exists A M, find_var L v = Some (v, A, M).
+induction L; intros; [ rewrite Mem_nil_eq in *; contradiction | ];
+destruct a; destruct p; rew_map in *; simpl in *.
+subst; rewrite Mem_cons_eq in H.
+destruct (eq_var_dec v v0).
+subst; simpl; exists t0 t; auto.
+destruct H; try contradiction; apply IHL; auto.
+Qed.
+
+Lemma NotMem_find_var:
+  forall L v,
+    ~Mem v (map fst_ (map fst_ L)) ->
+    find_var L v = None.
+induction L; intros; simpl in *; auto;
+destruct a; destruct p; rew_map in *; simpl in *;
+case_if.
+elim H; apply Mem_here.
+apply IHL; intro; elim H;
+rewrite Mem_cons_eq; right; auto.
+Qed.
+
+Lemma find_var_Mem:
+forall L v A M,
+  find_var L v = Some (v, A, M) -> Mem (v, A, M) L.
+induction L; intros; [inversion H; subst | ].
+destruct a; destruct p; simpl in *; case_if.
 inversion H; subst; apply Mem_here.
-rewrite Mem_cons_eq; right; eauto.
+rewrite Mem_cons_eq; right; apply IHL; auto.
 Qed.
 
-Lemma subst_free_vars_hyp_Red:
-forall D L,
-  red_list L D ->
-  ok_LF D nil ->
-  subst_typing L D ->
-  forall v A,
-    Mem (v, A) D ->
-    Red (subst_free_vars D L (hyp_LF (fte v))) A.
-Admitted.
-
-Lemma subst_free_vars_lam:
-forall D L A M,
-  subst_free_vars D L (lam_LF A M) = lam_LF A (subst_free_vars D L M).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Lemma lc_SL:
+forall M L n,
+  lc_t_n_LF n M ->
+  (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+  lc_t_n_LF n (SL L M).
+induction M; intros; simpl in *;
+try (inversion H; subst; constructor; eapply IHM; eauto).
+destruct v; inversion H; subst.
+constructor; auto.
+destruct (Mem_dec var (map fst_ (map fst_ L)) v). apply eq_var_dec.
+apply Mem_find_var in m; destruct m; destruct H1.
+rewrite H1. replace n with (0+n) by omega.
+apply closed_t_addition; apply H0 with v x. apply find_var_Mem; auto.
+rewrite NotMem_find_var; auto.
+inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
+inversion H; subst; constructor; [eapply IHM2 | apply IHM1]; auto.
 Qed.
 
-Lemma subst_free_vars_appl:
-forall D L M N,
-  subst_free_vars D L (appl_LF M N) =
-  appl_LF (subst_free_vars D L M) (subst_free_vars D L N).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Lemma SL_bte_subst:
+forall L0 M x k,
+  ~ Mem x (map fst_ (map fst_ L0)) ->
+  (forall v a m, Mem (v, a, m) L0 -> lc_t_LF m) ->
+  [hyp_LF (fte x) // bte k](SL L0 M) =
+  SL L0 [hyp_LF (fte x) // bte k]M.
+induction M; intros; simpl in *;
+try rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto.
+case_if; simpl.
+case_if. rewrite NotMem_find_var; auto.
+destruct v; simpl; repeat case_if; auto.
+destruct (Mem_dec var (map fst_ (map fst_ L0)) v);
+try apply eq_var_dec; [ | rewrite NotMem_find_var]; auto;
+simpl; repeat case_if; auto.
+apply Mem_find_var in m; destruct m as (a, (b, m)); rewrite m; simpl.
+rewrite closed_subst_t_bound_LF with (n:=0); auto; try omega;
+apply H0 with v a; apply find_var_Mem; auto.
 Qed.
 
-Lemma subst_free_vars_box:
-forall D L M,
-  subst_free_vars D L (box_LF M) = box_LF (subst_free_vars D L M).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Fixpoint FV_L (L: list (var * ty * te_LF)) :=
+match L with
+| nil => \{}
+| (v, A, M) :: L' => used_vars_te_LF M \u FV_L L'
+end.
+
+Lemma notin_FV_notin_elem:
+forall x L,
+  x \notin FV_L L ->
+  forall a b c, Mem (a,b,c) L -> x \notin used_vars_te_LF c.
+induction L; intros; simpl in *.
+rewrite Mem_nil_eq in *; contradiction.
+rewrite Mem_cons_eq in H0; destruct H0; [inversion H0; subst | ].
+rewrite notin_union in H; destruct H; auto.
+destruct a; destruct p; rewrite notin_union in H; destruct H;
+apply IHL with (a:=a0) (b:=b); auto.
 Qed.
 
-Lemma subst_free_vars_unbox:
-forall D L M,
-  subst_free_vars D L (unbox_LF M) = unbox_LF (subst_free_vars D L M).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Lemma SL_extend:
+forall M L0 x A N,
+  x \notin FV_L L0 ->
+  ~Mem x (map fst_ (map fst_ L0)) ->
+  SL ((x, A, N) :: L0) M =
+  [N // fte x](SL L0 M).
+induction M; intros; simpl in *;
+try rewrite IHM || (rewrite IHM1; try rewrite IHM2); auto.
+destruct v; simpl; repeat case_if; auto.
+rewrite NotMem_find_var; auto; simpl; case_if; auto.
+destruct (Mem_dec var (map fst_ (map fst_ L0)) v);
+try apply eq_var_dec; [ | rewrite NotMem_find_var]; auto;
+simpl; repeat case_if; auto.
+apply Mem_find_var in m; destruct m as (a, (b, m)); rewrite m; simpl.
+rewrite closed_subst_t_free_LF; auto.
+apply notin_FV_notin_elem with L0 v a; eauto.
+apply find_var_Mem; eauto.
 Qed.
 
-Lemma subst_free_vars_here:
-forall D L M,
-  subst_free_vars D L (here_LF M) = here_LF (subst_free_vars D L M).
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Theorem main_theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  forall L,
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Red c b) ->
+    Red (SL L M) A.
+intros G Gamma M A LC HT; induction HT; intros.
+(* hyp *)
+apply SL_hyp with G Gamma; auto; constructor; auto.
+(* lam *)
+unfold open_LF in *;
+assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u
+       from_list (map fst_ (map fst_ L0)) \u FV_L L0) by apply Fresh;
+destruct H4.
+assert (forall V, Red V A -> lc_t_LF V ->
+           Red (SL ((x, A, V) :: L0) [hyp_LF (fte x) // bte 0]M) B).
+intros; apply H0; auto.
+apply lc_t_subst_t_LF_bound; [ constructor | inversion LC]; auto.
+rew_map in *; simpl; rewrite <-  H1; rew_concat; auto.
+intros; rewrite Mem_cons_eq in *; destruct H7.
+inversion H7; subst; auto.
+apply H2 with a b; auto.
+intros; rewrite Mem_cons_eq in *; destruct H7.
+inversion H7; subst; auto.
+apply H3 with a ; auto.
+simpl in *; intros; apply property_3.
+constructor; auto; constructor; apply lc_SL; auto; inversion LC; auto.
+constructor.
+intros; inversion H6; subst; [ | inversion H12];
+rewrite subst_t_neutral_free_LF with (v:=x); auto.
+replace ([N // fte x]([hyp_LF (fte x) // bte 0](SL L0 M))) with
+  (SL ((x, A, N)::L0) [hyp_LF (fte x) // bte 0]M).
+apply H5; auto.
+rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
+rewrite SL_extend; auto; apply notin_Mem; auto.
+(* appl *)
+simpl in *; inversion LC; subst; apply IHHT1; auto; apply lc_SL; auto.
+(* box *)
+simpl in *; inversion LC; subst; apply property_3.
+constructor; constructor; apply lc_SL; auto.
+constructor.
+intros; inversion H2; subst.
+apply IHHT; auto; rew_concat in *; rewrite <- H; permut_simpl.
+inversion H6.
+(* unbox *)
+simpl in *;
+inversion LC; subst; apply IHHT; auto.
+(* unbox-fetch *)
+simpl in *;
+inversion LC; subst; apply IHHT; auto;
+rewrite <- H0; apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
+(* here *)
+inversion LC; subst; simpl in *; intros.
+apply H5; [ | apply lc_SL]; auto.
+(* get-here *)
+inversion LC; subst; simpl in *; intros.
+apply H6; [ | apply lc_SL]; auto.
+apply IHHT; auto.
+rewrite <- H0.
+apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
+(* letdia *)
+(* letdia-get *)
 Qed.
 
-Lemma subst_free_vars_letdia:
-forall D L M N,
-  subst_free_vars D L (letdia_LF M N) =
-  letdia_LF (subst_free_vars D L M) (subst_free_vars D L N) .
-induction D; intros; simpl in *; eauto;
-destruct a; destruct L; auto; destruct p; destruct p; rewrite IHD; simpl; auto.
+Lemma lc_t_n_LF_subst_t:
+forall N M n,
+lc_t_n_LF n M ->
+lc_t_n_LF n (subst_t_LF M (bte n) N) ->
+lc_t_n_LF (S n) N.
+induction N; intros; simpl in *; try destruct v; constructor;
+repeat case_if; try inversion H1; subst; try omega;
+inversion H0; subst; eauto.
+apply IHN with (M:=M); eauto; apply closed_t_succ_LF; auto.
 Qed.
-
-(* !!! *)
-Lemma lc_t_subst_free_vars:
-forall L D k M,
-  (forall G Gamma N, Mem (G, Gamma, N) L -> lc_t_LF N) ->
-  lc_t_n_LF k M ->
-  lc_t_n_LF k (subst_free_vars D L M).
-Admitted.
-
-(* !!! *)
-Lemma subst_t_bound_subst_free_vars:
-forall L D M v k,
-  ~ Mem v (map fst_ D) ->
-  [hyp_LF (fte v) // bte k](subst_free_vars D L M) =
-  subst_free_vars D L ([hyp_LF (fte v) // bte k] M).
-Admitted.
 
 Lemma types_LF_lc_t_LF:
 forall G Gamma M A,
   G |= Gamma |- M ::: A -> lc_t_LF M.
-intros; induction H; simpl in *; constructor; eauto.
-Admitted.
-
-Lemma subst_typing_lc:
-forall L G G0 Gamma M,
-  subst_typing L G ->
-  Mem (G0, Gamma, M) L ->
-  lc_t_LF M.
-induction L; destruct G; simpl; intros.
-rewrite Mem_nil_eq in H0; contradiction.
-contradiction.
-destruct a; destruct p; contradiction.
-destruct a; destruct p; destruct p0;
-rewrite Mem_cons_eq in *; destruct H0; destruct H.
-inversion H0; subst.
-apply types_LF_lc_t_LF in H; auto.
-eapply IHL with (G:=G); eauto.
+intros; induction H; constructor; try apply IHHT;
+unfold open_LF in *; auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H1;
+assert (x \notin L) by auto;
+specialize H0 with x; apply H0 in H1;
+apply lc_t_n_LF_subst_t in H0; auto; constructor.
 Qed.
 
-Lemma subst_free_vars_type:
-forall G Gamma M A L G',
-  G |= Gamma |- M ::: A ->
-  concat (Gamma::G) *=* G' ->
-  subst_typing L G' ->
-  G |= Gamma |- subst_free_vars G' L M ::: A.
-Admitted.
-
-Lemma map_permut_fst:
-forall (G: list (var * ty)) G',
-  G *=* G' -> map fst_ G *=* map fst_ G'.
-Admitted.
-
-Theorem subst_types_reducible:
-forall M G Gamma A L G'
-  (H_lc: lc_t_LF M)
-  (HT: G |= Gamma |- M ::: A)
-  (HPermut: concat (Gamma :: G) *=* G')
-  (HRed: red_list L G')
-  (HRedType: subst_typing L G'),
-  Red (subst_free_vars G' L M) A.
-intros; generalize dependent L; generalize dependent G';
-induction HT; intros; inversion H_lc; subst; rew_app in *; rew_concat in *;
-simpl in *.
-(* hyp *)
-apply subst_free_vars_hyp_Red; auto.
-apply ok_LF_permut with (G:=concat (Gamma::G)); unfold ok_Bg_LF in Ok; auto.
-apply Mem_permut with (l:=Gamma ++ concat G); auto;
-rewrite Mem_app_or_eq; left; auto.
-(* lam *)
-intros; rewrite subst_free_vars_lam; apply property_3.
-repeat constructor; auto; apply lc_t_subst_free_vars; auto.
-intros; eapply subst_typing_lc; eauto.
-constructor.
-intros; inversion H1; subst; [ | inversion H8].
-assert (exists x, x\notin L \u from_list (map fst_ G')
-       \u used_vars_te_LF (subst_free_vars G' L0 M))
-  by apply Fresh. destruct H2.
-unfold open_LF in *; rewrite subst_t_neutral_free_LF with (v:=x).
-rewrite subst_t_bound_subst_free_vars.
-specialize H0 with x L0 G';
-assert (x \notin L) as HH by eauto.
-apply H0 with ((x, A)::G') ((G0, Gamma0, N)::L0) in HH; simpl in *;
-auto.
-apply lc_t_subst_t_LF_bound; auto; constructor.
-rew_app; rew_concat; rewrite HPermut; auto.
-apply notin_Mem; rew_concat in H2; eauto.
-eauto.
-(* appl *)
-rewrite subst_free_vars_appl; eapply IHHT1 with (G:=G)(Gamma:=Gamma); eauto.
-apply lc_t_subst_free_vars; auto; intros; eapply subst_typing_lc; eauto.
-eapply subst_free_vars_type; auto.
-(* box *)
-apply property_3.
-constructor; apply lc_t_subst_free_vars; auto;
-intros; eapply subst_typing_lc; eauto.
-constructor.
-intros. inversion H; subst.
-rewrite subst_free_vars_box in H0; inversion H0; subst.
-eapply IHHT; eauto.
-rew_app; rewrite <- HPermut; auto.
-rewrite subst_free_vars_box in H3; inversion H3.
-(* unbox *)
-rewrite subst_free_vars_unbox; eapply IHHT; eauto.
-rewrite subst_free_vars_unbox; apply IHHT; auto.
-rewrite <- HPermut; rew_concat; permut_simpl;
-apply PPermut_concat_permut in H; rewrite <- H; rew_concat; permut_simpl.
-(* here and letdia cases - skip *)
-skip. skip. skip. skip.
+Theorem SN_Lang:
+forall G M A,
+  emptyEquiv_LF G |= nil |- M ::: A ->
+  SN M.
+intros; apply property_1 with A.
+apply types_LF_lc_t_LF in H; auto.
+apply main_theorem with (L:=nil) in H.
+rewrite SL_nil in H; auto.
+apply types_LF_lc_t_LF in H; auto.
+rew_concat; rew_map; clear H M A.
+induction G; simpl; rew_concat; auto.
+intros; rewrite Mem_nil_eq in *; contradiction.
+intros; rewrite Mem_nil_eq in *; contradiction.
 Qed.
