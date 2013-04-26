@@ -116,7 +116,7 @@ Qed.
 (* For every set of variables, we can generate a variable that is
    not within that set *)
 Lemma Fresh:
-forall (L: fset var), exists w0, w0 \notin L.
+forall (L: fset var), {w0 : var | w0 \notin L}.
 intro;
 exists (var_gen L);
 apply var_gen_spec.

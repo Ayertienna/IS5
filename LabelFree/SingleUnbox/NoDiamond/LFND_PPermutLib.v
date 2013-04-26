@@ -264,6 +264,18 @@ Qed.
 
 Hint Resolve PPermut_LF_nil_impl PPermut_LF_nil_contr.
 
+Lemma PPermut_LF_Mem_T:
+forall G G' X,
+  G ~=~ G' ->
+  Mem X G ->
+  { X' | X' *=* X /\ Mem X' G}.
+induction G; intros.
+assert False; [rewrite Mem_nil_eq in H0; auto | contradiction].
+apply Mem_cons_spec in H0.
+destruct H0; subst.
+  exists a; split; auto; apply Mem_here.
+Admitted. (* !!! *)
+
 (* Based on Sorting/Permutation/Permutation_ind_bis *)
 Theorem PPermut_LF_ind_bis :
  forall P : list ctx_LF -> list ctx_LF -> Prop,
@@ -433,6 +445,16 @@ exists hd; exists tl; split; [symmetry | ]; auto.
 apply Mem_here.
 Qed.
 
+(* !!! *)
+Lemma PPermut_LF_split_head_T:
+forall G G' Gamma,
+  Gamma :: G ~=~ G' ->
+  { t |
+        Gamma *=* (fst (fst t)) /\
+        G' = (snd (fst t)) & (fst (fst t)) ++ (snd t)}.
+Admitted.
+
+
 Lemma PPermut_LF_split_neq:
 forall G G' Gamma Gamma',
   G & Gamma ~=~ G' & Gamma' ->
@@ -453,6 +475,15 @@ inversion Hb; subst.
 exists Gamma''; exists GH; exists GT; split;
 [symmetry | rew_app]; auto.
 Qed.
+
+(* !!! *)
+Lemma PPermut_LF_split_neq_T:
+forall G G' Gamma Gamma',
+  G & Gamma ~=~ G' & Gamma' ->
+  ~Gamma *=* Gamma' ->
+  { t | fst (fst t) *=* Gamma' /\
+        G = snd (fst t) & fst (fst t) ++ (snd t)}.
+Admitted.
 
 Lemma PPermut_LF_swap2:
 forall C C' G,
