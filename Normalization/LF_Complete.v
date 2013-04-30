@@ -420,7 +420,6 @@ intros; inversion H; subst; auto.
 inversion H2.
 Qed.
 
-
 Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
                      option (var * ty * te_LF) :=
 match L with
@@ -667,15 +666,42 @@ apply notin_FV_notin_elem with L0 v a; eauto.
 apply find_var_Mem; eauto.
 Qed.
 
+(*
+Lemma reducible_letdia:
+forall B M N A,
+  lc_t_n_LF 1 N ->
+  lc_t_LF M ->
+  Red M (<*>A) ->
+  (forall P, lc_t_LF P ->
+             Red P A ->
+             Red ([P//bte 0] N) B) ->
+  Red (letdia_LF M N) B.
+intros; simpl in *.
+assert (SN (ContAppl (ConsK (IdK A) N A B) M)).
+apply H1 with B.
+constructor; auto; constructor.
+constructor; constructor.
+intros; simpl in *. skip.
+simpl in *.
+Admitted.
+*)
+
 Theorem main_theorem:
 forall G Gamma M A,
   lc_t_LF M ->
   G |= Gamma |- M ::: A ->
-  forall L,
+  forall K B, ContTyping K A B -> SN (ContAppl K (here_LF M)).
+intros G Gamma M A LC HT; induction HT; intros.
+
+
+
+
+(*
+ forall L,
     concat(Gamma::G) *=* map fst_ L ->
     (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
     (forall a b c, Mem (a,b,c) L -> Red c b) ->
-    Red (SL L M) A.
+    Red (SL L M) A. *)
 intros G Gamma M A LC HT; induction HT; intros.
 (* hyp *)
 apply SL_hyp with G Gamma; auto; constructor; auto.
@@ -731,6 +757,22 @@ apply IHHT; auto.
 rewrite <- H0.
 apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
 (* letdia *)
+unfold open_LF in *; simpl; inversion LC; subst.
+apply reducible_letdia with A.
+apply IHHT; auto.
+intros.
+assert (exists x, x\notin L) by apply Fresh.
+destruct H4.
+rewrite subst_t_neutral_free_LF with (v:=x); auto.
+replace ([P // fte x]([hyp_LF (fte x) // bte 0](SL L0 N))) with
+  (SL ((x, A, P)::L0) [hyp_LF (fte x) // bte 0]N).
+apply H with (G':=((x,A)::nil)::G); auto.
+skip. rew_map; rewrite <- H0; rew_concat; simpl; permut_simpl.
+skip. skip.
+rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
+rewrite SL_extend; auto.
+skip. skip. skip. skip.
+rewrite
 (* letdia-get *)
 Qed.
 

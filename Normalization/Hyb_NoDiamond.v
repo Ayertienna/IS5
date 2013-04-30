@@ -331,17 +331,38 @@ match L with
 | (v, A, M) :: L' => ~ Mem v U /\ OkL L' (v::U)
 end.
 
+Lemma OkL_permut:
+forall L U1 U2,
+  U1 *=* U2 ->
+  OkL L U1 -> OkL L U2.
+induction L; intros; [constructor | destruct a; destruct p];
+inversion H0; subst; constructor.
+intro; elim H1; apply Mem_permut with (l:=U2); [symmetry | ]; auto.
+apply IHL with (U1:=v::U1); auto.
+Qed.
+
+Lemma OkL_weaken:
+forall L U w,
+  OkL L (w::U) -> OkL L U.
+induction L; intros; simpl in *; auto; destruct a; destruct p; destruct H;
+split.
+intro; elim H; rewrite Mem_cons_eq; right; auto.
+apply IHL with w. apply OkL_permut with (U1:=v::w::U); auto; permut_simpl.
+Qed.
+
 Lemma OkL_used_notin:
 forall L U x A M,
   OkL L U ->
   Mem x U ->
   ~ Mem (x, A, M) L.
-Admitted.
-
-Lemma OkL_weaken:
-forall L U w,
-  OkL L (w::U) -> OkL L U.
-Admitted.
+induction L; intros.
+rewrite Mem_nil_eq; tauto.
+intro; destruct a; destruct p; rewrite Mem_cons_eq in *; inversion H; subst;
+destruct H1.
+inversion H1; subst; contradiction.
+specialize IHL with U x A M.
+apply OkL_weaken in H3; apply IHL in H3; auto.
+Qed.
 
 Lemma Mem_Red_Hyp:
 forall L v A M W,
@@ -646,58 +667,71 @@ apply find_world_Mem in m; apply Mem_fst_ in m; contradiction.
 Qed.
 
 Lemma OkL_fresh:
-forall L x a V,
-  OkL L nil->
-  x \notin FV_L L ->
-  OkL ((x, a, V):: L) nil.
-Admitted.
+forall L x U,
+  OkL L U->
+  x \notin from_list (map fst_ (map fst_ L)) \u from_list U ->
+  OkL L (x::U).
+induction L; intros; [constructor | destruct a; destruct p];
+simpl in *; destruct H; split.
+intro; elim H; rewrite Mem_cons_eq in *; destruct H2; subst; auto;
+repeat rewrite notin_union in *; destruct H0; destruct H0;
+rew_map; simpl; rewrite from_list_cons; rewrite in_union; left;
+rewrite in_singleton; auto.
+apply OkL_permut with (U1:=x::v::U); [permut_simpl | apply IHL]; auto.
+rew_map in *; simpl in *;
+repeat rewrite from_list_cons in *; repeat rewrite notin_union in *;
+simpl in *; destruct H0; destruct H0; split; auto.
+Qed.
 
 Lemma SL_subst_w:
 forall M L W w k,
   (forall a b c, Mem (a, b, c) L -> lc_w_Hyb c) ->
-  {{w // bwo k}}(SL L W M) =
-  SL L W {{w//bwo k}}M.
+  ~ Mem w (map snd_ W) ->
+  {{fwo w // bwo k}}(SL L W M) =
+  SL L W {{fwo w//bwo k}}M.
 induction M; intros; simpl; auto;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2));
 eauto.
-destruct v; simpl; auto.
-destruct (Mem_dec var (map fst_ (map fst_ L)) v).
-apply eq_var_dec.
-apply Mem_find_var in m; destruct m; destruct H0;
-rewrite H0; apply find_var_Mem in H0;
+destruct v; simpl; auto;
+destruct (Mem_dec var (map fst_ (map fst_ L)) v);
+[apply eq_var_dec | |].
+apply Mem_find_var in m; destruct m; destruct H1;
+rewrite H1; apply find_var_Mem in H1;
 rewrite closed_subst_w_Hyb_bound with (n:=0); auto;
 try omega; apply H with v x; auto.
 apply NotMem_find_var in n; rewrite n; simpl; auto.
-repeat case_if.
-Admitted.
 
-(*
-Lemma rename_world_subst_t:
-forall M w0 w1 N v,
-  {{fwo w0 // fwo w1}} ([N // v] M) =
-  [{{fwo w0//fwo w1}}N//v] {{fwo w0//fwo w1}}M.
-induction M; intros; simpl in *; repeat case_if; auto;
-try erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
+case_if.
+  rewrite find_world_bound_None; rewrite NotMem_find_world; auto; simpl;
+  case_if; rewrite IHM; eauto.
+  destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto.
+    rewrite IHM; eauto.
+    destruct (Mem_dec var (map snd_ W) v); [apply eq_var_dec | |];
+    [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
+    [ | rewrite IHM; eauto];
+    apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
+    case_if; rewrite IHM; auto.
+case_if.
+  rewrite find_world_bound_None; rewrite NotMem_find_world; auto; simpl;
+  case_if; rewrite IHM; eauto.
+  destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto.
+    rewrite IHM; eauto.
+    destruct (Mem_dec var (map snd_ W) v); [apply eq_var_dec | |];
+    [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
+    [ | rewrite IHM; eauto];
+    apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
+    case_if; rewrite IHM; auto.
+case_if.
+  rewrite find_world_bound_None; rewrite NotMem_find_world; auto; simpl;
+  case_if; rewrite IHM1; try rewrite IHM2; eauto.
+  destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto.
+    rewrite IHM1; try rewrite IHM2; eauto.
+    destruct (Mem_dec var (map snd_ W) v); [apply eq_var_dec | |];
+    [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
+    [ | rewrite IHM1; try rewrite IHM2; eauto];
+    apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
+    case_if; rewrite IHM1; try rewrite IHM2; auto.
 Qed.
-
-Lemma rename_reorder:
-forall M w0 w1 k,
-{{fwo w1 // fwo w0}}({{fwo w0 // bwo k}}M)  =
-{{fwo w1 // bwo k}} ({{fwo w1 // fwo w0}} M).
-induction M; intros; simpl in *; repeat case_if; auto;
-try erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto.
-Qed.
-
-Lemma reorder':
-forall M ctx'' w0 k w1,
-  ctx'' <> fwo w0 ->
-  {{ctx'' // bwo k}}({{fwo w1 // fwo w0}}M) =
-  {{fwo w1 // fwo w0}}({{ctx'' // bwo k}}M).
-induction M; intros; simpl in *; repeat case_if; auto;
-try erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto;
-destruct ctx''; simpl in *; auto; discriminate.
-Qed.
-*)
 
 Theorem main_theorem:
 forall G Gamma M A w,
@@ -729,7 +763,8 @@ assert (forall V, Red V A -> lc_t_Hyb V -> lc_w_Hyb V ->
 intros; apply H with ((x,A)::Gamma0) w0; auto.
 apply lc_t_subst_t_Hyb_bound; [ constructor | inversion LC_t]; auto.
 apply lc_w_subst_t_Hyb; [ constructor | inversion LC_w]; auto.
-apply OkL_fresh; auto.
+constructor; [rewrite Mem_nil_eq; tauto | apply OkL_fresh]; auto;
+rewrite notin_union; rewrite from_list_nil; split; auto.
 rew_map in *; simpl; rewrite <-  H1; rew_concat; auto.
 intros; rewrite Mem_cons_eq in *; destruct H9.
 inversion H9; subst; auto.
@@ -777,6 +812,7 @@ inversion LC_t; subst; apply lc_t_subst_w_Hyb; auto.
 inversion LC_w; subst; apply lc_w_subst_Hyb; auto.
 rew_concat; rew_map; rewrite <- H1; rew_map; rew_concat; permut_simpl.
 rewrite SL_extend_W; auto; apply notin_Mem; auto.
+apply notin_Mem; auto.
 (* unbox *)
 simpl in *; inversion LC_t; inversion LC_w; subst;
 destruct (find_world W (fwo w0)); try destruct p;
