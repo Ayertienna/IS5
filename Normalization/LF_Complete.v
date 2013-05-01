@@ -25,6 +25,37 @@ eapply IHM; eauto; apply closed_t_succ_LF; auto.
 eapply IHM2; eauto; apply closed_t_succ_LF; auto.
 Qed.
 
+Lemma lc_t_subst_t_LF_bound:
+forall M N n,
+  lc_t_n_LF n N ->
+  lc_t_n_LF (S n) M ->
+  lc_t_n_LF n ([N//bte n] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+assert (n <> v0) by (intro; subst; elim H1; auto); omega.
+eapply IHM; auto; apply closed_t_succ_LF; auto.
+eapply IHM2; auto; apply closed_t_succ_LF; auto.
+Qed.
+
+Lemma lc_t_step_LF:
+forall M N,
+  lc_t_LF M ->
+  M |-> N ->
+  lc_t_LF N.
+induction M; intros; inversion H0; inversion H; subst; try constructor; eauto.
+apply lc_t_subst_t_LF_bound; auto.
+eapply IHM1; eauto.
+eapply IHM; eauto.
+eapply IHM; eauto.
+unfold open_LF; apply lc_t_subst_t_LF_bound; auto.
+eapply IHM1; eauto.
+Qed.
+
+Require Export Relations.
+Definition multisteps := clos_refl_trans_1n _ step_LF.
+Notation " M |->* N " := (multisteps M N) (at level 70).
+
+(*
 Definition normal_form (M: te_LF) := value_LF M.
 
 Inductive neutral_LF: te_LF -> Prop :=
@@ -59,6 +90,18 @@ Inductive SN: te_LF -> Prop :=
 | step_SN: forall M,
              (forall N, M |-> N -> SN N) ->
              SN M.
+*)
+
+Lemma value_no_step_LF:
+forall M,
+  value_LF M ->
+  forall N , ~ M |-> N.
+induction M; intros; intro;
+try inversion H; inversion H0; subst;
+eapply IHM; eauto.
+Qed.
+
+Definition WT (M: te_LF) := exists V, value_LF V /\ M |->* V.
 
 Inductive Cont :=
 | IdK: ty -> Cont
@@ -69,25 +112,17 @@ Inductive Cont :=
 Inductive ContTyping: Cont -> ty -> ty -> Prop:=
 | IdKT: forall A, ContTyping (IdK A) A A
 | ConsKT:
-    forall K A B,
-      ContTyping K A B ->
-      forall N C,
-        ContTyping (ConsK K N B C) A C
+    forall K B C,
+      ContTyping K B C ->
+      forall N A,
+        ContTyping (ConsK K N A B) A C
 .
 
 Fixpoint ContAppl (K: Cont) (M: te_LF) : te_LF :=
 match K with
 | IdK A => here_LF M
-| ConsK K' N A B => ContAppl K' (here_LF (letdia_LF M N))
+| ConsK K' N A B => ContAppl K' (letdia_LF M (here_LF N))
 end.
-
-Definition ContReduction (K1: Cont) (K2: Cont) :=
-forall M, ContAppl K1 M |-> ContAppl K2 M.
-
-Inductive ContSN: Cont -> Prop :=
-| contSN: forall K1,
-         (forall K2, ContReduction K1 K2 -> ContSN K2) ->
-         ContSN K1.
 
 Inductive ContLC: Cont -> Prop :=
 | ContLC_nil: forall A, ContLC (IdK A)
@@ -95,9 +130,59 @@ Inductive ContLC: Cont -> Prop :=
                  ContLC K -> lc_t_n_LF 1 N -> ContLC (ConsK K N A B)
 .
 
+Lemma Step_KApplStep:
+forall K M M',
+  ContLC K ->
+  lc_t_LF M ->
+  M |-> M' ->
+  ContAppl K M |-> ContAppl K M'.
+induction K; intros; simpl in *.
+constructor; auto.
+inversion H; subst.
+assert ((letdia_LF M (here_LF t)) |-> (letdia_LF M' (here_LF t))).
+   constructor; auto; constructor; auto.
+apply IHK in H2; auto.
+constructor; auto; constructor; auto.
+Qed.
+
+Inductive neutral_LF: te_LF -> Prop :=
+| nHyp: forall n, neutral_LF (hyp_LF n)
+| nAppl: forall M N, neutral_LF (appl_LF M N)
+| nUnbox: forall M, neutral_LF (unbox_LF M)
+| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
+| nLetd: forall M N, neutral_LF (letdia_LF M N)
+.
+
+Lemma neutral_ContAppl:
+forall K M,
+  neutral_LF M ->
+  neutral_LF (ContAppl K M).
+induction K; intros; simpl in *.
+constructor; auto.
+apply IHK; constructor; constructor.
+Qed.
+
+Lemma neutral_not_value_LF:
+forall M,
+  neutral_LF M -> ~value_LF M.
+induction M; intros; intro; inversion H0; auto; subst; inversion H; subst.
+apply IHM in H3; contradiction.
+Qed.
+
+Lemma value_ContAppl:
+forall K M,
+  value_LF (ContAppl K M) ->
+  value_LF M /\ exists A, K = IdK A.
+induction K; intros; simpl in *.
+inversion H; subst; split; auto; eexists; auto.
+assert (neutral_LF (ContAppl K (letdia_LF M (here_LF t)))).
+apply neutral_ContAppl; constructor.
+apply neutral_not_value_LF in H0; contradiction.
+Qed.
+
 Fixpoint Red (M: te_LF) (A: ty) : Prop :=
 match A with
-| tvar => SN M
+| tvar => WT M
 | tarrow A1 A2 =>
   forall N
          (H_lc: lc_t_LF N)
@@ -110,17 +195,127 @@ match A with
     ContTyping K A1 B ->
 (* Definition of reducible continuation is embedded *)
     (forall V, Red V A1 -> lc_t_LF V ->
-               SN (ContAppl K (here_LF V))) ->
-    SN (ContAppl K M)
+               WT (ContAppl K (here_LF V))) ->
+    WT (ContAppl K M)
 end.
 
+Lemma step_LF_unique:
+forall M N1 N2,
+  M |-> N1 ->
+  M |-> N2 ->
+  N1 = N2.
+induction M; intros; inversion H; inversion H0; subst; auto.
+inversion H6; subst; auto.
+inversion H11.
+inversion H6.
+specialize IHM1 with M' M'0; rewrite IHM1; auto.
+inversion H4; subst; auto.
+inversion H6.
+inversion H3.
+specialize IHM with M' M'0; rewrite IHM; auto.
+specialize IHM with M' M'0; rewrite IHM; auto.
+inversion H7; subst; auto.
+inversion H12; subst. apply value_no_step_LF in H5; auto; contradiction.
+inversion H6; subst. apply value_no_step_LF in H5; auto; contradiction.
+specialize IHM1 with M' M'0; rewrite IHM1; auto.
+Qed.
 
 Definition ContReducible K A B:=
   ContTyping K A B ->
     (forall V, Red V A -> lc_t_LF V ->
-               SN (ContAppl K (here_LF V))).
+               WT (ContAppl K (here_LF V))).
+
+(* CR 2: head expansion *)
+Theorem property_2:
+forall A M M'
+  (HRed: Red M A)
+  (H_lc_t: lc_t_LF M)
+  (HStep: M |-> M'),
+  Red M' A.
+induction A; intros; simpl in *; intros.
+(* base type *)
+unfold WT in *; destruct HRed as (V, (H0, H1)).
+exists V; split; auto.
+inversion H1; subst. apply value_no_step_LF with (N:=M') in H0; contradiction.
+assert (y = M'); subst; auto.
+apply step_LF_unique with M; auto.
+(* arrow type *)
+apply IHA2 with (M:=appl_LF M N); auto.
+constructor; auto.
+constructor; auto.
+(* box type *)
+apply IHA with (M:=unbox_LF M); auto; constructor; eauto.
+(* dia type *)
+unfold WT in *.
+specialize HRed with K B.
+assert (ContLC K) by auto;
+apply HRed in H; auto.
+destruct H as (V, (H, H3)); exists V; split; auto.
+inversion H3; subst.
+apply value_ContAppl in H; destruct H.
+apply value_no_step_LF in HStep; auto; contradiction.
+assert (ContAppl K M |-> ContAppl K M').
+apply Step_KApplStep; auto.
+assert (ContAppl K M' = y); subst; auto.
+apply step_LF_unique with (ContAppl K M); auto.
+Qed.
+
+Lemma head_expansion_star:
+forall A M M'
+  (HRed: Red M A)
+  (H_lc_t: lc_t_LF M)
+  (HStep: M |->* M'),
+  Red M' A.
+intros; induction HStep; [ assumption | ].
+apply IHHStep.
+Focus 2.
+apply lc_t_step_LF with x; auto.
+apply property_2 with x; auto.
+Qed.
+
+Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
+                     option (var * ty * te_LF) :=
+match L with
+| nil => None
+| (v, A, M) :: L' =>
+  if (eq_var_dec x v) then Some (v, A, M) else find_var L' x
+end.
+
+Fixpoint SL (L: list (var * ty * te_LF)) M :=
+match M with
+| hyp_LF (bte v) => M
+| hyp_LF (fte v) =>
+  let x := find_var L v in
+  match x with
+    | Some (v, A, M) => M
+    | None => hyp_LF (fte v)
+  end
+| lam_LF A M => lam_LF A (SL L M)
+| appl_LF M N => appl_LF (SL L M) (SL L N)
+| box_LF M => box_LF (SL L M)
+| unbox_LF M => unbox_LF (SL L M)
+| here_LF M => here_LF (SL L M)
+| letdia_LF M N => letdia_LF (SL L M) (SL L N)
+end.
+
+Theorem main_theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+ forall L,
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Red c b) ->
+  forall K B,
+    ContTyping K A B ->
+    ContReducible K A B ->
+    WT (ContAppl K (here_LF (SL L M))).
+intros G Gamma M A LC HT; induction HT; unfold ContReducible in *;
+intros; simpl in *.
+Focus 9.
 
 
+(*
 Lemma lc_t_subst_t_LF_bound:
 forall M N n,
   lc_t_n_LF n N ->
@@ -227,10 +422,10 @@ forall K M M',
 induction K; intros; simpl in *.
 constructor; auto.
 inversion H; subst.
-assert (here_LF (letdia_LF M t) |-> here_LF (letdia_LF M' t)).
-   constructor; constructor; auto.
+assert ((letdia_LF M (here_LF t)) |-> (letdia_LF M' (here_LF t))).
+   constructor; auto; constructor; auto.
 apply IHK in H2; auto.
-constructor; constructor; auto.
+constructor; auto; constructor; auto.
 Qed.
 
 (* CR 2 *)
@@ -274,8 +469,8 @@ forall K M,
 induction K; intros; simpl in *.
 constructor; auto.
 inversion H; subst.
-apply IHK with (M:=(here_LF (letdia_LF M t))) in H3; auto;
-constructor; constructor; auto.
+apply IHK with (M:=(letdia_LF M (here_LF t))) in H3; auto;
+constructor; auto; constructor; auto.
 Qed.
 
 Lemma neutral_ContAppl:
@@ -301,13 +496,11 @@ forall K M N,
   (exists M', N = ContAppl K M' /\ M |-> M').
 induction K; intros; simpl in *.
 inversion H0; subst; eexists; split; eauto.
-destruct IHK with (M:=(here_LF (letdia_LF M t))) (N:=N).
+destruct IHK with (M:=(letdia_LF M (here_LF t))) (N:=N).
 constructor; constructor.
 auto.
 destruct H1.
-inversion H2; subst; inversion H5; subst.
-inversion H; subst; apply neutral_not_value in H3; contradiction.
-inversion H5; subst.
+inversion H2; subst.
 inversion H; subst; apply neutral_not_value in H3; contradiction.
 eexists; split; eauto.
 Qed.
@@ -666,69 +859,86 @@ apply notin_FV_notin_elem with L0 v a; eauto.
 apply find_var_Mem; eauto.
 Qed.
 
-(*
-Lemma reducible_letdia:
-forall B M N A,
-  lc_t_n_LF 1 N ->
-  lc_t_LF M ->
-  Red M (<*>A) ->
-  (forall P, lc_t_LF P ->
-             Red P A ->
-             Red ([P//bte 0] N) B) ->
-  Red (letdia_LF M N) B.
-intros; simpl in *.
-assert (SN (ContAppl (ConsK (IdK A) N A B) M)).
-apply H1 with B.
-constructor; auto; constructor.
-constructor; constructor.
-intros; simpl in *. skip.
-simpl in *.
+Lemma Red_appl:
+forall M N A B,
+lc_t_LF (appl_LF M N) -> Red M (A ---> B) -> Red N A -> Red (appl_LF M N) B.
+intros; simpl in *; apply H0; inversion H; auto.
+Qed.
+
+Lemma Red_unbo:
+forall M A,
+Red M ([*]A) -> Red (unbox_LF M) A.
+intros; simpl in *; auto.
+Qed.
+
+Lemma Red_here:
+forall N A,
+lc_t_LF N -> Red N A -> Red (here_LF N) (<*>A).
+intros; simpl in *; intros; apply H3; auto.
+Qed.
+
+Lemma SN_letdia:
+forall K M N,
+  SN M ->
+  SN (ContAppl K ([M // bte 0]N)) ->
+  SN (ContAppl K (here_LF (letdia_LF (here_LF M) N))).
 Admitted.
-*)
 
 Theorem main_theorem:
 forall G Gamma M A,
   lc_t_LF M ->
   G |= Gamma |- M ::: A ->
-  forall K B, ContTyping K A B -> SN (ContAppl K (here_LF M)).
-intros G Gamma M A LC HT; induction HT; intros.
-
-
-
-
-(*
  forall L,
     concat(Gamma::G) *=* map fst_ L ->
     (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
     (forall a b c, Mem (a,b,c) L -> Red c b) ->
-    Red (SL L M) A. *)
-intros G Gamma M A LC HT; induction HT; intros.
+  forall K B,
+    ContTyping K A B ->
+    ContReducible K A B ->
+    SN (ContAppl K (here_LF (SL L M))).
+intros G Gamma M A LC HT; induction HT; unfold ContReducible in *;
+intros.
 (* hyp *)
-apply SL_hyp with G Gamma; auto; constructor; auto.
+assert (lc_t_LF (SL L (hyp_LF (fte v)))) by
+  (apply lc_SL; auto; constructor);
+simpl in *;
+remember (match find_var L v with
+           | Some (_, _, M) => M
+           | None => hyp_LF (fte v)
+           end) as M';
+assert (Red M' A) by
+(subst; apply SL_hyp with G Gamma; auto; constructor; auto);
+apply H4 with (V:=M') in H3; auto.
+Focus 8.
+simpl.
+replace (ContAppl K (here_LF (letdia_LF (SL L0 M) (SL L0 N)))) with
+ (ContAppl (ConsK K (SL L0 N) A B) (SL L0 M)) by (simpl; auto).
+remember (ConsK K (SL L0 N) A B) as K'.
+
 (* lam *)
-unfold open_LF in *;
+unfold open_LF in *.
 assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u
        from_list (map fst_ (map fst_ L0)) \u FV_L L0) by apply Fresh;
-destruct H4.
-assert (forall V, Red V A -> lc_t_LF V ->
-           Red (SL ((x, A, V) :: L0) [hyp_LF (fte x) // bte 0]M) B).
-intros; apply H0; auto.
-apply lc_t_subst_t_LF_bound; [ constructor | inversion LC]; auto.
-rew_map in *; simpl; rewrite <-  H1; rew_concat; auto.
-intros; rewrite Mem_cons_eq in *; destruct H7.
-inversion H7; subst; auto.
-apply H2 with a b; auto.
-intros; rewrite Mem_cons_eq in *; destruct H7.
-inversion H7; subst; auto.
-apply H3 with a ; auto.
-simpl in *; intros; apply property_3.
+destruct H6.
+assert (SN (ContAppl K (here_LF (SL L0 [hyp_LF (fte x) // bte 0]M)))).
+apply H0 with B0; eauto.
+apply lc_t_subst_t_LF_bound; [constructor | inversion LC]; auto.
+rewrite <- H1.
+
+specialize H0 with x L K B0.
+apply H5; auto; [ | apply lc_SL; auto].
+simpl in *; intros; unfold open_LF in *;
+assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u
+       from_list (map fst_ (map fst_ L0)) \u FV_L L0) by apply Fresh;
+destruct H6; simpl in *; intros; apply property_3.
 constructor; auto; constructor; apply lc_SL; auto; inversion LC; auto.
 constructor.
-intros; inversion H6; subst; [ | inversion H12];
+intros; inversion H7; subst; [ | inversion H13];
 rewrite subst_t_neutral_free_LF with (v:=x); auto.
 replace ([N // fte x]([hyp_LF (fte x) // bte 0](SL L0 M))) with
   (SL ((x, A, N)::L0) [hyp_LF (fte x) // bte 0]M).
-apply H5; auto.
+
+(*apply H5; auto.
 rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
 rewrite SL_extend; auto; apply notin_Mem; auto.
 (* appl *)
@@ -773,8 +983,36 @@ rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
 rewrite SL_extend; auto.
 skip. skip. skip. skip.
 rewrite
-(* letdia-get *)
-Qed.
+
+Admitted.
+
+Lemma less_trivial_2:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  Red M A ->
+  forall K B,
+    ContTyping K A B ->
+    SN (ContAppl K (here_LF M)).
+Admitted.
+
+Lemma non_trivial:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  forall K B,
+    ContTyping K A B ->
+    SN (ContAppl K (here_LF M)).
+Admitted.
+*)
+
+(* Theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  forall K B, ContTyping K A B -> SN (ContAppl K (here_LF M)).
+intros G Gamma M A LC HT; induction HT; intros.
+*)
 
 Lemma lc_t_n_LF_subst_t:
 forall N M n,
@@ -785,6 +1023,7 @@ induction N; intros; simpl in *; try destruct v; constructor;
 repeat case_if; try inversion H1; subst; try omega;
 inversion H0; subst; eauto.
 apply IHN with (M:=M); eauto; apply closed_t_succ_LF; auto.
+apply IHN2 with (M:=M); eauto; apply closed_t_succ_LF; auto.
 Qed.
 
 Lemma types_LF_lc_t_LF:
@@ -796,19 +1035,34 @@ assert (exists x, x \notin L) by apply Fresh; destruct H1;
 assert (x \notin L) by auto;
 specialize H0 with x; apply H0 in H1;
 apply lc_t_n_LF_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H1;
+assert (x \notin L) by auto;
+specialize H0 with (((x, A) :: nil) :: G) x; apply H0 in H1;
+apply lc_t_n_LF_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H2;
+assert (x \notin L) by auto;
+specialize H0 with x; apply H0 in H2;
+apply lc_t_n_LF_subst_t in H2; auto; constructor.
 Qed.
 
 Theorem SN_Lang:
 forall G M A,
   emptyEquiv_LF G |= nil |- M ::: A ->
   SN M.
-intros; apply property_1 with A.
-apply types_LF_lc_t_LF in H; auto.
-apply main_theorem with (L:=nil) in H.
+intros.
+assert (lc_t_LF M).
+  apply types_LF_lc_t_LF in H; auto.
+assert (SN (ContAppl (IdK A) (here_LF M))).
+apply less_trivial_1 with (L:=nil) (K:=IdK A) (B:=A) in H; auto.
 rewrite SL_nil in H; auto.
-apply types_LF_lc_t_LF in H; auto.
-rew_concat; rew_map; clear H M A.
+rew_concat; rew_map; clear M A H H0;
 induction G; simpl; rew_concat; auto.
 intros; rewrite Mem_nil_eq in *; contradiction.
 intros; rewrite Mem_nil_eq in *; contradiction.
+constructor.
+unfold ContReducible; intros; simpl.
+repeat apply SN_N_SN_here; apply property_1 with (A:=A); auto.
+simpl in H1; apply SN_here; [constructor |]; auto; apply SN_here; auto;
+constructor; constructor; auto.
 Qed.
+*)
