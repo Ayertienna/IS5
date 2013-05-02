@@ -142,6 +142,17 @@ val subst_t_LF : te_LF -> vte -> te_LF -> te_LF
 
 val open_LF : te_LF -> te_LF -> te_LF
 
+type pPermut_LF =
+| PPermut_LF_nil
+| PPermut_LF_skip of ctx_LF list * ctx_LF list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+   * pPermut_LF
+| PPermut_LF_swap of (Variables.var, ty) prod list list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+| PPermut_LF_trans of ctx_LF list * ctx_LF list * ctx_LF list * pPermut_LF
+   * pPermut_LF
+
 val emptyEquiv_LF :
   (Variables.var, ty) prod list list -> (Variables.var, ty) prod list list
 
@@ -156,7 +167,7 @@ type types_LF =
 | T_box_LF of ctx_LF list * ctx_LF * te_LF * ty * types_LF
 | T_unbox_LF of ctx_LF list * ctx_LF * te_LF * ty * types_LF
 | T_unbox_fetch_LF of ctx_LF list * ctx_LF * ctx_LF * te_LF * ty * types_LF
-   * ctx_LF list
+   * ctx_LF list * pPermut_LF
 
 type value_LF =
 | Val_lam_LF of ty * te_LF

@@ -113,106 +113,106 @@ let append l1 l2 =
 
 type 'a set = __
 
-module type FsetSig = 
- sig 
-  type 'x fset 
-  
+module type FsetSig =
+ sig
+  type 'x fset
+
   val empty : 'a1 fset
-  
+
   val singleton : 'a1 -> 'a1 fset
-  
+
   val union : 'a1 fset -> 'a1 fset -> 'a1 fset
-  
+
   val inter : 'a1 fset -> 'a1 fset -> 'a1 fset
-  
+
   val remove : 'a1 fset -> 'a1 fset -> 'a1 fset
-  
+
   val from_list : 'a1 list -> 'a1 fset
  end
 
-module FsetImpl = 
- struct 
+module FsetImpl =
+ struct
   type 'a fset = 'a set
-  
+
   (** val build_fset : __ -> 'a1 set **)
-  
+
   let build_fset _ =
     __
-  
+
   (** val empty : 'a1 fset **)
-  
+
   let empty =
     build_fset __
-  
+
   (** val singleton : 'a1 -> 'a1 fset **)
-  
+
   let singleton x =
     build_fset __
-  
+
   (** val union : 'a1 fset -> 'a1 fset -> 'a1 fset **)
-  
+
   let union e f =
     build_fset __
-  
+
   (** val inter : 'a1 fset -> 'a1 fset -> 'a1 set **)
-  
+
   let inter e f =
     build_fset __
-  
+
   (** val remove : 'a1 fset -> 'a1 fset -> 'a1 set **)
-  
+
   let remove e f =
     build_fset __
-  
+
   (** val from_list : 'a1 list -> 'a1 fset **)
-  
+
   let from_list l =
     fold_right (fun x acc -> union (singleton x) acc) empty l
  end
 
-module type VariablesType = 
- sig 
-  type var 
-  
+module type VariablesType =
+ sig
+  type var
+
   val var_comp : var comparable
-  
+
   val var_comparable : var comparable
-  
+
   type vars = var FsetImpl.fset
-  
+
   val var_gen : vars -> var
-  
+
   val var_fresh : vars -> var
  end
 
-module Variables = 
- struct 
+module Variables =
+ struct
   type var = nat
-  
+
   (** val var_comp : var comparable **)
-  
+
   let var_comp =
     nat_comparable
-  
+
   (** val var_comparable : var comparable **)
-  
+
   let var_comparable =
     var_comp
-  
+
   type vars = var FsetImpl.fset
-  
+
   (** val var_gen_list : nat list -> nat **)
-  
+
   let var_gen_list l =
     plus (S O) (fold_right plus O l)
-  
+
   (** val var_gen : vars -> var **)
-  
+
   let var_gen e =
     var_gen_list (epsilon __)
-  
+
   (** val var_fresh : vars -> var **)
-  
+
   let var_fresh l =
     var_gen l
  end
@@ -346,6 +346,17 @@ let rec subst_t_LF m x n = match n with
 let open_LF m t =
   subst_t_LF t (Bte O) m
 
+type pPermut_LF =
+| PPermut_LF_nil
+| PPermut_LF_skip of ctx_LF list * ctx_LF list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+   * pPermut_LF
+| PPermut_LF_swap of (Variables.var, ty) prod list list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+| PPermut_LF_trans of ctx_LF list * ctx_LF list * ctx_LF list * pPermut_LF
+   * pPermut_LF
+
 (** val emptyEquiv_LF :
     (Variables.var, ty) prod list list -> (Variables.var, ty) prod list list **)
 
@@ -367,7 +378,7 @@ type types_LF =
 | T_box_LF of ctx_LF list * ctx_LF * te_LF * ty * types_LF
 | T_unbox_LF of ctx_LF list * ctx_LF * te_LF * ty * types_LF
 | T_unbox_fetch_LF of ctx_LF list * ctx_LF * ctx_LF * te_LF * ty * types_LF
-   * ctx_LF list
+   * ctx_LF list * pPermut_LF
 
 type value_LF =
 | Val_lam_LF of ty * te_LF
@@ -639,7 +650,7 @@ let rec main_theorem b c t t0 t1 l x =
         main_theorem (append g (Cons (gamma, Nil))) Nil m a h l x
       | _ -> assert false (* absurd case *))
   | T_unbox_LF (g, gamma, m, a, h) -> main_theorem g gamma m (Tbox a) h l x
-  | T_unbox_fetch_LF (g, gamma, gamma', m, a, h, g') ->
+  | T_unbox_fetch_LF (g, gamma, gamma', m, a, h, g', p) ->
     main_theorem (append g (Cons (gamma', Nil))) gamma m (Tbox a) h l x
 
 (** val sN_Lang :
@@ -649,4 +660,3 @@ let sN_Lang g m a x =
   property_1 a m
     (main_theorem (emptyEquiv_LF g) Nil m a x Nil (fun a0 b c _ ->
       assert false (* absurd case *)))
-

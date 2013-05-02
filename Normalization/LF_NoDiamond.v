@@ -617,7 +617,8 @@ inversion LC; auto.
 (* unbox-fetch *)
 simpl in *;apply IHHT; auto.
 inversion LC; auto.
-rewrite <- H0; apply PPermut_concat_permut; rewrite <- p; PPermut_LF_simpl.
+rewrite <- H0; apply PPermut_concat_permut.
+transitivityP (Gamma' :: G & Gamma); PPermut_LF_simpl.
 Qed.
 
 Theorem SN_Lang:
