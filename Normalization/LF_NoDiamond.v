@@ -635,3 +635,5 @@ induction G; simpl; rew_concat; auto.
 intros; rewrite Mem_nil_eq in *; contradiction.
 intros; rewrite Mem_nil_eq in *; contradiction.
 Qed.
+
+Extraction "termination_LF_nodia" SN_Lang.
