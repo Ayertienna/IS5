@@ -24,18 +24,20 @@ rewrite <- IHx; rew_concat; rew_map; rewrite from_list_app;
 rewrite union_assoc; auto.
 Qed.
 
-Add Morphism used_vars_ctx_LF: PPermut_used_t.
+Lemma PPermut_used_t:
+forall x y,
+  x ~=~ y -> used_vars_ctx_LF x = used_vars_ctx_LF y.
 induction x; intros.
 apply PPermut_LF_nil_impl in H; subst; auto.
 simpl; unfold used_vars_ctx_LF in *; simpl;
 rew_concat; rew_map.
 assert (a :: x ~=~ y) by auto.
-apply PPermut_LF_split_head in H;
-destruct H as (l', (hd, (tl, (Ha, Hb)))).
+apply PPermut_LF_split_head_T in H;
+destruct H as (t, (Ha, Hb)). destruct t as ((l', hd), tl); simpl in *;
 subst.
 assert (x & a ~=~  (hd ++ tl) & l').
-  transitivity (a::x); [ | rewrite H0];
-  PPermut_LF_simpl.
+  transitivityP (a::x).
+  PPermut_LF_simpl. transitivityP (hd & l' ++ tl); auto; PPermut_LF_simpl.
 apply PPermut_LF_last_rev in H; auto.
 rew_concat; rew_map;
 repeat rewrite from_list_app.
@@ -178,10 +180,10 @@ forall c1 c2 G0 G1 G2,
   (ok_Bg_LF G1 <-> ok_Bg_LF G2).
 split; intros.
 apply ok_Bg_LF_PPermut with (G:=(c1++c2)::G0); auto;
-apply ok_Bg_LF_PPermut with (G':=c1::c2::G0) in H1; [ | symmetry]; auto;
+apply ok_Bg_LF_PPermut with (G':=c1::c2::G0) in H1; [ | symmetryP]; auto;
 unfold ok_Bg_LF in *; rew_concat in *; auto.
 apply ok_Bg_LF_PPermut with (G':=(c1++c2)::G0) in H1; auto;
-apply ok_Bg_LF_PPermut with (G:=c1::c2::G0); [ | symmetry]; auto;
+apply ok_Bg_LF_PPermut with (G:=c1::c2::G0); [ | symmetryP]; auto;
 unfold ok_Bg_LF in *; rew_concat in *; auto.
 Qed.
 
@@ -189,10 +191,6 @@ Lemma ok_Bg_LF_empty:
 forall G,
   ok_Bg_LF (emptyEquiv_LF G).
 unfold ok_Bg_LF; induction G; simpl in *; rew_concat. constructor. auto.
-Qed.
-
-Add Morphism ok_Bg_LF: PPermut_ok_Bg_LF.
-split; intros; eapply ok_Bg_LF_PPermut; eauto.
 Qed.
 
 Lemma ok_Bg_LF_empty_first:
@@ -236,8 +234,9 @@ forall G C C' x A,
   C *=* (x, A)::C' ->
   ok_Bg_LF (C' :: G).
 intros;
-assert (((x, A) :: C') :: G ~=~ (C) :: G) by PPermut_LF_simpl;
-rewrite <- H1 in H; unfold ok_Bg_LF in *.
+assert (((x, A) :: C') :: G ~=~ (C) :: G) by PPermut_LF_simpl.
+apply ok_Bg_LF_PPermut with (G':=((x, A) :: C') :: G) in H; auto.
+unfold ok_Bg_LF in *.
 rew_concat in *; inversion H; subst.
 apply ok_LF_used_weakening with (x:=x); auto.
 Qed.
@@ -249,18 +248,22 @@ forall A A' v C C' G G',
  G ~=~ G' & ((v, A') :: C') ->
  False.
 intros.
-rewrite H1 in H.
+apply ok_Bg_LF_PPermut with (G':=C::G' & ((v, A') :: C')) in H.
 apply permut_Mem_split_head with (l2 := C) in H0; auto;
 destruct H0 as (gh); destruct H0 as (gt); subst.
 assert (( gh & (v, A) ++ gt) :: G' & ((v, A') :: C') ~=~
         ((v, A) :: gh ++ gt) :: ((v, A') :: C') :: G') by
 (PPermut_LF_simpl; apply PPermut_LF_skip; [permut_simpl | auto]).
-rewrite H0 in H; unfold ok_Bg_LF in H. rew_concat in *.
+apply ok_Bg_LF_PPermut with (G':=((v, A) :: gh ++ gt) :: ((v, A') :: C') :: G')
+  in H.
+unfold ok_Bg_LF in H. rew_concat in *.
 inversion H; subst.
 assert (ok_LF ((v, A') :: C' ++ concat G') (v :: nil)).
   eapply ok_LF_split with (G1:=concat ((gh++gt)::nil)); simpl;
   rew_concat; auto.
 inversion H2; subst. elim H9; apply Mem_here.
+auto.
+PPermut_LF_simpl.
 Qed.
 
 Lemma ok_Bg_LF_permut_no_last:
@@ -270,8 +273,10 @@ forall G C v A,
 intros;
 assert (G & (C) ~=~ (C) :: G) by PPermut_LF_simpl;
 assert (G & ((v, A) :: C) ~=~ ((v,A) :: C) :: G) by PPermut_LF_simpl.
-rewrite H1 in H. unfold ok_Bg_LF in H; rew_concat in *.
-inversion H; subst. rewrite H0. unfold ok_Bg_LF; rew_concat.
+apply ok_Bg_LF_PPermut with (G':=((v,A)::C)::G) in H; auto.
+unfold ok_Bg_LF in H; rew_concat in *.
+inversion H; subst. apply ok_Bg_LF_PPermut with (G:=C::G); auto;
+unfold ok_Bg_LF; rew_concat.
 apply ok_LF_used_weakening in H7;
 auto.
 Qed.
@@ -282,7 +287,8 @@ forall G C C0 v A,
   ok_Bg_LF (C0::G & (C)).
 intros;
 assert (C0 :: G & (C)  ~=~ (C0 :: G) & (C)) by (rew_app; PPermut_LF_simpl).
-rewrite H0; eapply ok_Bg_LF_permut_no_last; rew_app; eauto.
+apply ok_Bg_LF_PPermut with ((C0::G)&C); auto.
+eapply ok_Bg_LF_permut_no_last; rew_app; eauto.
 Qed.
 
 Lemma ok_Bg_LF_emptyEquiv:

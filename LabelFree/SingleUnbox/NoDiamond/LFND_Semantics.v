@@ -102,7 +102,8 @@ constructor;
 constructor;
 [apply ok_Bg_LF_PPermut with (G:=Gamma::G)|]; auto.
 
-apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma); auto. rewrite p; auto.
+apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma); auto.
+transitivityP G'; auto.
 Qed.
 
 Lemma PermutationGamma_LF:
@@ -136,15 +137,6 @@ apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma);
 apply PPermutationG_LF with (G:=G & Gamma'); auto.
 Qed.
 
-(* equality on types_LF, don't know how to go about it
-Add Morphism types_LF: PPermut_LF_types.
-intros.
-eapply PermutationGamma_LF; eauto; eapply PPermutationG_LF; eauto.
-apply PermutationGamma_LF with (Gamma:=y0); [ | symmetry ]; eauto;
-eapply PPermutationG_LF; eauto.
-Qed.
-*)
-
 Lemma WeakeningG_LF:
 forall G Gamma M A Delta,
   G |= Gamma |- M ::: A ->
@@ -165,9 +157,10 @@ apply ok_Bg_LF_PPermut with (G:=Gamma::Delta::G); auto. PPermut_LF_simpl.
 
 apply t_unbox_fetch_LF with (Gamma:=Gamma) (G:=Delta :: G);
 [apply ok_Bg_LF_PPermut with (G:=Gamma'::Delta::G') | |]; auto;
-rew_app. rewrite <- p; PPermut_LF_simpl.
+rew_app. transitivityP (Gamma'::Delta::G & Gamma); auto; PPermut_LF_simpl.
 apply IHX; eapply ok_Bg_LF_PPermut; eauto.
-rewrite <- p; PPermut_LF_simpl. rewrite p; auto.
+transitivityP (Gamma'::Delta::G & Gamma); auto; PPermut_LF_simpl.
+transitivityP (Delta::G & Gamma); auto.
 Qed.
 
 Lemma WeakeningWithinContext_LF:
@@ -176,8 +169,7 @@ forall G Gamma M A,
   (forall Delta Delta' G',
     G' & Delta ~=~ G ->
     ok_Bg_LF (Gamma :: G' & (Delta ++ Delta')) ->
-    G' & (Delta++Delta') |= Gamma |- M ::: A)
-  *
+    G' & (Delta++Delta') |= Gamma |- M ::: A) *
   (forall Gamma',
     ok_Bg_LF ((Gamma++Gamma')::G) ->
     G |= Gamma ++ Gamma' |- M ::: A).
@@ -203,7 +195,7 @@ econstructor;
 [apply ok_Bg_LF_PPermut with (G:=Gamma:: G' & (Delta++Delta')) | ];
 auto. PPermut_LF_simpl.
 apply PPermutationG_LF with (G:= ((G'& Gamma) & (Delta ++ Delta'))).
-eapply IHtypes_LF. rewrite <- H0; PPermut_LF_simpl.
+eapply IHtypes_LF. transitivityP (G' & Delta & Gamma); auto; PPermut_LF_simpl.
 apply ok_Bg_LF_nil; apply ok_Bg_LF_PPermut
   with (G:=Gamma :: G' & (Delta ++ Delta'));
 auto. PPermut_LF_simpl.
@@ -216,7 +208,7 @@ auto. PPermut_LF_simpl.
 constructor; eauto; eapply IHtypes_LF; eauto.
 constructor; eauto; eapply IHtypes_LF; eauto.
 assert (Delta::G'0 ~=~ G & Gamma).
-  transitivity G'; auto; rewrite <- H0; PPermut_LF_simpl.
+  transitivityP G'; auto; transitivityP (G'0 & Delta); auto; PPermut_LF_simpl.
 assert ({Gamma *=* Delta} + {~ Gamma *=* Delta}).
   eapply permut_dec; intros; destruct k; destruct k'; repeat decide equality.
   apply eq_var_dec.
@@ -224,19 +216,17 @@ destruct H3.
 (* Gamma *=* Delta *)
 assert (G'0 ~=~ G).
   apply PPermut_LF_last_rev with (Gamma:=Delta) (Gamma':=Gamma).
-  symmetry; auto.
-  rewrite <- H2; PPermut_LF_simpl.
+  symmetry; auto. transitivityP (Delta::G'0); auto; PPermut_LF_simpl.
 apply t_unbox_fetch_LF with (G:=G'0) (Gamma:=Delta++Delta'); auto.
 apply ok_Bg_LF_PPermut with (G:=Gamma'::G'0&(Delta++Delta')); auto.
 apply PPermutationG_LF with (G:=G & Gamma'); auto.
 apply PermutationGamma_LF with (Gamma:=Gamma++Delta'); auto.
 eapply IHtypes_LF.
 apply ok_Bg_LF_PPermut with (G:=Gamma'::G'0&(Delta++Delta')); auto.
-rewrite H3; PPermut_LF_simpl.
+transitivityP ((Gamma++Delta') :: G'0 & Gamma'); auto; PPermut_LF_simpl.
 (* ~ Gamma *=* Delta *)
-assert (G'0 & Delta ~=~ G & Gamma) by (rewrite <- H2; PPermut_LF_simpl).
-
-(*!!!!!*)
+assert (G'0 & Delta ~=~ G & Gamma).
+transitivityP (Delta::G'0); auto; PPermut_LF_simpl.
 apply PPermut_LF_split_neq_T in H3; [ | intro; elim n; symmetry; auto].
 destruct H3 as (t, (H4, H5)). destruct t as (t', tl);
 destruct t' as (Gamma0, hd); simpl in *; subst.
@@ -246,8 +236,8 @@ apply ok_Bg_LF_PPermut
 auto; rew_app; PPermut_LF_simpl.
 apply PPermutationG_LF with (G:=(hd& Gamma' ++ tl) & (Delta ++ Delta')).
 eapply IHtypes_LF. rew_app; PPermut_LF_simpl.
-apply PPermut_LF_last_rev with (Gamma:=Gamma0) (Gamma':=Gamma); auto;
-rewrite <- H2; PPermut_LF_simpl.
+apply PPermut_LF_last_rev with (Gamma:=Gamma0) (Gamma':=Gamma); auto.
+transitivityP (Delta :: hd & Gamma0 ++ tl); auto; PPermut_LF_simpl.
 apply ok_Bg_LF_PPermut
   with (G:=Gamma' :: (hd & Gamma0 ++ tl) & (Delta ++ Delta'));
 auto; rew_app; PPermut_LF_simpl.
@@ -255,10 +245,10 @@ rew_app; PPermut_LF_simpl.
 rew_app; PPermut_LF_simpl.
 apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma);
 [apply ok_Bg_LF_PPermut with (G:=(Gamma'++Gamma'0):: G') | | ];
-auto. rewrite <- p; PPermut_LF_simpl.
+auto. transitivityP ((Gamma'++Gamma'0) :: G & Gamma); auto; PPermut_LF_simpl.
 eapply IHtypes_LF; auto.
 apply ok_Bg_LF_PPermut with (G:=(Gamma'++Gamma'0):: G'); auto.
-rewrite <- p; PPermut_LF_simpl.
+transitivityP ((Gamma' ++ Gamma'0) ::G & Gamma); auto.
 Qed.
 
 Lemma WeakeningGamma_LF:
@@ -357,8 +347,8 @@ constructor; auto.
 apply ok_Bg_LF_PPermut with (G:=(Gamma::G0) & Gamma').
 apply ok_Bg_LF_PPermut with (G':=(Gamma::G0 & ((v0, A0)::Gamma'))) in Ok.
 apply ok_Bg_LF_permut_no_last with (v:=v0)(A:=A0); auto.
-rewrite H0; PPermut_LF_simpl.
-rewrite H2; PPermut_LF_simpl.
+transitivityP (Gamma::G0 & ((v0, A0) :: Gamma')); auto; PPermut_LF_simpl.
+transitivityP (Gamma::G0 & Gamma'); auto; PPermut_LF_simpl.
 
 (* lam *)
 apply t_lam_LF with (L:=L \u \{v}).
@@ -374,7 +364,8 @@ apply t_lam_LF with (L:=L \u \{v}).
 apply ok_Bg_LF_PPermut with (G':=Gamma::G0 & ((v,A0)::Gamma')) in Ok.
 apply ok_Bg_LF_PPermut with (G:=(Gamma::G0) & Gamma').
 apply ok_Bg_LF_permut_no_last with (v:=v) (A:=A0); rew_app; auto.
-rewrite H2; auto. rewrite H0; auto.
+transitivityP (Gamma::G0 & Gamma'); auto.
+transitivityP (Gamma :: G0 & ((v, A0) :: Gamma')); auto.
 intros.
 rewrite notin_union in H3; rewrite notin_singleton in H3; destruct H3;
 unfold open_LF in *;
@@ -382,7 +373,9 @@ rewrite <- subst_t_comm_LF; auto.
 eapply X with (G0:=G0); eauto;
 assert (emptyEquiv_LF G' ~=~
   emptyEquiv_LF (G0 ++ nil & ((v0, A) :: Gamma))).
-rewrite H1; rew_app; eapply emptyEquiv_LF_last_change; auto.
+transitivityP (emptyEquiv_LF(G0 & Gamma)).
+  apply PPermut_emptyEquiv_LF; auto.
+rew_app; eapply emptyEquiv_LF_last_change; auto.
 rew_app in *.
 apply PPermutationG_LF with (G:=emptyEquiv_LF G'); auto.
 
@@ -415,17 +408,19 @@ constructor.
 apply ok_Bg_LF_PPermut with (G:=G0 & Gamma & Gamma').
 apply ok_Bg_LF_permut_no_last with (v:=v) (A:=A0).
 apply ok_Bg_LF_PPermut with (G:=G & Gamma); auto.
-rewrite H; PPermut_LF_simpl.
-rewrite H1; PPermut_LF_simpl.
+transitivityP (G0 & ((v, A0) :: Gamma') & Gamma); auto; PPermut_LF_simpl.
+transitivityP (G0 & Gamma' & Gamma); auto; PPermut_LF_simpl.
 eapply IHHT with (G0:=G0 & Gamma) (Gamma':=Gamma'); auto.
-rewrite H; PPermut_LF_simpl; eauto.
-rewrite H1; PPermut_LF_simpl.
+transitivityP (G0 & ((v, A0) :: Gamma') & Gamma); auto; PPermut_LF_simpl.
+transitivityP (G0 & Gamma' & Gamma); auto; PPermut_LF_simpl.
 repeat rewrite emptyEquiv_LF_rewrite;
 simpl; rew_app.
 apply PPermutationG_LF with (G:=nil::emptyEquiv_LF G').
 apply WeakeningG_LF; auto.
 repeat apply ok_Bg_LF_nil; apply ok_Bg_LF_emptyEquiv.
-rewrite H0; rewrite emptyEquiv_LF_rewrite_last; simpl;
+transitivityP (nil :: (emptyEquiv_LF(G0 & Gamma))).
+  PPermut_LF_simpl. apply PPermut_emptyEquiv_LF. auto.
+rewrite emptyEquiv_LF_rewrite_last; simpl;
 PPermut_LF_simpl.
 
 (* unbox *)
@@ -436,8 +431,8 @@ econstructor.
 apply ok_Bg_LF_PPermut with (G:=G0 & Gamma & Gamma').
 apply ok_Bg_LF_permut_no_last with (v:=v) (A:=A0).
 apply ok_Bg_LF_PPermut with (G:=Gamma :: G); auto.
-rewrite H; PPermut_LF_simpl.
-rewrite H1; PPermut_LF_simpl.
+transitivityP (Gamma::G0 & ((v, A0) :: Gamma')); auto; PPermut_LF_simpl.
+transitivityP (Gamma :: G0 & Gamma'); auto; PPermut_LF_simpl.
 eapply IHHT; eauto.
 
 (* unbox_fetch *)
@@ -447,7 +442,9 @@ apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma); auto;
   eapply IHHT; eauto]; auto.
 rewrite emptyEquiv_LF_rewrite; simpl.
 apply PPermutationG_LF with (emptyEquiv_LF G'); auto.
-rewrite <- p; rewrite emptyEquiv_LF_rewrite; simpl; auto.
+transitivityP (emptyEquiv_LF (G & Gamma)).
+  apply PPermut_emptyEquiv_LF; auto.
+  rewrite emptyEquiv_LF_rewrite; simpl; auto.
 
 destruct (permut_dec (var * ty) Gamma ((v,A0)::Gamma'0)).
   intros; destruct k; destruct k'; repeat decide equality.
@@ -456,26 +453,29 @@ destruct (permut_dec (var * ty) Gamma ((v,A0)::Gamma'0)).
 assert (G ~=~ G0).
   apply PPermut_LF_last_rev with (Gamma:=Gamma)(Gamma':=(v,A0)::Gamma'0);
   auto.
-  transitivity G'; auto.
+  transitivityP G'; auto.
 apply t_unbox_fetch_LF with (G:=G) (Gamma:=Gamma'0).
 apply ok_Bg_LF_PPermut with (Gamma' :: G & Gamma'0).
 apply ok_Bg_LF_permut_no_last_spec with (v:=v)(A:=A0).
 apply ok_Bg_LF_PPermut with (Gamma :: G & Gamma').
-auto. transitivity (((v,A0)::Gamma'0):: G & Gamma'); auto.
-PPermut_LF_simpl. rew_app. transitivity (Gamma' :: Gamma'0 :: G);
-PPermut_LF_simpl; auto. transitivity (Gamma'0 :: Gamma' :: G);
+auto. transitivityP (((v,A0)::Gamma'0):: G & Gamma'); auto.
+PPermut_LF_simpl. rew_app. transitivityP (Gamma' :: Gamma'0 :: G);
+PPermut_LF_simpl; auto. transitivityP (Gamma'0 :: Gamma' :: G);
 rew_app; PPermut_LF_simpl; auto. rew_app. constructor; auto.
 PPermut_LF_simpl.
 destruct IHHT with (M0:=M0) (A0:=A0) (v:=v); auto.
 apply t; auto. apply PPermutationG_LF with (G:=emptyEquiv_LF G'0);
-auto. rewrite H0. rewrite H2; auto.
-symmetry; rewrite H2; auto.
+auto.
+transitivityP (emptyEquiv_LF (G0 & Gamma')).
+  apply PPermut_emptyEquiv_LF; auto.
+apply PPermut_emptyEquiv_LF; auto.
+transitivityP (G0 & Gamma'0); auto.
 (* <> *)
 assert ({ t |
   fst (fst t) *=* (v, A0)::Gamma'0 /\ G = snd (fst t) & fst (fst t) ++ (snd t)})
   as HP.
   apply PPermut_LF_split_neq_T with (Gamma:=Gamma) (G':=G0);
-    auto; transitivity G'; auto.
+    auto; transitivityP G'; auto.
 destruct HP as (t, (HPa, HPb)); destruct t as (t', GT);
 destruct t' as (Gamma'', GH); simpl in *.
 assert (GH & Gamma'' ++ GT ~=~ GH & ((v, A0)::Gamma'0) ++ GT)
@@ -493,16 +493,21 @@ destruct IHHT with (M0:=M0) (A0:=A0) (v:= v); auto.
 eapply t0 with (Gamma'0:=Gamma'0) (G0:=GH ++ GT & Gamma')
   (G':=GH ++ GT & Gamma' & Gamma);subst; try PPermut_LF_simpl.
 assert (GH ++ Gamma'' :: GT & Gamma ~=~ G0 & Gamma'').
-  transitivity G'; rew_app in *; auto; rewrite H; auto.
+  transitivityP G'; rew_app in *; auto.
+transitivityP  (G0 & ((v, A0) :: Gamma'0)); auto.
 assert (GH ++ GT & Gamma ~=~ G0).
-  apply PPermut_LF_last_rev_simpl with (a:=Gamma'');
-    rewrite <- H3; PPermut_LF_simpl.
+  apply PPermut_LF_last_rev_simpl with (a:=Gamma'').
+  transitivityP (GH ++ Gamma'' :: GT & Gamma);
+    auto; PPermut_LF_simpl.
 apply PPermutationG_LF with (G := emptyEquiv_LF G'0); auto.
-rewrite H0; rewrite <- H4; repeat rewrite emptyEquiv_LF_rewrite;
-PPermut_LF_simpl.
-rewrite H1.
+transitivityP (emptyEquiv_LF (G0 & Gamma')).
+apply PPermut_emptyEquiv_LF; auto.
+transitivityP (emptyEquiv_LF (GH++GT& Gamma & Gamma'));
+apply PPermut_emptyEquiv_LF; PPermut_LF_simpl; auto.
+transitivityP ( G0 & Gamma'0); auto.
 rew_app; PPermut_LF_simpl; apply PPermut_LF_last_rev_simpl
-  with (a:=(v,A0)::Gamma'0). rewrite <- H; rewrite <- p; subst;
+  with (a:=(v,A0)::Gamma'0). transitivityP G'; auto.
+transitivityP (G & Gamma); auto; subst;
   PPermut_LF_simpl.
 Qed.
 
@@ -544,14 +549,16 @@ intros; induction H; repeat split; intros.
 constructor; auto.
 eapply ok_Bg_LF_concat with (G0:=Gamma::G0) (c1:=Gamma0) (c2:=Delta0)
   (G1:=Gamma::G) (G2:=Gamma::G1);
-eauto; [rewrite H0 | rewrite H1]; PPermut_LF_simpl.
+eauto. transitivityP (Gamma ::Gamma0 :: Delta0 :: G0); auto; PPermut_LF_simpl.
+transitivityP (Gamma::(Gamma0 ++ Delta0) :: G0) ; PPermut_LF_simpl.
 constructor.
 eapply ok_Bg_LF_concat with (G0:=G0) (G1:=Gamma::G); eauto.
 rewrite Mem_app_or_eq; left; auto.
 (* lam *)
 apply t_lam_LF with (L:=L).
-eapply ok_Bg_LF_concat with (G0:=Gamma::G0) (G1:=Gamma::G); eauto;
-try rewrite H1 || rewrite H0; auto; PPermut_LF_simpl.
+eapply ok_Bg_LF_concat with (G0:=Gamma::G0) (G1:=Gamma::G); eauto.
+transitivityP (Gamma::Gamma0 :: Delta0 :: G0); auto; PPermut_LF_simpl.
+transitivityP (Gamma:: (Gamma0 ++ Delta0) :: G0); auto; PPermut_LF_simpl.
 intros; eapply X; eauto.
 apply t_lam_LF with (L:=L).
 eapply ok_Bg_LF_concat with (G0:=G0) (G1:=Gamma::G); eauto.
@@ -570,17 +577,20 @@ eapply IHtypes_LF2; eauto.
 (* box *)
 constructor.
 eapply ok_Bg_LF_concat with (G0:=G0 & Gamma) (G1:=G & Gamma)
-  (c1:=Gamma0) (c2:=Delta0); eauto;
-try rewrite H0 || rewrite H1; auto.
+  (c1:=Gamma0) (c2:=Delta0); eauto.
+transitivityP (Gamma ::Gamma0 :: Delta0 :: G0); auto; PPermut_LF_simpl.
+transitivityP (Gamma::(Gamma0 ++ Delta0) :: G0) ; PPermut_LF_simpl.
 eapply IHtypes_LF with (G0:=G0 & Gamma) (Gamma0:=Gamma0) (Delta0:=Delta0);
 eauto.
-rewrite H0; PPermut_LF_simpl.
-rewrite H1; PPermut_LF_simpl.
+transitivityP (Gamma ::Gamma0 :: Delta0 :: G0); auto; PPermut_LF_simpl.
+transitivityP (Gamma::(Gamma0 ++ Delta0) :: G0) ; PPermut_LF_simpl.
 constructor.
 eapply ok_Bg_LF_concat with (G0:=G0) (G1:=G & Gamma)
   (c1:=Gamma) (c2:=Delta0); eauto; try PPermut_LF_simpl.
 eapply IHtypes_LF with (G0:=G0) (Gamma0:=Gamma)
-  (Delta0:=Delta0); eauto. rewrite H0; PPermut_LF_simpl. PPermut_LF_simpl.
+  (Delta0:=Delta0); eauto.
+transitivityP (Delta0 :: G0 & Gamma); auto; PPermut_LF_simpl.
+PPermut_LF_simpl.
 (* unbox *)
 constructor.
 eapply ok_Bg_LF_concat with (G0:=Gamma::G0) (G1:=Gamma::G)
@@ -592,9 +602,9 @@ eapply ok_Bg_LF_concat with (G0:=G0) (G1:=Gamma::G); eauto.
 eapply IHtypes_LF; eauto.
 (* Gamma *=* Gamma0 \/ Gamma *=* Gamma1 \/ neither *)
 assert (G & Gamma ~=~ Gamma0 :: Delta0 :: G0).
-  transitivity G'; auto.
-assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) +
-        (Gamma *=* Delta0 /\ G ~=~ Gamma0::G0) +
+  transitivityP G'; auto.
+assert (( prod (Gamma *=* Gamma0) (G ~=~ Delta0::G0)) +
+        ( prod (Gamma *=* Delta0)  (G ~=~ Gamma0::G0)) +
         {t | Gamma *=* fst (fst t) /\ G0 = snd (fst t) & fst (fst t) ++ snd t}).
   assert ({Gamma *=* Gamma0} + {~ Gamma *=* Gamma0}).
   apply permut_dec. intros. destruct k; destruct k'; decide equality.
@@ -604,13 +614,17 @@ assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) +
   apply eq_ty_dec. apply eq_var_dec.
   destruct H3. left; left; split; auto.
   apply PPermut_LF_last_rev with (Gamma:=Gamma)
-  (Gamma':=Gamma0); auto; rewrite H2; PPermut_LF_simpl.
+  (Gamma':=Gamma0); auto. transitivityP (Gamma0 :: Delta0 :: G0); auto;
+                          PPermut_LF_simpl.
   destruct H4.
   left; right; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
-  (Gamma':=Delta0); auto; rewrite H2; PPermut_LF_simpl.
+  (Gamma':=Delta0); auto; transitivityP (Gamma0 :: Delta0 :: G0); auto;
+                          PPermut_LF_simpl.
   right.
-  assert (G & Gamma ~=~ G0 & Delta0 & Gamma0) by (rewrite H2; PPermut_LF_simpl).
-  symmetry in H3.
+  assert (G & Gamma ~=~ G0 & Delta0 & Gamma0)
+    by (transitivityP (Gamma0 :: Delta0 :: G0); auto;
+                          PPermut_LF_simpl).
+  apply PPermut_LF_symmetric in H3.
   apply PPermut_LF_split_neq_T in H3; auto.
   destruct H3 as (t, (H3, H4)); destruct t; destruct p0; simpl in *.
   assert (G0 & Delta0 ~=~ (l1 ++ l) & Gamma).
@@ -620,72 +634,76 @@ assert ((Gamma *=* Gamma0 /\ G ~=~ Delta0::G0) +
   exists (l3, l4, l2); split; auto; symmetry; auto.
   intro nn; symmetry in nn; elim n0; auto.
   intro nn; symmetry in nn; elim n; auto.
-destruct H3; destruct s.
-destruct a;
+destruct H3. destruct s.
+destruct p0;
 apply t_unbox_fetch_LF with (G:=G0) (Gamma:=Gamma0++Delta0).
 eapply ok_Bg_LF_concat
  with (G0:=G0 & Gamma') (G1:=Gamma::G & Gamma'); eauto.
-rewrite H4; auto.
+transitivityP (Gamma0::G & Gamma'); auto; PPermut_LF_simpl.
 apply PermutationGamma_LF with (Gamma:=Gamma++Delta0); auto.
-eapply IHtypes_LF. rewrite H4; auto. rewrite H1; PPermut_LF_simpl.
-destruct a.
+eapply IHtypes_LF. PPermut_LF_simpl.
+transitivityP ((Gamma0 ++ Delta0) :: G0); auto; PPermut_LF_simpl.
+destruct p0.
 apply t_unbox_fetch_LF with (G:=G0) (Gamma:=Delta0++Gamma0).
 eapply ok_Bg_LF_concat
- with (G0:=G0 & Gamma') (G1:=Gamma::G & Gamma'); eauto;
-rewrite H4; auto.
+ with (G0:=G0 & Gamma') (G1:=Gamma::G & Gamma'); eauto.
+transitivityP (Gamma::Gamma0::G0 & Gamma'); auto; PPermut_LF_simpl.
 apply PermutationGamma_LF with (Gamma:=Gamma++Gamma0); auto.
-eapply IHtypes_LF. rewrite H4; auto. rewrite H1; PPermut_LF_simpl.
-destruct a; destruct x; destruct p0; simpl in *.
+eapply IHtypes_LF. PPermut_LF_simpl.
+transitivityP ( (Gamma0 ++ Delta0) :: G0); auto; PPermut_LF_simpl.
+destruct s. destruct x; destruct p0; simpl in *. destruct a.
 apply t_unbox_fetch_LF with (G:=(Gamma0++Delta0)::l1++l) (Gamma:=l0).
 eapply ok_Bg_LF_concat with (G0:=G0 & Gamma') (G1:=Gamma::G & Gamma')
   (c1:=Gamma0) (c2:=Delta0); subst; auto.
-transitivity (G & Gamma & Gamma'); auto; rewrite H2; subst; eauto;
+transitivityP ((G & Gamma) & Gamma'); [ | PPermut_LF_simpl].
+transitivityP ((Gamma0 :: Delta0 :: l1 & l0 ++ l) & Gamma'); PPermut_LF_simpl.
+transitivityP G'; auto. transitivityP (Gamma0 :: Delta0 :: l1 & l0 ++ l); auto.
 PPermut_LF_simpl.
-transitivity ((Gamma0++Delta0)::l0::l1++l & Gamma'); [PPermut_LF_simpl |].
+transitivityP ((Gamma0++Delta0)::l0::l1++l & Gamma'); [PPermut_LF_simpl |].
 rew_app; auto.
 apply PermutationGamma_LF with (Gamma:=Gamma); auto.
 assert (G ~=~ Gamma0::Delta0::l1 ++ l).
-  subst; apply PPermut_LF_last_rev with (Gamma:=Gamma) (Gamma':=l0); auto;
-  rewrite H2; PPermut_LF_simpl.
+  subst; apply PPermut_LF_last_rev with (Gamma:=Gamma) (Gamma':=l0); auto.
+  transitivityP (Gamma0 :: Delta0 :: l1 & l0 ++ l); auto; PPermut_LF_simpl.
 eapply IHtypes_LF with (Gamma0:=Gamma0) (Delta0:=Delta0) (G0:=l1 ++l & Gamma');
-eauto.
-rewrite H5. rew_app; auto. rew_app; auto. rewrite H1; subst; PPermut_LF_simpl.
-assert (G & Gamma ~=~ Delta0 :: G0).
-  transitivity G'; auto.
-assert ((Gamma *=* Delta0 /\ G ~=~ G0) +
+eauto. PPermut_LF_simpl. PPermut_LF_simpl.
+transitivityP ((Gamma0 ++ Delta0) :: G0); auto; subst; PPermut_LF_simpl.
+assert ((prod (Gamma *=* Delta0)  (G ~=~ G0)) +
         {t | fst (fst t) *=* Gamma /\ G0 = snd(fst t) & fst (fst t) ++ snd t}).
   assert ({Gamma *=* Delta0} + {~ Gamma *=* Delta0}).
   apply permut_dec. intros. destruct k; destruct k'; decide equality.
   apply eq_ty_dec. apply eq_var_dec.
-  destruct H2. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
-  (Gamma':=Delta0); auto; rewrite H1; PPermut_LF_simpl.
+  destruct H1. left; split; auto. apply PPermut_LF_last_rev with (Gamma:=Gamma)
+  (Gamma':=Delta0); auto. transitivityP G'; auto. transitivityP (Delta0::G0);
+                                                  auto; PPermut_LF_simpl.
   right.
-  assert (G & Gamma ~=~ G0 & Delta0) by (rewrite H1; PPermut_LF_simpl).
-  symmetry in H2.
-  apply PPermut_LF_split_neq_T in H2; auto.
+  assert (G & Gamma ~=~ G0 & Delta0).
+  transitivityP G'; auto; transitivityP (Delta0::G0); auto; PPermut_LF_simpl.
+  apply PPermut_LF_symmetric in H1.
+  apply PPermut_LF_split_neq_T in H1; auto.
   intro nn; symmetry in nn; elim n; auto.
-destruct H2.
-destruct a. constructor.
-eapply ok_Bg_LF_concat with (G0:=G0) (G1:=Gamma::G & Gamma'); eauto;
-rewrite H3; PPermut_LF_simpl.
+destruct H1.
+destruct p0. constructor.
+eapply ok_Bg_LF_concat with (G0:=G0) (G1:=Gamma::G & Gamma'); eauto.
+transitivityP (Gamma'::Delta0::G); auto; PPermut_LF_simpl.
 apply PermutationGamma_LF with (Gamma:=Gamma++Gamma').
-eapply IHtypes_LF. rewrite H3; PPermut_LF_simpl.
+eapply IHtypes_LF.
+transitivityP (Gamma'::G); auto; PPermut_LF_simpl.
 permut_simpl; auto.
 destruct s as (t, (H3a, H3b)); destruct t; destruct p0; simpl in *.
 apply t_unbox_fetch_LF with (G:=l1++l) (Gamma:=Gamma).
 eapply ok_Bg_LF_concat with (G0:=Gamma::(l1++l)) (G1:=Gamma::G & Gamma')
   (c1:=Gamma')(c2:=Delta0);
 eauto.
-transitivity (G & Gamma & Gamma'); auto; rewrite H1; PPermut_LF_simpl.
-PPermut_LF_simpl.
-assert (G ~=~ Delta0::l1++l).
-  apply PPermut_LF_last_rev with (Gamma:=Gamma) (Gamma':=l0). symmetry; auto.
-  rewrite H1; subst; PPermut_LF_simpl.
-subst; PPermut_LF_simpl.
+transitivityP (G & Gamma & Gamma'); auto. transitivityP (G' & Gamma');
+[ | PPermut_LF_simpl]. transitivityP (Delta0 :: G0 & Gamma');
+PPermut_LF_simpl. subst; PPermut_LF_simpl.
 PPermut_LF_simpl.
 eapply IHtypes_LF with (Gamma0:=Gamma') (Delta0:=Delta0) (G0:= l1++l);
 subst; try PPermut_LF_simpl. Focus 2. subst; PPermut_LF_simpl.
-apply PPermut_LF_last_rev_simpl with Gamma; rewrite H1;
+apply PPermut_LF_last_rev_simpl with Gamma.
+transitivityP G'; auto.
+transitivityP (Delta0 :: l1 & l0 ++ l); auto.
 PPermut_LF_simpl.
 Qed.
 
@@ -795,9 +813,9 @@ replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
   by (rew_app; auto);
 apply merge_LF_preserv_types_old with (G:=emptyEquiv_LF G0 & nil);
 rew_app; auto.
-transitivity (emptyEquiv_LF (G0&nil)).
+transitivityP (emptyEquiv_LF (G0&nil)).
   rewrite emptyEquiv_LF_rewrite; auto.
-  transitivity (emptyEquiv_LF (nil :: G0)); auto.
+  transitivityP (emptyEquiv_LF (nil :: G0)); auto.
 
 apply PPermut_emptyEquiv_LF; PPermut_LF_simpl.
 
@@ -805,7 +823,7 @@ inversion HT; subst;
 replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
   by (rew_app; auto);
 apply merge_LF_preserv_types_old with (G:=G & nil & Gamma);
-auto. rewrite <- p; auto.
+auto. transitivityP (nil :: G & Gamma); auto.
 apply ok_Bg_LF_nil; apply ok_Bg_LF_empty.
 assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in p; auto.
