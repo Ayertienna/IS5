@@ -720,9 +720,8 @@ Lemma Progress_LF:
 forall G M A
   (H_lc_t: lc_t_LF M)
   (HT: emptyEquiv_LF G |= nil |- M ::: A),
-  value_LF M + {N | M |-> N = True }.
-Admitted. (* !!!! *)
-(*
+  value_LF M + (sigT (fun x => M |-> x)).
+(* sigT (fun x => .. ) = { N & M |-> N}, but in tlc & is used for lists... *)
 intros;
 remember (@nil (var * ty)) as Ctx;
 generalize dependent Ctx;
@@ -731,24 +730,24 @@ generalize dependent G;
 induction M; intros; eauto using value_LF;
 inversion HeqCtx; subst.
 (* hyp *)
-inversion HT; subst.
+inversion HT; subst;
 rewrite Mem_nil_eq in H3;
 contradiction.
 (* appl *)
-right; inversion HT; subst.
-(* inversion H_lc_t; subst; *)
-edestruct IHM1 with (A := A0 ---> A); eauto.
-[inversion H0; subst; inversion H4; subst | inversion H0];
-eexists; constructor; eauto;
-inversion H3; subst; auto.
-(* unbox *)
 right; inversion HT; subst;
-inversion H_lc_t; subst.
-edestruct IHM with (A := [*]A); eauto;
-[ inversion H0; subst; inversion H3; subst; inversion H3 |
-  destruct H0];
+edestruct IHM1 with (A := A0 ---> A); eauto;
+[inversion H_lc_t; subst; auto |
+ inversion v; subst; inversion H4; subst |
+ destruct s];
 eexists; constructor; eauto;
-inversion H1; inversion H2; subst; auto.
+inversion H_lc_t; auto; inversion H5; auto.
+(* unbox *)
+right; inversion HT; subst.
+edestruct IHM with (A := [*]A); eauto; try inversion H_lc_t; auto; eauto.
+inversion v; subst; inversion H3; subst; eexists; constructor; eauto;
+inversion H_lc_t; inversion H2; auto.
+destruct s; eexists; constructor; eauto;
+inversion H_lc_t; auto.
 assert (Gamma = nil) by
   ( apply emptyEquiv_LF_permut_empty with
     (G:= G0 & Gamma) (G':=G); auto;
@@ -757,15 +756,14 @@ destruct IHM with (A := [*]A)
                   (Ctx := (@nil (var * ty)))
                   (G := G0 & nil);
 eauto.
-
-assert (emptyEquiv_LF (G0 & nil) = G0 & nil).
-  eapply emptyEquiv_LF_PPermut_eq; eauto.
-rewrite H0; auto.
-inversion H0; subst; inversion H1; subst.
-eexists; constructor; eauto. inversion H3; auto; subst.
-destruct H0; eexists; econstructor; eauto.
+inversion H_lc_t; auto.
+assert (emptyEquiv_LF (G0 & nil) = G0 & nil)
+  by (eapply emptyEquiv_LF_PPermut_eq; eauto); rewrite H0; auto.
+inversion v; subst; inversion H1; subst;
+eexists; constructor; eauto; inversion H_lc_t; inversion H3; auto.
+destruct s; eexists; constructor; eauto;
+inversion H_lc_t; auto.
 Qed.
-*)
 
 Lemma Preservation_LF:
 forall G M N A
