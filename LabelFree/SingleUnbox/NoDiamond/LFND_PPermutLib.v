@@ -7,7 +7,6 @@ Require Export LFND_Shared.
 Open Scope permut_scope.
 
 Inductive PPermut_LF: list ctx_LF -> list ctx_LF -> Prop :=
-| PPermut_LF_nil: PPermut_LF nil nil
 | PPermut_LF_skip: forall G G' A A',
   A *=* A' -> PPermut_LF G G' -> PPermut_LF (A::G) (A'::G')
 | PPermut_LF_swap: forall G A A' B B',
@@ -222,7 +221,8 @@ Ltac PPermut_LF_simpl :=
 
 (*** Other lemmas ***)
 (* Note:
-   Some are covered by PPermut_LF_simpl tactic, but we want to use them in auto! *)
+   Some are covered by PPermut_LF_simpl tactic,
+   but we want to use them in auto! *)
 
 Lemma PPermut_LF_Mem:
 forall G G' X,
@@ -268,13 +268,19 @@ Lemma PPermut_LF_Mem_T:
 forall G G' X,
   G ~=~ G' ->
   Mem X G ->
-  { X' | X' *=* X /\ Mem X' G}.
+  { X' | X' *=* X /\ Mem X' G'}.
 induction G; intros.
-assert False; [rewrite Mem_nil_eq in H0; auto | contradiction].
-apply Mem_cons_spec in H0.
-destruct H0; subst.
-  exists a; split; auto; apply Mem_here.
-Admitted. (* !!! *)
+assert False; [ | contradiction]; rewrite Mem_nil_eq in H0; auto.
+assert ( ∀ k k' : ctx_LF, {k = k'} + {k ≠ k'}).
+intros; decide equality; destruct l0; destruct p; decide equality;
+try apply eq_var_dec; try apply eq_ty_dec.
+apply Mem_cons_spec in H0; auto; destruct H0.
+
+apply Mem_split_spec in H0.
+Focus 2. intros; decide equality; destruct l0; destruct p; decide equality;
+try apply eq_var_dec; try apply eq_ty_dec.
+destruct H0 as (hd, (tl, H0)).
+Admitted.
 
 (* Based on Sorting/Permutation/Permutation_ind_bis *)
 Theorem PPermut_LF_ind_bis :
@@ -445,15 +451,22 @@ exists hd; exists tl; split; [symmetry | ]; auto.
 apply Mem_here.
 Qed.
 
-(* !!! *)
 Lemma PPermut_LF_split_head_T:
 forall G G' Gamma,
   Gamma :: G ~=~ G' ->
-  { t |
-        Gamma *=* (fst (fst t)) /\
+  { t | Gamma *=* (fst (fst t)) /\
         G' = (snd (fst t)) & (fst (fst t)) ++ (snd t)}.
-Admitted.
-
+intros.
+apply PPermut_LF_Mem_T with (X:=Gamma) in H.
+destruct H as (Gamma'); destruct a.
+assert (  sigT (fun hd =>
+      sigT (fun tl => G' = hd & Gamma' ++ tl))).
+ eapply Mem_split_spec; auto; intros; decide equality; destruct a;
+ decide equality; try apply eq_var_dec; try apply eq_ty_dec.
+destruct H1 as (hd, (tl, H1)).
+exists (Gamma', hd, tl); split; simpl; [symmetry | ]; auto.
+apply Mem_here.
+Qed.
 
 Lemma PPermut_LF_split_neq:
 forall G G' Gamma Gamma',
@@ -476,14 +489,26 @@ exists Gamma''; exists GH; exists GT; split;
 [symmetry | rew_app]; auto.
 Qed.
 
-(* !!! *)
 Lemma PPermut_LF_split_neq_T:
 forall G G' Gamma Gamma',
   G & Gamma ~=~ G' & Gamma' ->
   ~Gamma *=* Gamma' ->
   { t | fst (fst t) *=* Gamma' /\
         G = snd (fst t) & fst (fst t) ++ (snd t)}.
-Admitted.
+intros.
+assert (Gamma ::G  ~=~ (G' & Gamma')) by
+  (transitivity (G & Gamma); auto; PPermut_LF_simpl).
+assert (Gamma :: G ~=~ Gamma' :: G') by
+  (transitivity (G' & Gamma'); auto; PPermut_LF_simpl).
+symmetry in H2;
+apply PPermut_LF_split_head_T in H2; destruct H2 as (t, (Ha, Hb));
+destruct t as (t', GT); destruct t' as (Gamma'', GH); simpl in *.
+destruct GH; rew_app in *.
+inversion Hb; subst. elim H0; symmetry; auto.
+inversion Hb; subst.
+exists (Gamma'', GH, GT); split; simpl;
+[symmetry | rew_app]; auto.
+Qed.
 
 Lemma PPermut_LF_swap2:
 forall C C' G,

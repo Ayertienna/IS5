@@ -235,6 +235,7 @@ apply ok_Bg_LF_PPermut with (G:=Gamma'::G'0&(Delta++Delta')); auto.
 rewrite H3; PPermut_LF_simpl.
 (* ~ Gamma *=* Delta *)
 assert (G'0 & Delta ~=~ G & Gamma) by (rewrite <- H2; PPermut_LF_simpl).
+
 (*!!!!!*)
 apply PPermut_LF_split_neq_T in H3; [ | intro; elim n; symmetry; auto].
 destruct H3 as (t, (H4, H5)). destruct t as (t', tl);
