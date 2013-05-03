@@ -783,7 +783,26 @@ Inductive L_to_Hyb_term_R: te_L -> te_Hyb -> Prop :=
       L_to_Hyb_term_R (get_L w M)
                     (letdia_get_Hyb w N (get_here_Hyb (bwo 0)
                                                       (hyp_Hyb (bte 0))))
+| get_get_L_Hyb:
+    forall M N w w',
+      L_to_Hyb_term_R M N ->
+      value_L (get_L w' M) ->
+      L_to_Hyb_term_R (get_L w (get_L w' M))
+                    (letdia_get_Hyb w' N (get_here_Hyb (bwo 0)
+                                                      (hyp_Hyb (bte 0))))
 .
+
+Lemma value_L_subst_t:
+forall V C x,
+  value_L V -> value_L (subst_t_L C x V).
+intros; induction H; simpl; constructor; auto.
+Qed.
+
+Lemma value_L_subst_w:
+forall V w1 w2,
+  value_L V -> value_L (subst_w_L V w1 w2).
+intros; induction H; simpl; constructor; auto.
+Qed.
 
 Lemma L_to_Hyb_term_R_subst_t:
 forall M M' C1 C2 v,
@@ -792,10 +811,28 @@ forall M M' C1 C2 v,
   L_to_Hyb_term_R (subst_t_L C1 v M) (subst_t_Hyb C2 v M').
 intros;
 generalize dependent C1; generalize dependent C2; generalize dependent v.
-induction H0; intros; simpl;
-try (apply letd_get_L_Hyb; auto);
+induction H0; intros; simpl.
 repeat case_if; try constructor; auto;
 destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+repeat case_if; try constructor; auto;
+destruct v; simpl in *; inversion H1.
+case_if; [destruct v; simpl in *; inversion H2 | ].
+constructor; auto.
+apply value_L_subst_t with (C:=C1) (x:=v) in H; simpl in *; auto.
 Qed.
 
 Lemma L_to_Hyb_term_R_subst_w:
@@ -804,10 +841,30 @@ forall M M',
   forall w0 w1,
     L_to_Hyb_term_R (subst_w_L M w1 w0)
                     (subst_w_Hyb w1 w0 M').
-intros M M' H; induction H; intros; simpl;
-try (apply letd_get_L_Hyb; auto);
+intros M M' H; induction H; intros; simpl.
 repeat case_if; try constructor; auto;
 destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if; try constructor; auto;
+destruct w0; simpl in *; inversion H0 || inversion H1.
+repeat case_if;
+try (destruct w0; simpl in *; inversion H1 || inversion H2 || inversion H3);
+apply get_get_L_Hyb; auto;
+apply value_L_subst_w with (w1:=w1) (w2:=w0) in H0;
+simpl in *; case_if; auto.
 Qed.
 
 Lemma L_to_Hyb_term_L_to_Hyb_term_R:
@@ -839,11 +896,13 @@ intros; inversion H; subst; constructor; eauto.
 constructor; constructor; constructor; omega.
 constructor; eauto.
 constructor; constructor; omega.
+constructor; constructor; omega.
+inversion H1; inversion H4; subst; auto.
 Qed.
 
 Hint Resolve L_to_Hyb_term_R_lc_t.
 
-(* A mixture of both relation and function *)
+(* Value preservation *)
 
 Lemma L_to_Hyb_term_R_value:
 forall M M',
@@ -885,6 +944,8 @@ intros.
 destruct L_to_Hyb_term_R_value with M M'; subst; eauto.
 Qed.
 
+(* Step preservation *)
+
 Fixpoint has_fetch_L (M0: te_L) :=
 match M0 with
 | hyp_L v => False
@@ -898,78 +959,23 @@ match M0 with
 | fetch_L w M => True
 end.
 
-(*
-Alt. formulation:
-forall M N,
-  ~ has_fetch_L M ->
-  L_to_Hyb_term_R M N ->
-  forall M' w, step_L (M, w) (M', w) ->
-    exists N', L_to_Hyb_term_R M' N' /\ steps_Hyb (N, w) (N', w).
+Fixpoint has_get_L (M0: te_L) :=
+match M0 with
+| hyp_L v => False
+| lam_L A M => has_get_L M
+| appl_L M N => has_get_L M \/ has_get_L N
+| box_L M => has_get_L M
+| unbox_L M => has_get_L M
+| here_L M => has_get_L M
+| letd_L M N  => has_get_L M \/ has_get_L M
+| get_L w M => True
+| fetch_L w M => has_get_L M
+end.
 
-   This lemma is too weak as we have no way of knowing that this N ' is
-   actually simply L_to_Hyb_term w M' -- and since not all of pairs
-   in R preserve types, this gives us nothing.
-
-   Another problem: for unbox, we have
-      R M N -> forall w, R (unbox M) (unbf w N),
-   Say we have
-   R (unbox M) (unbf w1 N0)
-   R M N0
-   M, w |-> M'0, w
-   N'0 is such that
-      N0, w |->* N'0, w
-      R M'0 N'0
-   What is N'?
-   It has to be that (unbf w1 N), w |->* N', w, so N' is of the form "unbf w1 X"
-   At the same time, R (unbox M'0) (unbf w1 X) - so R M'0 X.
-   Finally N' = unbf w1 N'0
-   BUT: how do we prove that (unbf w1 N), w |->* (unbf w1 N'0), w?
-   It requires that N, w1 |->* N'0, w1. But this is not the case.
-
-   Idea: can we add typing as a condition and the N' that exists has
-   to also preserve typing?
-
-*)
-
-(*
-Alt. formulation:
-forall M M' w,
-  ~ has_fetch_L M ->
-  step_L (M, w) (M', w) ->
-  steps_Hyb (L_to_Hyb_term w M, w) (L_to_Hyb_term w M', w).
-
-   For beta reduction (and reduction for letdia-here) we need to be able to
-   say steps_Hyb (appl (lam a (f w M)) (f w N), w) (f w (open_L M N))
-   and we cannot move f w (open M N) = open (f w M) (f w N), because
-   lemma for subst_t rewrites requires basically (forall w0, f w0 M = f w M)
-   -- and we do not have that.
-*)
-
-(*
-Alt. formulation:
-forall M N M' N' w,
-  ~ has_fetch_L M ->
-  step_L (M, w) (M', w) ->
-  L_to_Hyb_term_R M N ->
-  L_to_Hyb_term_R M' N' ->
-  steps_Hyb (N, w) (N', w).
-
-   In order to prove this we need to be able to conclude:
-   N' = open_t_Hyb N N2
-   from:
-   L_to_Hyb_term_R (open_t_L M M2) N',
-   L_to_Hyb_term_R M N,
-   L_to_Hyb_term_R M2 N2
-   (e.g. for beta-reduction) and this is simply not true,
-   as we cannot conclude
-   R M N /\ R M N' -> N = N' and this is what we are actually asking for.
-*)
-
-(* Note: first try to prove the silly version, then make it useful *)
 Lemma L_to_Hyb_steps:
 forall M M' w,
   lc_w_L M -> lc_t_L M ->
-  ~ has_fetch_L M ->
+  ~ has_fetch_L M /\ ~ has_get_L M /\ ~ has_get_L M' ->
   step_L (M, fwo w) (M', fwo w) ->
   exists N,
     L_to_Hyb_term_R M N /\ lc_w_Hyb N /\
@@ -979,12 +985,10 @@ forall M M' w,
 induction M; intros; inversion H2; subst.
 (* appl-lam *)
 exists (L_to_Hyb_term (fwo w) (appl_L (lam_L A M) M2)); repeat split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R |
- eapply L_to_Hyb_term_lc_w; eauto | simpl ];
+[ | eapply L_to_Hyb_term_lc_w; eauto | simpl ]; auto;
 exists (open_t_Hyb (L_to_Hyb_term (fwo w) M) (L_to_Hyb_term (fwo w) M2)); split.
 unfold open_t_L; unfold open_t_Hyb;
-apply L_to_Hyb_term_R_subst_t;
-apply L_to_Hyb_term_L_to_Hyb_term_R.
+apply L_to_Hyb_term_R_subst_t; auto.
 constructor; constructor.
 eapply L_to_Hyb_term_lc_w; eauto; right; split; eauto; omega.
 eapply L_to_Hyb_term_lc_t; eauto;
@@ -995,22 +999,19 @@ unfold open_t_L in *; apply lc_t_L_subst_t_rev in H8; auto.
 (* appl *)
 simpl in *.
 destruct IHM1 with (M':=M'0) (w:=w); auto.
+repeat split; destruct H1; destruct H3; eauto.
 destruct H3; destruct H4; destruct H5; destruct H5.
 exists (appl_Hyb x (L_to_Hyb_term (fwo w) M2));
 repeat split; [constructor | constructor | ]; auto;
-[apply L_to_Hyb_term_L_to_Hyb_term_R | ];
 exists (appl_Hyb x0 (L_to_Hyb_term (fwo w) M2));
 split; [constructor | ]; auto;
-[apply L_to_Hyb_term_L_to_Hyb_term_R | ].
 apply steps_Hyb_appl; auto.
 (* unbox-box *)
 exists (L_to_Hyb_term (fwo w) (unbox_L (box_L M0))); repeat split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R |
- eapply L_to_Hyb_term_lc_w; eauto | simpl ];
+[| eapply L_to_Hyb_term_lc_w; eauto | simpl ]; auto;
 exists (open_w_Hyb (L_to_Hyb_term (bwo 0) M0) (fwo w)); split.
 unfold open_w_L; unfold open_w_Hyb;
-apply L_to_Hyb_term_R_subst_w;
-apply L_to_Hyb_term_L_to_Hyb_term_R.
+apply L_to_Hyb_term_R_subst_w; auto.
 constructor; constructor.
 eapply L_to_Hyb_term_lc_w; eauto;
 unfold open_w_L in *; apply lc_w_L_subst_t_rev in H7; auto.
@@ -1025,6 +1026,60 @@ split; [constructor | ]; auto;
 apply steps_Hyb_unbox; eauto.
 eapply L_to_Hyb_term_R_lc_t; eauto.
 (* get *)
+simpl in H1; destruct H1; destruct H3; elim H3; auto.
+(* get-get *)
+simpl in H1; destruct H1; destruct H3; elim H3; auto.
+(* letd-get-here *)
+simpl in H1; destruct H1; destruct H3; elim H3; auto.
+(* letdia *)
+simpl in *; destruct IHM1 with (M':=M'0) (w:=w); auto.
+repeat split; destruct H1; destruct H3; eauto.
+destruct H3; destruct H4; destruct H5; destruct H5.
+exists (letdia_get_Hyb (fwo w) x (L_to_Hyb_term (fwo w) M2));
+repeat split; [constructor | constructor |]; auto.
+apply L_to_Hyb_term_lc_w with (k:=1) (w0:=w);
+inversion H; subst; auto.
+exists (letdia_get_Hyb (fwo w) x0 (L_to_Hyb_term (fwo w) M2));
+split; [constructor |]; auto.
+apply steps_Hyb_letdia; eauto.
+(* here *)
+simpl in *; destruct IHM with (M':=N') (w:=w); auto;
+destruct H3; destruct H4; destruct H5; destruct H5.
+exists (get_here_Hyb (fwo w) x);
+repeat split; [constructor | constructor |]; auto;
+exists (get_here_Hyb (fwo w) x0);
+split; [constructor | ]; auto;
+apply steps_Hyb_here; eauto.
+(* get-here *)
+simpl in H1; destruct H1; destruct H3; elim H4; auto.
+(* fetch *)
+simpl in H1; destruct H1; elim H1; auto.
+(* fetch value *)
+simpl in H1; destruct H1; elim H1; auto.
+Grab Existential Variables.
+auto. exact 0. exact 0. exact 0. exact 0.
+Qed.
+
+(* Possible future development
+
+Definition many0steps_Hyb := |->*
+Lemma L_to_Hyb_steps_with_get:
+forall M M' w,
+  lc_w_L M -> lc_t_L M ->
+  ~ has_fetch_L M ->
+  step_L (M, fwo w) (M', fwo w) ->
+  exists N,
+    L_to_Hyb_term_R M N /\ lc_w_Hyb N /\
+    exists N' N'',
+      L_to_Hyb_term_R M' N' /\
+      many0steps_Hyb (N, fwo w) (N'', fwo w).
+      many0steps_Hyb (N', fwo w) (N'', fwo w).
+
+Proof idea: for all of the non-get terms N''=N',
+for the get-related ones with value at the end we use
+N'' as this value
+This is the last get - the one without value
+(* get *)
 destruct v; inversion H; subst; try omega; simpl in *.
 destruct IHM with (M'0) v; auto.
 destruct H3 as (H3, (H4, (x0, (H9, H10)))).
@@ -1038,227 +1093,15 @@ split; [constructor | ]; auto.
 eapply steps_Hyb_get; eauto.
 eapply L_to_Hyb_term_R_lc_t; eauto.
 constructor; auto. constructor; auto.
-(* get-get *)
-(*
-destruct v; inversion H; subst; try omega; simpl in *;
-destruct w'; inversion H6; subst; try omega; simpl in *;
-inversion H0; inversion H8; inversion H4; subst;
-inversion H7; inversion H12; subst.
-apply L_to_Hyb_value with (M':= L_to_Hyb_term (fwo v0) M2) in HT;
-[| eapply L_to_Hyb_term_lc_w | eapply L_to_Hyb_term_lc_t |
- apply L_to_Hyb_term_L_to_Hyb_term_R]; eauto; destruct HT.
-(* value *)
 
-assert (step_Hyb ((letdia_get_Hyb (fwo v0)
-           (get_here_Hyb (fwo v0) (L_to_Hyb_term (fwo v0) M2))
-           (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))), fwo v)
-    (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))) ^w^ (fwo v0)) ^t^
-        (L_to_Hyb_term (fwo v0) M2), fwo v)).
-  constructor.
-  eapply L_to_Hyb_term_lc_w; eauto.
-  eapply L_to_Hyb_term_lc_t; eauto.
-  constructor; [constructor | omega].
-  constructor; constructor; omega.
-  auto.
-unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
-repeat case_if.
-apply red_letdia_get_Hyb with (ctx':=fwo w)
-  (N:=(get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))))in H5.
-Focus 2.
-constructor; constructor; try omega; try constructor;
-eapply L_to_Hyb_term_lc_w; eauto.
-Focus 2.
-constructor; constructor; try constructor; try omega;
-eapply L_to_Hyb_term_lc_t; eauto.
-Focus 2.
-constructor; constructor.
-Focus 2.
-constructor; constructor; omega.
-exists (L_to_Hyb_term (fwo w) (get_L (fwo v) (get_L (fwo v0) (here_L M2))));
-repeat split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R | eapply L_to_Hyb_term_lc_w; eauto |];
-simpl.
-exists (letdia_get_Hyb (fwo v)
-              (get_here_Hyb (fwo v0) (L_to_Hyb_term (fwo v0) M2))
-              (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))); split.
-Focus 2. constructor; auto.
-constructor; constructor; apply L_to_Hyb_term_L_to_Hyb_term_R.
-exists (L_to_Hyb_term (fwo v0) (get_L (fwo v0) (here_L M2)));
-split; [apply L_to_Hyb_term_L_to_Hyb_term_R | ].
-simpl.
-Note: make special case in the function (and relation) for get-get?
+Another one:
+Problem with fetch is that when term under fetch is a value,
+we drop fetch and end the evaluation with M. After translation,
+we instead are left with box (unbox_fetch M). But this is only
+important when
+M |-> M' -> value_L M',
+so we can simply add a disjunctive pattern to capture that.
 *)
-skip.
-(* letdia-here *)
-inversion H; inversion H0; subst;
-destruct w'; inversion H12; inversion H17; try omega; subst;
-inversion H5; inversion H18; subst;
-exists (L_to_Hyb_term (fwo w) (letd_L (get_L (fwo v) (here_L M)) M2));
-repeat split;
-[apply L_to_Hyb_term_L_to_Hyb_term_R |
- eapply L_to_Hyb_term_lc_w; eauto | simpl ].
-exists (((L_to_Hyb_term (fwo v) M2) ^w^ (fwo v)) ^t^ (L_to_Hyb_term (fwo v) M));
-split.
-unfold open_w_L; unfold open_w_Hyb; unfold open_t_L; unfold open_t_Hyb;
-apply L_to_Hyb_term_R_subst_t; [apply L_to_Hyb_term_L_to_Hyb_term_R |];
-apply L_to_Hyb_term_R_subst_w; apply L_to_Hyb_term_L_to_Hyb_term_R.
-apply L_to_Hyb_value with (M':= L_to_Hyb_term (fwo v) M) in H11;
-[| eapply L_to_Hyb_term_lc_w | eapply L_to_Hyb_term_lc_t |
- apply L_to_Hyb_term_L_to_Hyb_term_R]; eauto; destruct H11.
-(* value *)
-assert ((letdia_get_Hyb (fwo v)
-           (get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M))
-           (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))), fwo w) |->
-        (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))^w^ (fwo v)) ^t^
-          (L_to_Hyb_term (fwo v) M), fwo w)).
-constructor. skip. skip. skip. skip. auto.
-unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
-repeat case_if.
-assert (
-    (letdia_get_Hyb (fwo w) (get_here_Hyb (fwo v) (L_to_Hyb_term (fwo v) M))
-                     (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))), fwo w) |->
-     (((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))) ^w^ (fwo v)) ^t^
-      (L_to_Hyb_term (fwo v) M),
-      fwo w)).
-constructor. skip. skip. skip. skip. auto.
-unfold open_w_Hyb in *; unfold open_t_Hyb in *; simpl in *;
-repeat case_if.
-(*
-exists (letdia_get_Hyb (fwo v0)
-        (L_to_Hyb_term (fwo v) (get_L (fwo v0) M0))
-        (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))).
-assert (L_to_Hyb_term_R (get_L (fwo v0) M0)
-
-repeat split; simpl. constructor. | constructor |]; auto.
-[constructor; constructor; try omega |];
-exists (letdia_get_Hyb (fwo v0)
-        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
-split; [constructor | ]; auto;
-eapply steps_Hyb_get; eauto;
-[eapply L_to_Hyb_term_R_lc_t in H3; eauto | |];
-constructor; auto.
-inversion H2.
-destruct IHM with M0 v; auto.
-destruct H3 as (H3, (H4, (x0, (H9, H10))));
-exists (letdia_get_Hyb (fwo v0)
-        x (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
-repeat split; [constructor | constructor |]; auto;
-[constructor; constructor; try omega |];
-exists (letdia_get_Hyb (fwo v0)
-        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
-split; [constructor | ]; auto;
-eapply steps_Hyb_get; eauto;
-[eapply L_to_Hyb_term_R_lc_t in H3; eauto | |];
-constructor; auto.
-
-(*
-forall M N,
-  lc_t_Hyb N -> lc_w_Hyb N ->
-  ~ has_fetch_L M ->
-  L_to_Hyb_term_R M N ->
-  forall M' w, step_L (M, w) (M', w) ->
-    exists N' w', L_to_Hyb_term_R M' N' /\
-               steps_Hyb (N, w') (N', w')
-.
-(* try: induction M *)
-induction M; intros; inversion H2; inversion H3; subst; simpl in *.
-(* appl-lam *)
-inversion H6; subst;
-inversion H; inversion H0; inversion H10; inversion H19; subst.
-exists (open_t_Hyb N N2); exists w;
-split;
-[unfold open_t_L in *; unfold open_t_Hyb in *; apply L_to_Hyb_term_R_subst_t |
- constructor; constructor ]; auto.
-(* appl *)
-inversion H; inversion H0; subst.
-destruct IHM1 with N1 M'0 w; auto; try (intro; elim H; left; auto);
-destruct H4; destruct H4;
-exists (appl_Hyb x N2); exists x0; split; [constructor; auto |];
-apply steps_Hyb_appl; auto.
-(* unbox-box *)
-inversion H5; subst.
-destruct w0; inversion H; inversion H0; subst; try omega;
-inversion H8; inversion H14; subst.
-exists (open_w_Hyb N w); exists w; split;
-[unfold open_w_L in *; unfold open_w_Hyb in *; apply L_to_Hyb_term_R_subst_w |
- constructor; constructor]; auto.
-(* unbox *)
-destruct w0; inversion H; inversion H0; try omega; subst.
-destruct IHM with N0 M'0 w; auto. destruct H4; destruct H4.
-exists (unbox_fetch_Hyb (fwo v) x); exists (fwo v); split;
-[constructor; auto | ];
-apply steps_Hyb_unbox; auto.
-(* try: induction on step_L M M' *)
-intros.
-generalize dependent G.
-generalize dependent Gamma.
-generalize dependent Omega.
-generalize dependent Delta.
-generalize dependent A.
-generalize dependent N.
-remember (M, fwo w) as M0; generalize dependent M;
-remember (M', fwo w) as M'0; generalize dependent M'.
-generalize dependent w.
-induction H4; intros; inversion HeqM0; inversion HeqM'0; subst;
-simpl in *.
-(* appl-lam *)
-inversion H4; inversion H10; subst.
-exists (open_t_Hyb N3 N2);
-repeat split;
-[unfold open_t_L in *; unfold open_t_Hyb in *; apply L_to_Hyb_term_R_subst_t |
- constructor; constructor ]; auto.
-skip. skip. skip. skip. (* lc! *)
-(* unbox-box *)
-inversion H2; inversion H7; subst.
-exists (open_w_Hyb N1 (fwo w0)); split;
-[unfold open_w_L in *; unfold open_w_Hyb in *; apply L_to_Hyb_term_R_subst_w |
- constructor; constructor]; auto. skip. skip. (* lc !*)
-(* letdia-here *)
-inversion H5; inversion H11; inversion H18; subst.
-apply L_to_Hyb_value with (M':= N4) in H3; destruct H3.
-(* value *)
-exists (open_t_Hyb (open_w_Hyb N2 w') N4); split.
-unfold open_t_L in *; unfold open_t_Hyb in *; apply L_to_Hyb_term_R_subst_t;
-auto; unfold open_w_L in *; unfold open_w_Hyb in *;
-apply L_to_Hyb_term_R_subst_w; auto.
-assert (((letdia_get_Hyb w' (get_here_Hyb w2 N4)
-           (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))), w) |->
-     ((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)) ^w^ w2 ) ^t^ N4, w))
-by (constructor; try repeat constructor; try omega; auto; skip);
-unfold open_t_Hyb in H7; unfold open_w_Hyb in H7; simpl in *; repeat case_if.
-apply multi_step_Hyb with (M':=letdia_get_Hyb w (get_here_Hyb w2 N4) N2).
-constructor. auto.
-skip. skip. skip. skip.
-constructor. constructor.
-
-replace ((get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)) ^w^ w2 ) ^t^ N4) with
-  (get_here_Hyb w2 N4) by
-    (unfold open_w_Hyb; unfold open_t_Hyb; simpl; repeat case_if; auto).
-constructor.
-(* finite steps *)
-constructor. constructor.
-(* appl *)
-destruct IHM1 with N1 M'0 w; auto; try (intro; elim H; left; auto);
-destruct H2; exists (appl_Hyb x N2); split; [constructor; auto |];
-apply steps_Hyb_appl; auto.
-(* unbox *)
-destruct IHM with N0 M'0 w; auto; destruct H2.
-exists (unbox_fetch_Hyb w1 x); split; [constructor; auto | ].
-apply steps_Hyb_unbox; auto.
-(* try: induction on step_L M M' *)
-intros.
-generalize dependent N.
-remember (M, w) as M0; generalize dependent M;
-remember (M', w) as M'0; generalize dependent M';
-generalize dependent w.
-induction H1; intros; inversion HeqM0; inversion HeqM'0; subst;
-simpl in *.
-
-(* try: induction on R M N *)
-Admitted.
-*)
-*)
-Admitted.
 
 Close Scope labeled_is5_scope.
 Close Scope permut_scope.
