@@ -646,50 +646,11 @@ rewrite <- subst_w_neutral_free_L; auto.
 (* red_fetch_val *)
 inversion HVal; subst; [inversion HType | | inversion HType].
 inversion HType; subst; econstructor; eauto.
-(*destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same_L|]; auto;
-replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
-  (simpl; auto).
-assert (Mem w Omega) by (eapply types_w_in_Omega_L; eauto);
-apply Mem_split in H; destruct H as (hd, (tl, H));
-apply PermutOmega_L with (Omega := w :: hd ++ tl); [ | permut_simpl];
-[ eapply WeakeningOmega_L | rewrite H ]; eauto; try permut_simpl.
-eapply rename_w_L_types_preserv with (w:=w); try case_if; subst; eauto;
-try permut_simpl.
-rewrite Mem_app_or_eq;
-rewrite Mem_app_or_eq in Hin; destruct Hin.
-  rewrite Mem_app_or_eq in H; destruct H; [ left | rewrite Mem_cons_eq in H];
-  auto; destruct H; [ subst | rewrite Mem_nil_eq in H; contradiction].
-  elim n; auto.
-  right; auto.
-simpl; destruct Ok; split; auto; apply ok_Omega_L_permut with (O1:=Omega); auto;
-rewrite H; permut_simpl.
-*)
 (* red_get_here *)
 destruct Ok; repeat constructor; auto;
 apply types_L_Mem_Omega in HType; auto.
 (* red_get_val *)
 inversion HType; subst; constructor; auto.
-(*
-replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
-  (simpl; auto).
-destruct (eq_var_dec w'0 w); subst; [rewrite rename_w_same_L|]; auto;
-replace (@nil (prod var (prod var ty))) with (rename_context_L w w'0 nil) by
-  (simpl; auto).
-assert (Mem w Omega) by (eapply types_w_in_Omega_L; eauto);
-apply Mem_split in H; destruct H as (hd, (tl, H));
-apply PermutOmega_L with (Omega := w :: hd ++ tl); [ | permut_simpl];
-[ eapply WeakeningOmega_L | rewrite H ]; eauto; try permut_simpl.
-eapply rename_w_L_types_preserv with (w:=w); try case_if; eauto.
-rewrite Mem_app_or_eq;
-rewrite H in Hin; rewrite Mem_app_or_eq in Hin; destruct Hin.
-  rewrite Mem_app_or_eq in H0; destruct H0; [ left | rewrite Mem_cons_eq in H0];
-  auto; destruct H0; [ subst | rewrite Mem_nil_eq in H0; contradiction].
-  elim n; auto.
-  right; auto.
-subst; permut_simpl.
-simpl; destruct Ok; split; auto; apply ok_Omega_L_permut with (O1:=Omega); auto;
-rewrite H; permut_simpl.
-*)
 (* red_letd_here *)
 clear H.
 inversion HType; subst; unfold open_w_L in *; unfold open_t_L in *;
@@ -862,3 +823,95 @@ apply stepm_L with (M':=letd_L (get_L (fwo v) M') N);
 apply lc_t_step_L_preserv with (M:=M) (w:= fwo v); eauto.
 apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
 Qed.
+
+Lemma unique_types_LF:
+forall Omega Gamma M A B w,
+  Omega; Gamma |- M ::: A @ w ->
+  Omega; Gamma |- M ::: B @ w ->
+                  A = B.
+intros; generalize dependent B.
+induction H; intros.
+(* hyp *)
+inversion H0; subst.
+unfold ok_L in ; destruct Ok.
+apply Mem_split in HT; destruct HT as (Gamma0, (Gamma1, HT)); subst.
+apply ok_Gamma_L_permut with (G2:=(w, (v,A)) :: Gamma0 ++ Gamma1) in H1;
+try permut_simpl;
+apply Mem_permut with (l':=(w, (v,A)) :: Gamma0 ++ Gamma1) in HT0;
+try permut_simpl.
+rewrite Mem_cons_eq in HT0; destruct HT0. inversion H2; subst; auto.
+apply ok_L_Mem_contradiction with (Omega:=Omega) (B:=A) in H2.
+contradiction. split; auto.
+(* lam *)
+inversion H0; subst.
+assert (exists x, x \notin L \u L0) by apply Fresh. destruct H1.
+rewrite H with x B1; eauto.
+(* appl *)
+inversion H1; subst.
+assert (A ---> B = A0 ---> B0).
+  rewrite IHtypes_L1 with (A0 ---> B0); auto.
+inversion H2; subst; auto.
+(* box *)
+inversion H0; subst;
+assert (exists x, x \notin L \u L0) by apply Fresh; destruct H1;
+rewrite H with x A0; eauto.
+(* unbox *)
+inversion H0; subst.
+assert ([*]A = [*]B).
+rewrite IHtypes_L with ([*]B); eauto.
+inversion H1; auto.
+(* fetch *)
+inversion H0; subst; rewrite IHtypes_L with ([*]A0); auto.
+(* here *)
+inversion H0; subst.
+assert (A = A0).
+rewrite IHtypes_L with A0; eauto.
+subst; auto.
+(* get *)
+inversion H0; subst; rewrite IHtypes_L with (<*>A0); auto.
+(* letd *)
+inversion H1; subst.
+assert (A = A0).
+  assert (<*>A = <*>A0).
+  apply IHtypes_L; auto.
+  inversion H2; auto.
+assert (exists x, x \notin Lw \u Lw0) by apply Fresh; destruct H3.
+assert (exists x, x \notin Lt \u Lt0) by apply Fresh; destruct H4.
+subst; apply H0 with x0 x; auto.
+Qed.
+
+Lemma typing_dec_attempt_1:
+forall M Omega Gamma A w,
+  Mem w Omega ->
+  ok_L Omega Gamma ->
+  {Omega; Gamma |- M ::: A @ w} +
+  { ~ Omega; Gamma |- M ::: A @ w}.
+induction M; intros.
+(* hyp *)
+destruct v.
+right; intro nn; inversion nn.
+destruct (Mem_dec (prod var (prod var ty)) Gamma (w, (v, A))).
+intros; repeat decide equality; apply eq_var_dec || apply eq_ty_dec.
+left; constructor; auto.
+right; intro nn; inversion nn; contradiction.
+(* lam *)
+destruct A; [right |  | right | right ]; try intro;
+try inversion H1;
+destruct (eq_ty_dec t A1); subst;
+[ | right; intro; inversion H1; subst; elim n; auto].
+remember (forall L,
+          forall v, v \notin L ->
+             Omega; (w, (v, A1)) :: Gamma |- M ^t^ (hyp_L (fte v)) ::: A2 @ w)
+         as P.
+assert ({ P } + { ~ P}). skip.
+destruct H1; [ left | right]; subst.
+econstructor; [auto | intros; eapply p; eauto].
+intro nn; inversion nn; subst. elim n; intros; eauto.
+specialize X with (used_vars_term_L M \u used_vars_context_L Gamma); destruct X.
+
+
+destruct IHM with Omega ((w, (x, A1))::Gamma) A2 w; auto.
+apply ok_L_extend_fresh; auto.
+left; apply t_lam_L
+      with (L:=  used_vars_term_L M \u used_vars_context_L Gamma); auto.
+intros.
