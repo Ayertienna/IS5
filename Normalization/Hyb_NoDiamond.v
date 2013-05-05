@@ -1,7 +1,7 @@
 Add LoadPath "..".
-Add LoadPath "../Hybrid".
-Require Import Shared.
-Require Import Hybrid.
+Add LoadPath "../Hybrid/NoDiamond".
+Require Import HybND_Shared.
+Require Import HybridNoDia.
 Require Import ListLib.
 
 Open Scope is5_scope.
@@ -25,7 +25,6 @@ induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
 try constructor; eauto.
 assert (n <> v0) by (intro; subst; elim H1; auto); omega.
 eapply IHM; auto; apply closed_t_succ_Hyb; auto.
-eapply IHM2; auto; apply closed_t_succ_Hyb; auto.
 Qed.
 
 Lemma lc_t_subst_t_Hyb_free:
@@ -36,7 +35,6 @@ forall M N n v,
 induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
 try constructor; eauto.
 eapply IHM; eauto; apply closed_t_succ_Hyb; auto.
-eapply IHM2; auto; apply closed_t_succ_Hyb; auto.
 Qed.
 
 Lemma lc_t_step_Hyb:
@@ -44,8 +42,14 @@ forall M N w,
   lc_t_Hyb M ->
   (M, w) |-> (N, w) ->
   lc_t_Hyb N.
-intros; eapply lc_t_step_Hyb_preserv; eauto.
-Qed.
+Admitted.
+
+Lemma lc_w_step_Hyb:
+forall M M' w,
+  lc_w_Hyb M ->
+  step_Hyb (M, w) (M', w) ->
+  lc_w_Hyb M'.
+Admitted.
 
 Lemma closed_t_succ:
 forall M n,
@@ -65,14 +69,38 @@ try apply closed_t_succ;
 assumption.
 Qed.
 
+Lemma types_Hyb_lc_w_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_t in H0; auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_w in H0; auto.
+Qed.
+
+Lemma types_Hyb_lc_t_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
+Qed.
+
 Definition normal_form (M: te_Hyb) := value_Hyb M.
 
 Inductive neutral_Hyb: te_Hyb -> Prop :=
 | nHyp: forall n, neutral_Hyb (hyp_Hyb n)
 | nAppl: forall M N, neutral_Hyb (appl_Hyb M N)
 | nUnbox: forall M w, neutral_Hyb (unbox_fetch_Hyb w M)
-| nHere: forall M w, neutral_Hyb M -> neutral_Hyb (get_here_Hyb w M)
-| nULetdia: forall M N w, neutral_Hyb (letdia_get_Hyb w M N)
 .
 
 Lemma value_no_step:
@@ -93,7 +121,6 @@ left; constructor.
 right; constructor.
 left; constructor.
 right; constructor.
-left; constructor.
 left; constructor.
 Qed.
 
@@ -122,7 +149,7 @@ destruct H3;
 apply step_SN with w; intros;
 eapply H2 with (N0:=appl_Hyb N0 N) (N:=N);
 constructor; eauto.
-apply lc_w_step_Hyb_preserv in H4; auto.
+apply lc_w_step_Hyb in H4; auto.
 apply lc_t_step_Hyb in H4; auto.
 Qed.
 
@@ -144,7 +171,7 @@ apply step_SN with (w:=fwo w2); intros.
 inversion H; inversion H0; subst.
 apply H2 with (N := unbox_fetch_Hyb (fwo w2) N) (w:=fwo w2); auto.
 constructor; auto.
-constructor; apply lc_w_step_Hyb_preserv in H4; auto.
+constructor; apply lc_w_step_Hyb in H4; auto.
 constructor; apply lc_t_step_Hyb in H4; auto.
 omega.
 Qed.
@@ -160,7 +187,6 @@ match A with
       Red (appl_Hyb M N) A2
 | tbox A1 => forall w',
                Red (unbox_fetch_Hyb (fwo w') M) A1
-| tdia A1 => False
 end.
 
 (* CR 2 *)
@@ -182,8 +208,6 @@ apply H0; auto].
 apply IHA2 with (M:=appl_Hyb M N); auto; constructor; auto.
 (* box type *)
 apply IHA with (M:=unbox_fetch_Hyb (fwo w') M); auto; constructor; auto.
-
-auto.
 Qed.
 
 (* CR 3 *)
@@ -206,8 +230,6 @@ inversion H2; subst; inversion H0; subst; eapply H1; eauto.
 intros; apply IHA; try constructor; auto; intros;
 inversion H2; subst; [inversion H0 | ];
 apply H1 with w'; auto.
-
-skip.
 Qed.
 
 (* CR 1 *)
@@ -241,8 +263,6 @@ intros; apply SN_box with (fwo x).
 constructor; auto.
 constructor; auto.
 apply IHA; [constructor | constructor | ]; auto.
-
-contradiction.
 Grab Existential Variables.
 auto.
 Qed.
@@ -310,18 +330,6 @@ match M with
   match x with
       | Some (x0, x1) => unbox_fetch_Hyb (fwo x0) (SL L W M)
       | None => unbox_fetch_Hyb w (SL L W M)
-  end
-| get_here_Hyb w M =>
-  let x := find_world W w in
-  match x with
-      | Some (x0, x1) => get_here_Hyb (fwo x0) (SL L W M)
-      | None => get_here_Hyb w (SL L W M)
-  end
-| letdia_get_Hyb w M N =>
-  let x := find_world W w in
-  match x with
-      | Some (x0, x1) => letdia_get_Hyb (fwo x0) (SL L W M) (SL L W N)
-      | None => letdia_get_Hyb w (SL L W M) (SL L W N)
   end
 end.
 
@@ -470,10 +478,6 @@ rewrite NotMem_find_var; auto.
 inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
 destruct (find_world W v); simpl in *; try destruct p; constructor; auto;
 apply IHM; inversion H; eauto.
-destruct (find_world W v); simpl in *; try destruct p; constructor; auto;
-apply IHM; inversion H; eauto.
-destruct (find_world W v); simpl in *; try destruct p; constructor; auto;
-inversion H; subst; [apply IHM2 | apply IHM1 | apply IHM2 | apply IHM1 ]; auto.
 Qed.
 
 Lemma lc_w_SL:
@@ -491,10 +495,6 @@ rewrite H1. replace n with (0+n) by omega.
 apply closed_w_addition; apply H0 with v x. apply find_var_Mem; auto.
 rewrite NotMem_find_var; auto.
 inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
-destruct (find_world W v); simpl in *; try destruct p;
-inversion H; constructor; auto; apply IHM; auto.
-destruct (find_world W v); simpl in *; try destruct p;
-inversion H; constructor; auto; apply IHM; auto.
 destruct (find_world W v); simpl in *; try destruct p;
 inversion H; constructor; auto; apply IHM; auto.
 Qed.
@@ -518,10 +518,6 @@ rewrite closed_subst_t_Hyb_bound with (n:=0); auto; try omega;
 apply H0 with v a; apply find_var_Mem; auto.
 destruct (find_world W v); simpl in *; try destruct p; simpl;
 try erewrite IHM; eauto.
-destruct (find_world W v); simpl in *; try destruct p; simpl;
-try erewrite IHM; eauto.
-destruct (find_world W v); simpl in *; try destruct p; simpl;
-try erewrite IHM1; try erewrite IHM2; eauto.
 Qed.
 
 Fixpoint FV_L (L: list (var * ty * te_Hyb)) :=
@@ -611,8 +607,6 @@ rewrite closed_subst_t_Hyb_free; auto.
 apply notin_FV_notin_elem with L0 v a; eauto.
 apply find_var_Mem; eauto.
 destruct (find_world W v); simpl; try destruct p; auto.
-destruct (find_world W v); simpl; try destruct p; auto.
-destruct (find_world W v); simpl; try destruct p; auto.
 Qed.
 
 Lemma find_world_bound_None:
@@ -646,18 +640,6 @@ simpl; repeat case_if; auto;
 apply Mem_find_var in m; destruct m as (a, (b, m)); rewrite m; simpl;
 rewrite closed_subst_w_Hyb_free; auto;
 apply notin_FW_notin_elem with L v a; eauto; apply find_var_Mem; eauto.
-destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto;
-destruct (Mem_dec var (map snd_ W) v); [ apply eq_var_dec | | ];
-[ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
-apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
-case_if; auto; inversion H3; subst;
-apply find_world_Mem in m; apply Mem_fst_ in m; contradiction.
-destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto;
-destruct (Mem_dec var (map snd_ W) v); [ apply eq_var_dec | | ];
-[ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
-apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
-case_if; auto; inversion H3; subst;
-apply find_world_Mem in m; apply Mem_fst_ in m; contradiction.
 destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto;
 destruct (Mem_dec var (map snd_ W) v); [ apply eq_var_dec | | ];
 [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
@@ -711,26 +693,6 @@ case_if.
     [ | rewrite IHM; eauto];
     apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
     case_if; rewrite IHM; auto.
-case_if.
-  rewrite find_world_bound_None; rewrite NotMem_find_world; auto; simpl;
-  case_if; rewrite IHM; eauto.
-  destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto.
-    rewrite IHM; eauto.
-    destruct (Mem_dec var (map snd_ W) v); [apply eq_var_dec | |];
-    [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
-    [ | rewrite IHM; eauto];
-    apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
-    case_if; rewrite IHM; auto.
-case_if.
-  rewrite find_world_bound_None; rewrite NotMem_find_world; auto; simpl;
-  case_if; rewrite IHM1; try rewrite IHM2; eauto.
-  destruct v; [rewrite find_world_bound_None | ]; simpl; repeat case_if; auto.
-    rewrite IHM1; try rewrite IHM2; eauto.
-    destruct (Mem_dec var (map snd_ W) v); [apply eq_var_dec | |];
-    [ | rewrite NotMem_find_world]; auto; simpl; repeat case_if; auto;
-    [ | rewrite IHM1; try rewrite IHM2; eauto];
-    apply Mem_find_world in m; destruct m as (wa, m); rewrite m; simpl;
-    case_if; rewrite IHM1; try rewrite IHM2; auto.
 Qed.
 
 Theorem main_theorem:
@@ -831,7 +793,6 @@ repeat rewrite flat_map_concat; simpl;
 transitivity (flat_map snd_ ((w, Gamma)::G)).
 rew_flat_map; auto. apply flat_map_PPermut_Hyb; rewrite <- H.
 PPermut_Hyb_simpl.
-skip. skip. skip. skip.
 Qed.
 
 Lemma lc_t_n_Hyb_subst_t:
@@ -843,8 +804,6 @@ induction N; intros; simpl in *; try destruct v; constructor;
 repeat case_if; try inversion H1; subst; try omega;
 inversion H0; subst; eauto.
 apply IHN with (M:=M); eauto; apply closed_t_succ_Hyb; auto.
-apply IHN2 with (M:=M); eauto; apply closed_t_succ_Hyb; auto.
-apply IHN2 with (M:=M); eauto; apply closed_t_succ_Hyb; auto.
 Qed.
 
 Theorem SN_Lang:

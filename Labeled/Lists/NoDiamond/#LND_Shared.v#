@@ -16,13 +16,10 @@ Inductive ty :=
 | tvar: ty
 | tarrow: ty -> ty -> ty
 | tbox: ty -> ty
-| tdia: ty -> ty
 .
 Notation " A '--->' B " := (tarrow A B)
   (at level 30, right associativity) : is5_scope.
 Notation " '[*]' A " := (tbox A)
-  (at level 30) : is5_scope.
-Notation " '<*>' A " := (tdia A)
   (at level 30) : is5_scope.
 
 (*
