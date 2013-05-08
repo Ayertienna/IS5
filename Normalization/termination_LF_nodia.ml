@@ -113,106 +113,106 @@ let append l1 l2 =
 
 type 'a set = __
 
-module type FsetSig =
- sig
-  type 'x fset
-
+module type FsetSig = 
+ sig 
+  type 'x fset 
+  
   val empty : 'a1 fset
-
+  
   val singleton : 'a1 -> 'a1 fset
-
+  
   val union : 'a1 fset -> 'a1 fset -> 'a1 fset
-
+  
   val inter : 'a1 fset -> 'a1 fset -> 'a1 fset
-
+  
   val remove : 'a1 fset -> 'a1 fset -> 'a1 fset
-
+  
   val from_list : 'a1 list -> 'a1 fset
  end
 
-module FsetImpl =
- struct
+module FsetImpl = 
+ struct 
   type 'a fset = 'a set
-
+  
   (** val build_fset : __ -> 'a1 set **)
-
+  
   let build_fset _ =
     __
-
+  
   (** val empty : 'a1 fset **)
-
+  
   let empty =
     build_fset __
-
+  
   (** val singleton : 'a1 -> 'a1 fset **)
-
+  
   let singleton x =
     build_fset __
-
+  
   (** val union : 'a1 fset -> 'a1 fset -> 'a1 fset **)
-
+  
   let union e f =
     build_fset __
-
+  
   (** val inter : 'a1 fset -> 'a1 fset -> 'a1 set **)
-
+  
   let inter e f =
     build_fset __
-
+  
   (** val remove : 'a1 fset -> 'a1 fset -> 'a1 set **)
-
+  
   let remove e f =
     build_fset __
-
+  
   (** val from_list : 'a1 list -> 'a1 fset **)
-
+  
   let from_list l =
     fold_right (fun x acc -> union (singleton x) acc) empty l
  end
 
-module type VariablesType =
- sig
-  type var
-
+module type VariablesType = 
+ sig 
+  type var 
+  
   val var_comp : var comparable
-
+  
   val var_comparable : var comparable
-
+  
   type vars = var FsetImpl.fset
-
+  
   val var_gen : vars -> var
-
+  
   val var_fresh : vars -> var
  end
 
-module Variables =
- struct
+module Variables = 
+ struct 
   type var = nat
-
+  
   (** val var_comp : var comparable **)
-
+  
   let var_comp =
     nat_comparable
-
+  
   (** val var_comparable : var comparable **)
-
+  
   let var_comparable =
     var_comp
-
+  
   type vars = var FsetImpl.fset
-
+  
   (** val var_gen_list : nat list -> nat **)
-
+  
   let var_gen_list l =
     plus (S O) (fold_right plus O l)
-
+  
   (** val var_gen : vars -> var **)
-
+  
   let var_gen e =
     var_gen_list (epsilon __)
-
+  
   (** val var_fresh : vars -> var **)
-
+  
   let var_fresh l =
     var_gen l
  end
@@ -435,42 +435,42 @@ let rec eq_te_LF_dec t m0 =
      | Unbox_LF t1 -> eq_te_LF_dec t0 t1
      | _ -> Right)
 
-type sN =
-| Val_SN of te_LF * value_LF
-| Step_SN of te_LF * (te_LF -> step_LF -> sN)
+type wHT =
+| Val_WHT of te_LF * value_LF
+| Step_WHT of te_LF * (te_LF -> step_LF -> wHT)
 
-(** val sN_appl : te_LF -> te_LF -> sN -> sN **)
+(** val wHT_appl : te_LF -> te_LF -> wHT -> wHT **)
 
-let sN_appl m n h0 =
+let wHT_appl m n h0 =
   let t = Appl_LF (m, n) in
-  let rec f t0 s n0 m0 =
-    match s with
-    | Val_SN (m1, v) -> assert false (* absurd case *)
-    | Step_SN (m1, s0) ->
-      let s1 = neutral_or_value m0 in
-      (match s1 with
+  let rec f t0 w n0 m0 =
+    match w with
+    | Val_WHT (m1, v) -> assert false (* absurd case *)
+    | Step_WHT (m1, w0) ->
+      let s = neutral_or_value m0 in
+      (match s with
        | Inl n1 ->
-         Step_SN (m0, (fun n2 h1 ->
+         Step_WHT (m0, (fun n2 h1 ->
            let n3 = Appl_LF (n2, n0) in
-           let s2 = Red_appl_LF (m0, n2, n0, h1) in f n3 (s0 n3 s2) n0 n2))
-       | Inr v -> Val_SN (m0, v))
+           let s0 = Red_appl_LF (m0, n2, n0, h1) in f n3 (w0 n3 s0) n0 n2))
+       | Inr v -> Val_WHT (m0, v))
   in f t h0 n m
 
-(** val sN_box : te_LF -> sN -> sN **)
+(** val wHT_box : te_LF -> wHT -> wHT **)
 
-let sN_box m h0 =
+let wHT_box m h0 =
   let t = Unbox_LF m in
-  let rec f t0 s m0 =
-    match s with
-    | Val_SN (m1, v) -> assert false (* absurd case *)
-    | Step_SN (m1, s0) ->
-      let s1 = neutral_or_value m0 in
-      (match s1 with
+  let rec f t0 w m0 =
+    match w with
+    | Val_WHT (m1, v) -> assert false (* absurd case *)
+    | Step_WHT (m1, w0) ->
+      let s = neutral_or_value m0 in
+      (match s with
        | Inl n ->
-         Step_SN (m0, (fun n0 h1 ->
+         Step_WHT (m0, (fun n0 h1 ->
            let n1 = Unbox_LF n0 in
-           let s2 = Red_unbox_LF (m0, n0, h1) in f n1 (s0 n1 s2) n0))
-       | Inr v -> Val_SN (m0, v))
+           let s0 = Red_unbox_LF (m0, n0, h1) in f n1 (w0 n1 s0) n0))
+       | Inr v -> Val_WHT (m0, v))
   in f t h0 m
 
 type red = __
@@ -480,7 +480,7 @@ type red = __
 
 let rec property_3 t m h x =
   match t with
-  | Tvar -> Obj.magic (Step_SN (m, (Obj.magic x)))
+  | Tvar -> Obj.magic (Step_WHT (m, (Obj.magic x)))
   | Tarrow (t0, t1) ->
     Obj.magic (fun n _ hRed ->
       property_3 t1 (Appl_LF (m, n)) (NAppl (m, n)) (fun m' h0 ->
@@ -493,7 +493,7 @@ let rec property_3 t m h x =
       | Red_unbox_LF (m0, m'0, h2) -> x m'0 h2
       | _ -> assert false (* absurd case *))
 
-(** val property_1 : ty -> te_LF -> red -> sN **)
+(** val property_1 : ty -> te_LF -> red -> wHT **)
 
 let property_1 a m x =
   let nn = fresh FsetImpl.empty in
@@ -508,8 +508,8 @@ let property_1 a m x =
       in
       let x2 = fun x2 -> Obj.magic x0 (Hyp_LF (Fte x2)) __ (x1 x2) in
       let h1 = fun x3 -> f t1 (Appl_LF (m0, (Hyp_LF (Fte x3)))) (x2 x3) in
-      sN_appl m0 (Hyp_LF (Fte nn)) (h1 nn)
-    | Tbox t0 -> sN_box m0 (f t0 (Unbox_LF m0) x0)
+      wHT_appl m0 (Hyp_LF (Fte nn)) (h1 nn)
+    | Tbox t0 -> wHT_box m0 (f t0 (Unbox_LF m0) x0)
   in f a m x
 
 (** val find_var :
@@ -653,10 +653,11 @@ let rec main_theorem b c t t0 t1 l x =
   | T_unbox_fetch_LF (g, gamma, gamma', m, a, h, g', p) ->
     main_theorem (append g (Cons (gamma', Nil))) gamma m (Tbox a) h l x
 
-(** val sN_Lang :
-    (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> sN **)
+(** val wHT_Lang :
+    (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> wHT **)
 
-let sN_Lang g m a x =
+let wHT_Lang g m a x =
   property_1 a m
     (main_theorem (emptyEquiv_LF g) Nil m a x Nil (fun a0 b c _ ->
       assert false (* absurd case *)))
+

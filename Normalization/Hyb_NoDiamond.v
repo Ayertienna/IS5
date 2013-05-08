@@ -42,13 +42,21 @@ forall M N w,
   lc_t_Hyb M ->
   (M, w) |-> (N, w) ->
   lc_t_Hyb N.
-Admitted.
+induction M; intros; inversion H0; subst.
+apply lc_t_subst_t_Hyb_bound; auto.
+constructor; eauto. apply IHM1 with w; auto.
+apply lc_t_subst_w_Hyb; auto.
+constructor; apply IHM with v; auto.
+Qed.
 
 Lemma lc_w_step_Hyb:
 forall M M' w,
   lc_w_Hyb M ->
   step_Hyb (M, w) (M', w) ->
   lc_w_Hyb M'.
+induction M; intros; inversion H0; subst.
+apply lc_w_subst_t_Hyb; auto.
+constructor; eauto. apply IHM1 with w; auto.
 Admitted.
 
 Lemma closed_t_succ:
@@ -124,18 +132,18 @@ right; constructor.
 left; constructor.
 Qed.
 
-Inductive SN: te_Hyb -> Prop :=
-| val_SN: forall M, value_Hyb M -> SN M
-| step_SN: forall M w,
-             (forall N, (M , w) |-> (N, w) -> SN N) ->
-             SN M.
+Inductive WHT: te_Hyb -> Prop :=
+| val_WHT: forall M, value_Hyb M -> WHT M
+| step_WHT: forall M w,
+             (forall N, (M , w) |-> (N, w) -> WHT N) ->
+             WHT M.
 
-Lemma SN_appl:
+Lemma WHT_appl:
 forall M N,
   lc_w_Hyb (appl_Hyb M N) ->
   lc_t_Hyb (appl_Hyb M N) ->
-  SN (appl_Hyb M N) ->
-  SN M.
+  WHT (appl_Hyb M N) ->
+  WHT M.
 intros;
 remember (appl_Hyb M N) as T;
 generalize dependent M;
@@ -146,19 +154,19 @@ induction H1; intros; subst;
 destruct H3;
 [ inversion H; subst; inversion H0; subst |
   constructor; auto];
-apply step_SN with w; intros;
+apply step_WHT with w; intros;
 eapply H2 with (N0:=appl_Hyb N0 N) (N:=N);
 constructor; eauto.
 apply lc_w_step_Hyb in H4; auto.
 apply lc_t_step_Hyb in H4; auto.
 Qed.
 
-Lemma SN_box:
+Lemma WHT_box:
 forall M w,
   lc_w_Hyb (unbox_fetch_Hyb w M) ->
   lc_t_Hyb (unbox_fetch_Hyb w M) ->
-  SN (unbox_fetch_Hyb w M) ->
-  SN M.
+  WHT (unbox_fetch_Hyb w M) ->
+  WHT M.
 intros; remember (unbox_fetch_Hyb w M) as T;
 generalize dependent M;
 generalize dependent w.
@@ -167,7 +175,7 @@ induction H1; intros; subst;
   assert (neutral_Hyb M0 \/ value_Hyb M0) by apply neutral_or_value];
 destruct H3;
 [ inversion H0; inversion H; subst | constructor; auto].
-apply step_SN with (w:=fwo w2); intros.
+apply step_WHT with (w:=fwo w2); intros.
 inversion H; inversion H0; subst.
 apply H2 with (N := unbox_fetch_Hyb (fwo w2) N) (w:=fwo w2); auto.
 constructor; auto.
@@ -178,7 +186,7 @@ Qed.
 
 Fixpoint Red (M: te_Hyb) (A: ty): Prop :=
 match A with
-| tvar => SN M
+| tvar => WHT M
 | tarrow A1 A2 =>
     forall N
            (H_lc_t: lc_t_Hyb N)
@@ -221,7 +229,7 @@ forall A M
 assert (exists (x:var), x \notin \{}) as nn by apply Fresh; destruct nn; auto;
 induction A; intros; simpl in *.
 (* base type *)
-intros; apply step_SN with (w:=fwo x); auto; intros;
+intros; apply step_WHT with (w:=fwo x); auto; intros;
 apply H1 with x; auto.
 (* arrow type *)
 intros; apply IHA2; try constructor; auto; intros; simpl in *;
@@ -237,7 +245,7 @@ Theorem property_1:
 forall A M
   (H_lc_t: lc_t_Hyb M)
   (H_lc_w: lc_w_Hyb M),
-  Red M A -> SN M.
+  Red M A -> WHT M.
 assert (exists (x:var), x \notin \{}) as nn by apply Fresh; destruct nn; auto;
 induction A; intros; simpl in *.
 (* base type *)
@@ -245,21 +253,21 @@ auto.
 (* arrow type *)
 (* Create variable of type A1 *)
 assert (forall x, neutral_Hyb (hyp_Hyb x)) by (intros; constructor).
-assert (forall x, SN (hyp_Hyb x))
-  by (intros; apply step_SN with (fwo x); intros; inversion H2).
+assert (forall x, WHT (hyp_Hyb x))
+  by (intros; apply step_WHT with (fwo x); intros; inversion H2).
 assert (forall x, Red (hyp_Hyb (fte x)) A1).
   intros; apply property_3; auto.
   constructor.
   intros; inversion H3.
 assert (forall x, Red (appl_Hyb M (hyp_Hyb (fte x))) A2).
 intros; apply H0; auto; simpl; constructor.
-assert (forall x, SN (appl_Hyb M (hyp_Hyb (fte x)))).
+assert (forall x, WHT (appl_Hyb M (hyp_Hyb (fte x)))).
 intros; eapply IHA2; eauto;
 constructor; auto; constructor.
 (* From strong_norm (appl_L M (hyp_L x)) w deduce strong_norm M w *)
-eapply SN_appl; auto; constructor; auto; constructor.
+eapply WHT_appl; auto; constructor; auto; constructor.
 (* box type *)
-intros; apply SN_box with (fwo x).
+intros; apply WHT_box with (fwo x).
 constructor; auto.
 constructor; auto.
 apply IHA; [constructor | constructor | ]; auto.
@@ -313,7 +321,8 @@ match L with
   if (eq_vwo_dec w (fwo w1)) then Some (w0, w1) else find_world L' w
 end.
 
-Fixpoint SL (L: list (var * ty * te_Hyb)) (W: list (var * var)) M :=
+Fixpoint SL (L: list (var * ty * te_Hyb)) (W: list (var * var)) (M: te_Hyb)
+  : te_Hyb :=
 match M with
 | hyp_Hyb (bte v) => M
 | hyp_Hyb (fte v) =>
@@ -695,7 +704,7 @@ case_if.
     case_if; rewrite IHM; auto.
 Qed.
 
-Theorem main_theorem:
+Theorem red_theorem:
 forall G Gamma M A w,
   lc_t_Hyb M ->
   lc_w_Hyb M ->
@@ -737,7 +746,7 @@ apply H3 with a b; auto.
 intros; rewrite Mem_cons_eq in *; destruct H9.
 inversion H9; subst; auto.
 eapply H4; eauto.
-simpl in *; intros; apply property_3.
+simpl in *. intros. apply property_3.
 constructor; auto; constructor; apply lc_SL; auto; inversion LC_t; auto.
 constructor.
 intros; inversion H7; subst.
@@ -806,21 +815,21 @@ inversion H0; subst; eauto.
 apply IHN with (M:=M); eauto; apply closed_t_succ_Hyb; auto.
 Qed.
 
-Theorem SN_Lang:
+Theorem termination_theorem:
 forall G M A w,
   emptyEquiv_Hyb G |= (w, nil) |- M ::: A ->
-  SN M.
+  WHT M.
 intros; apply property_1 with A.
 apply types_Hyb_lc_t_Hyb in H; auto.
 apply types_Hyb_lc_w_Hyb in H; auto.
-apply main_theorem with (L:=nil) (W:=nil) in H.
-rewrite SL_nil in H; auto.
-apply types_Hyb_lc_t_Hyb in H; auto.
-apply types_Hyb_lc_w_Hyb in H; auto.
-constructor.
-rew_concat; rew_map; clear H M A.
-induction G; simpl; rew_concat; auto; destruct a; auto.
-intros; rewrite Mem_nil_eq in *; contradiction.
-intros; rewrite Mem_nil_eq in *; contradiction.
-intros; rewrite Mem_nil_eq in *; contradiction.
+apply red_theorem with (L:=nil) (W:=nil) in H.
+  rewrite SL_nil in H; auto.
+  apply types_Hyb_lc_t_Hyb in H; auto.
+  apply types_Hyb_lc_w_Hyb in H; auto.
+  constructor.
+  rew_concat; rew_map; clear H M A.
+  induction G; simpl; rew_concat; auto; destruct a; auto.
+  intros; rewrite Mem_nil_eq in *; contradiction.
+  intros; rewrite Mem_nil_eq in *; contradiction.
+  intros; rewrite Mem_nil_eq in *; contradiction.
 Qed.

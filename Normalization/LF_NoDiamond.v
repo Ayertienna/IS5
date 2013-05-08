@@ -107,7 +107,7 @@ Inductive neutral_LF: te_LF -> Type :=
 
 Lemma neutral_or_value:
 forall M,
-  neutral_LF M +  value_LF M.
+  neutral_LF M + value_LF M.
 induction M; intros;
 try (destruct IHM; [left | right]; constructor; auto);
 try (left; constructor);
@@ -158,17 +158,17 @@ Qed.
 
 (* Termination begins here *)
 
-Inductive SN: te_LF -> Type :=
-| val_SN: forall M, value_LF M -> SN M
-| step_SN: forall M, (* change this to transitive closure? *)
-             (forall N, M |-> N -> SN N) ->
-             SN M.
+Inductive WHT: te_LF -> Type :=
+| val_WHT: forall M, value_LF M -> WHT M
+| step_WHT: forall M, (* change this to transitive closure? *)
+             (forall N, M |-> N -> WHT N) ->
+             WHT M.
 
-Lemma SN_appl:
+Lemma WHT_appl:
 forall M N,
   lc_t_LF (appl_LF M N) ->
-  SN (appl_LF M N) ->
-  SN M.
+  WHT (appl_LF M N) ->
+  WHT M.
 intros;
 remember (appl_LF M N) as T;
 generalize dependent M;
@@ -177,7 +177,7 @@ induction H0; intros; subst.
 inversion v; auto.
 destruct (neutral_or_value M0);
 [ | constructor; auto];
-apply step_SN; intros.
+apply step_WHT; intros.
 apply H0 with (N0:=appl_LF N0 N) (N:=N); auto.
 constructor; eauto.
 inversion H; auto.
@@ -187,18 +187,18 @@ inversion H; auto.
 inversion H; auto.
 Qed.
 
-Lemma SN_box:
+Lemma WHT_box:
 forall M,
   lc_t_LF (unbox_LF M) ->
-  SN (unbox_LF M) ->
-  SN M.
+  WHT (unbox_LF M) ->
+  WHT M.
 intros; remember (unbox_LF M) as T;
 generalize dependent M;
 induction H0; intros; subst;
 [ inversion v |
   destruct (neutral_or_value M0)];
 [  | constructor; auto];
-apply step_SN; intros;
+apply step_WHT; intros;
 apply H0 with (N := unbox_LF N).
 constructor; auto; inversion H; auto.
 apply lc_t_step_LF with (M:=unbox_LF M0); auto; constructor; auto;
@@ -208,7 +208,7 @@ Qed.
 
 Fixpoint Red (M: te_LF) (A: ty) : Type :=
 match A with
-| tvar => SN M
+| tvar => WHT M
 | tarrow A1 A2 =>
     forall N
            (H_lc: lc_t_LF N)
@@ -247,7 +247,7 @@ forall A M
    Red M A.
 induction A; intros; simpl in *.
 (* base type *)
-intros; apply step_SN; auto.
+intros; apply step_WHT; auto.
 (* arrow type *)
 intros. apply IHA2; try constructor; auto; intros; simpl in *.
 inversion H0; subst; inversion H; subst; eapply X; eauto.
@@ -260,7 +260,7 @@ Qed.
 Theorem property_1:
 forall A M
   (H_lc_t: lc_t_LF M),
-  Red M A -> SN M.
+  Red M A -> WHT M.
 assert ({ x:var |  x \notin \{}}) as nn by apply Fresh; destruct nn; auto;
 induction A; intros; simpl in *.
 (* base type *)
@@ -273,21 +273,21 @@ unfold ok_Bg_LF; rew_concat; constructor;
 [rewrite Mem_nil_eq | constructor]; auto.
 apply Mem_here.
 assert (forall x, neutral_LF (hyp_LF x)) by (intros; constructor).
-assert (forall x, SN (hyp_LF x)).
-  intros; apply step_SN; intros; inversion H0.
+assert (forall x, WHT (hyp_LF x)).
+  intros; apply step_WHT; intros; inversion H0.
 assert (forall x, Red (hyp_LF (fte x)) A1).
   intros; apply property_3; auto.
   constructor.
   intros; inversion H1.
 assert (forall x, Red (appl_LF M (hyp_LF (fte x))) A2).
 intros; apply X; auto; simpl; constructor.
-assert (forall x, SN (appl_LF M (hyp_LF (fte x)))).
+assert (forall x, WHT (appl_LF M (hyp_LF (fte x)))).
 intros; eapply IHA2; eauto.
 constructor; auto; constructor.
 (* From strong_norm (appl_L M (hyp_L x)) w deduce strong_norm M w *)
-eapply SN_appl; auto; constructor; auto; constructor.
+eapply WHT_appl; auto; constructor; auto; constructor.
 (* box type *)
-intros; apply SN_box.
+intros; apply WHT_box.
 constructor; auto.
 apply IHA; [constructor | ]; auto.
 Grab Existential Variables.
@@ -441,7 +441,7 @@ apply IHL; auto; apply OkL_weaken in H1; auto.
 intros; decide equality. apply eq_ty_dec. apply eq_var_dec.
 Qed.
 
-Fixpoint SL (L: list (var * ty * te_LF)) M :=
+Fixpoint SL (L: list (var * ty * te_LF)) (M: te_LF) : te_LF :=
 match M with
 | hyp_LF (bte v) => M
 | hyp_LF (fte v) =>
@@ -621,10 +621,10 @@ rewrite <- H0; apply PPermut_concat_permut.
 transitivityP (Gamma' :: G & Gamma); PPermut_LF_simpl.
 Qed.
 
-Theorem SN_Lang:
+Theorem WHT_Lang:
 forall G M A,
   emptyEquiv_LF G |= nil |- M ::: A ->
-  SN M.
+  WHT M.
 intros; apply property_1 with A.
 apply types_LF_lc_t_LF in X; auto.
 apply main_theorem with (L:=nil) in X.
@@ -637,4 +637,4 @@ intros; rewrite Mem_nil_eq in *; contradiction.
 intros; rewrite Mem_nil_eq in *; contradiction.
 Qed.
 
-Extraction "termination_LF_nodia" SN_Lang.
+Extraction "termination_LF_nodia" WHT_Lang.

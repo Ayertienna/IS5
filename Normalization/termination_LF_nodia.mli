@@ -188,20 +188,20 @@ val neutral_or_value : te_LF -> (neutral_LF, value_LF) sum
 
 val eq_te_LF_dec : te_LF -> te_LF -> sumbool
 
-type sN =
-| Val_SN of te_LF * value_LF
-| Step_SN of te_LF * (te_LF -> step_LF -> sN)
+type wHT =
+| Val_WHT of te_LF * value_LF
+| Step_WHT of te_LF * (te_LF -> step_LF -> wHT)
 
-val sN_appl : te_LF -> te_LF -> sN -> sN
+val wHT_appl : te_LF -> te_LF -> wHT -> wHT
 
-val sN_box : te_LF -> sN -> sN
+val wHT_box : te_LF -> wHT -> wHT
 
 type red = __
 
 val property_3 :
   ty -> te_LF -> neutral_LF -> (te_LF -> step_LF -> red) -> red
 
-val property_1 : ty -> te_LF -> red -> sN
+val property_1 : ty -> te_LF -> red -> wHT
 
 val find_var :
   ((Variables.var, ty) prod, te_LF) prod list -> Variables.var ->
@@ -224,6 +224,6 @@ val main_theorem :
   bg_LF -> ctx_LF -> te_LF -> ty -> types_LF -> ((Variables.var, ty) prod,
   te_LF) prod list -> (Variables.var -> ty -> te_LF -> __ -> red) -> red
 
-val sN_Lang :
-  (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> sN
+val wHT_Lang :
+  (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> wHT
 
