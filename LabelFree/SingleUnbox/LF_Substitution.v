@@ -16,14 +16,12 @@ match N with
 | box_LF N' => box_LF [M//x]N'
 | unbox_LF N' => unbox_LF [M//x]N'
 | here_LF N' => here_LF [M//x]N'
-| letdia_LF N' N'' => letdia_LF [M//x]N' [M//shift_vte x]N''
+| letdia_LF A N' N'' => letdia_LF A [M//x]N' [M//shift_vte x]N''
 end
 where " [ M // x ] N " := (subst_t_LF M x N).
 
 Definition open_LF (M: te_LF) (t: te_LF) := subst_t_LF t (bte 0) M.
 Notation " M '^t^' t " := (open_LF M t) (at level 67).
-
-
 
 Lemma closed_subst_t_free_LF:
 forall M v0 N

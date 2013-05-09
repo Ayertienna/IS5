@@ -13,7 +13,7 @@ Inductive te_LF :=
 | box_LF: te_LF -> te_LF
 | unbox_LF: te_LF -> te_LF
 | here_LF: te_LF -> te_LF
-| letdia_LF: te_LF -> te_LF -> te_LF
+| letdia_LF: ty -> te_LF -> te_LF -> te_LF
 .
 
 Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
@@ -34,9 +34,9 @@ Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
  | lc_t_here_LF: forall M n,
      lc_t_n_LF n M ->
      lc_t_n_LF n (here_LF M)
- | lc_t_letdia_LF: forall M N n,
+ | lc_t_letdia_LF: forall M N A n,
      lc_t_n_LF (S n) N -> lc_t_n_LF n M ->
-     lc_t_n_LF n (letdia_LF M N)
+     lc_t_n_LF n (letdia_LF A M N)
 .
 
 Definition lc_t_LF := lc_t_n_LF 0.
@@ -50,5 +50,5 @@ match M with
 | box_LF M => used_vars_te_LF M
 | unbox_LF M => used_vars_te_LF M
 | here_LF M => used_vars_te_LF M
-| letdia_LF M N => used_vars_te_LF M \u used_vars_te_LF N
+| letdia_LF A M N => used_vars_te_LF M \u used_vars_te_LF N
 end.
