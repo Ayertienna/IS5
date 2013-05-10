@@ -161,9 +161,11 @@ Qed.
 Inductive WHT: te_LF -> Type :=
 | val_WHT: forall M, value_LF M -> WHT M
 | step_WHT: forall M, (* change this to transitive closure? *)
-             (forall N, M |-> N -> WHT N) ->
-             WHT M.
-
+             (*
+(forall N, M |-> N -> WHT N) ->
+             WHT M. *)
+              sigT (fun V => prod (value_LF V) (steps_LF M V)) -> WHT M.
+(*
 Lemma WHT_appl:
 forall M N,
   lc_t_LF (appl_LF M N) ->
@@ -205,17 +207,32 @@ apply lc_t_step_LF with (M:=unbox_LF M0); auto; constructor; auto;
 inversion H; auto.
 auto.
 Qed.
-
+*)
 Fixpoint Red (M: te_LF) (A: ty) : Type :=
 match A with
 | tvar => WHT M
 | tarrow A1 A2 =>
-    forall N
-           (H_lc: lc_t_LF N)
-           (HRed: Red N A1),
-      Red (appl_LF M N) A2
-| tbox A1 => Red (unbox_LF M) A1
+    prod (WHT M)
+    (forall N,
+       lc_t_LF N ->
+       Red N A1 ->
+      Red (appl_LF M N) A2)
+| tbox A1 => prod (WHT M) (Red (unbox_LF M) A1)
 end.
+
+Lemma WHT_step:
+forall M M',
+  M |-> M' ->
+WHT M -> WHT M'.
+Admitted.
+
+Lemma WHT_step_back:
+forall M M',
+  M |-> M' ->
+WHT M' -> WHT M.
+Admitted.
+
+Hint Resolve WHT_step WHT_step_back.
 
 (* CR 2 *)
 Theorem property_2:
@@ -226,34 +243,15 @@ forall A M M'
   Red M' A.
 induction A; intros; simpl in *; intros.
 (* base type *)
-inversion HRed; subst;
-[ | apply H; auto];
-apply value_no_step with (N:=M') in H; auto; contradiction.
+eauto.
 (* arrow type *)
+destruct HRed; split; eauto; intros.
 apply IHA2 with (M:=appl_LF M N); auto.
 constructor; auto.
 constructor; auto.
 (* box type *)
+destruct HRed; split; eauto; intros.
 apply IHA with (M:=unbox_LF M); auto; constructor; eauto.
-Qed.
-
-(* CR 3 *)
-Theorem property_3:
-forall A M
-  (H_lc: lc_t_LF M),
-  neutral_LF M ->
-  (forall M', M |-> M' ->
-    Red M' A) ->
-   Red M A.
-induction A; intros; simpl in *.
-(* base type *)
-intros; apply step_WHT; auto.
-(* arrow type *)
-intros. apply IHA2; try constructor; auto; intros; simpl in *.
-inversion H0; subst; inversion H; subst; eapply X; eauto.
-(* box type *)
-intros; apply IHA; try constructor; auto; intros;
-inversion H0; subst; [inversion H | ]; apply X; auto.
 Qed.
 
 (* CR 1 *)
@@ -261,39 +259,30 @@ Theorem property_1:
 forall A M
   (H_lc_t: lc_t_LF M),
   Red M A -> WHT M.
-assert ({ x:var |  x \notin \{}}) as nn by apply Fresh; destruct nn; auto;
-induction A; intros; simpl in *.
-(* base type *)
-auto.
-(* arrow type *)
-(* Create variable of type A1 *)
-assert (forall x, nil |= (x, A1) :: nil |- hyp_LF (fte x) ::: A1).
-intros; constructor.
-unfold ok_Bg_LF; rew_concat; constructor;
-[rewrite Mem_nil_eq | constructor]; auto.
-apply Mem_here.
-assert (forall x, neutral_LF (hyp_LF x)) by (intros; constructor).
-assert (forall x, WHT (hyp_LF x)).
-  intros; apply step_WHT; intros; inversion H0.
-assert (forall x, Red (hyp_LF (fte x)) A1).
-  intros; apply property_3; auto.
-  constructor.
-  intros; inversion H1.
-assert (forall x, Red (appl_LF M (hyp_LF (fte x))) A2).
-intros; apply X; auto; simpl; constructor.
-assert (forall x, WHT (appl_LF M (hyp_LF (fte x)))).
-intros; eapply IHA2; eauto.
-constructor; auto; constructor.
-(* From strong_norm (appl_L M (hyp_L x)) w deduce strong_norm M w *)
-eapply WHT_appl; auto; constructor; auto; constructor.
-(* box type *)
-intros; apply WHT_box.
-constructor; auto.
-apply IHA; [constructor | ]; auto.
-Grab Existential Variables.
-auto.
+induction A; intros; simpl in *; auto;
+destruct X; auto.
 Qed.
 
+(* CR 3 *)
+Theorem property_3:
+forall A M M'
+  (H_lc: lc_t_LF M),
+  neutral_LF M ->
+  M |-> M' ->
+  Red M' A ->
+  Red M A.
+induction A; intros; simpl in *.
+(* base type *)
+eauto.
+(* arrow type *)
+destruct X; split; eauto; intros.
+apply IHA2 with (appl_LF M' N); try constructor; auto; intros; simpl in *.
+(* box type *)
+destruct X; split; eauto; intros.
+intros; apply IHA with (unbox_LF M'); try constructor; auto.
+Qed.
+
+(*
 Lemma reducible_abstraction:
 forall A N B
   (lc_N: lc_t_LF (lam_LF A N))
@@ -322,6 +311,7 @@ repeat constructor; auto.
 intros; inversion H; subst; auto.
 inversion H2.
 Qed.
+*)
 
 Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
                      option (var * ty * te_LF) :=
@@ -589,10 +579,12 @@ apply X0 with a ; auto.
 intros; destruct k; destruct p; destruct k'; destruct p; decide equality.
 apply eq_te_LF_dec. destruct p; destruct a0; decide equality.
 apply eq_ty_dec. apply eq_var_dec.
-simpl in *; intros; apply property_3.
+simpl in *; split; intros. repeat constructor.
+apply property_3 with (M':=(SL L0 M) ^t^ N).
 constructor; auto; constructor; apply lc_SL; auto; inversion LC; auto.
 constructor.
-intros; inversion H3; subst; [ | inversion H9];
+constructor; auto. inversion LC; subst; apply lc_SL; auto.
+unfold open_LF in *.
 rewrite subst_t_neutral_free_LF with (v:=x); auto.
 replace ([N // fte x]([hyp_LF (fte x) // bte 0](SL L0 M))) with
   (SL ((x, A, N)::L0) [hyp_LF (fte x) // bte 0]M).
@@ -604,13 +596,13 @@ simpl in *; apply IHHT1; auto. inversion LC; auto.
 apply lc_SL; inversion LC; auto.
 apply IHHT2; auto; inversion LC; subst; auto.
 (* box *)
-simpl in *; apply property_3.
+simpl in *; split. repeat constructor.
+apply property_3 with (SL L M).
 constructor; constructor; apply lc_SL; inversion LC; auto.
 constructor.
-intros; inversion H2; subst.
+constructor; auto; inversion LC; subst; apply lc_SL; auto.
 apply IHHT; auto; rew_concat in *. inversion LC; auto.
 rewrite <- H0; permut_simpl.
-inversion H5.
 (* unbox *)
 simpl in *; apply IHHT; auto.
 inversion LC; auto.
