@@ -130,7 +130,7 @@ Definition ctx_Hyb := prod var (list (prod var ty)).
 Definition bg_Hyb := list ctx_Hyb.
 
 (* Context for labeled language *)
-Definition ctx_L := list (prod var (prod var ty)).
+Definition ctx_L := list (var * var * ty).
 
 (* Background and context for label-free language *)
 Definition ctx_LF := list (var * ty).

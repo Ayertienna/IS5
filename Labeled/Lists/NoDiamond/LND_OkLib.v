@@ -8,7 +8,7 @@ Open Scope permut_scope.
 Fixpoint ok_Gamma_L (G: ctx_L) (Used: list var) : Prop :=
 match G with
 | nil => True
-| (w, (v, A)) :: G' => ~ Mem v Used /\ ok_Gamma_L G' (v::Used)
+| (w, v, A) :: G' => ~ Mem v Used /\ ok_Gamma_L G' (v::Used)
 end.
 
 Fixpoint ok_Omega_L (L: list var) : Prop :=
@@ -44,11 +44,11 @@ forall G1 G2 U,
 induction G1; intros.
 apply permut_nil_eq in H; subst; auto.
 destruct a; destruct p; simpl in *; destruct H0.
-assert ((v, (v0, t))::G1 *=* G2) by auto.
+assert ((v, v0, t)::G1 *=* G2) by auto.
 apply permut_split_head in H.
 destruct H as (hd, (tl, H)).
 assert (G1 *=* hd ++ tl).
-  apply permut_cons_inv with (a:=(v, (v0, t))); rewrite H2; subst; permut_simpl.
+  apply permut_cons_inv with (a:=(v, v0, t)); rewrite H2; subst; permut_simpl.
 specialize IHG1 with (G2:=hd++tl).
 apply IHG1 in H1; auto.
 subst; generalize dependent G1; generalize dependent U;
@@ -105,7 +105,7 @@ forall G U x w A,
   ok_Gamma_L G U ->
   x \notin used_vars_context_L G ->
   ~ Mem x U ->
-  ok_Gamma_L ((w, (x, A))::G) U.
+  ok_Gamma_L ((w, x, A)::G) U.
 induction G; intros; simpl in *; split; auto;
 destruct a; destruct p; destruct H; split.
 rewrite Mem_cons_eq; intro n; destruct n; subst.
@@ -127,7 +127,7 @@ Lemma ok_L_extend_fresh:
 forall O G x w A,
   ok_L O G ->
   x \notin used_vars_context_L G ->
-  ok_L O ((w, (x, A))::G).
+  ok_L O ((w, x, A)::G).
 unfold ok_L; intros; destruct H; split; auto.
 apply ok_Gamma_L_extend_fresh; auto.
 rewrite Mem_nil_eq; tauto.
@@ -135,12 +135,12 @@ Qed.
 
 Lemma ok_L_Mem_contradiction:
 forall w x A Gamma Omega B,
-  Mem (w, (x, A)) Gamma ->
-  ok_L Omega ((w, (x, B)) :: Gamma) ->
+  Mem (w, x, A) Gamma ->
+  ok_L Omega ((w, x, B) :: Gamma) ->
   False.
 unfold ok_L; intros; simpl in *; destruct H0; destruct H1.
 apply Mem_split in H; destruct H as (hd, (tl, H)); subst.
-apply ok_Gamma_L_permut with (G2:=(w, (x,A))::hd++tl) in H2.
+apply ok_Gamma_L_permut with (G2:=(w, x,A)::hd++tl) in H2.
 simpl in H2; destruct H2.
 elim H; apply Mem_here.
 permut_simpl.
@@ -148,7 +148,7 @@ Qed.
 
 Lemma ok_L_smaller_Gamma:
 forall O X w x a,
-  ok_L O ((w, (x, a)) :: X)  ->
+  ok_L O ((w, x, a) :: X)  ->
   ok_L O X.
 unfold ok_L; intros; split; destruct H; auto.
 simpl in *; destruct H0; apply ok_Gamma_L_weakening_used with (u:=x); auto.
@@ -164,20 +164,20 @@ Qed.
 
 Lemma ok_L_Mem_contr:
 forall X w x a U,
-  ok_Gamma_L ((w, (x, a)) :: X) U  ->
-  forall w' b, ~ Mem (w', (x, b)) X.
+  ok_Gamma_L ((w, x, a) :: X) U  ->
+  forall w' b, ~ Mem (w', x, b) X.
 intros; intro n; simpl in *; destruct H.
 apply Mem_split in n; destruct n as (hd, (tl, n)); subst.
-apply ok_Gamma_L_permut with (G2:= (w', (x, b))::hd ++ tl) in H0;
+apply ok_Gamma_L_permut with (G2:= (w', x, b)::hd ++ tl) in H0;
 [|permut_simpl]; simpl in *; destruct H0; elim H0; apply Mem_here.
 Qed.
 
 Fixpoint rename_context_L (w: var) (w': var) (C: ctx_L) :=
 match C with
 | nil => nil
-| (w0, (x, A)) :: C'  =>
+| (w0, x, A) :: C'  =>
   let w1 := if (eq_var_dec w0 w) then w' else w0 in
-    (w1, (x, A)) :: (rename_context_L w w' C')
+    (w1, x, A) :: (rename_context_L w w' C')
 end.
 
 Lemma ok_Gamma_L_rename:
@@ -198,9 +198,9 @@ Qed.
 
 Lemma Mem_rename_context_L:
 forall Gamma x A w w' w0 w1,
-  Mem (w, (x, A)) Gamma ->
+  Mem (w, x, A) Gamma ->
   w' = (if (eq_var_dec w0 w) then w1 else w) ->
-  Mem (w', (x, A)) (rename_context_L w0 w1 Gamma).
+  Mem (w', x, A) (rename_context_L w0 w1 Gamma).
 induction Gamma; intros; simpl in *; [| destruct a; destruct p].
 rewrite Mem_nil_eq in H; tauto.
 repeat case_if; subst;

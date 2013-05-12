@@ -220,17 +220,39 @@ match A with
 | tbox A1 => prod (WHT M) (Red (unbox_LF M) A1)
 end.
 
+Lemma step_LF_unique:
+forall M N N',
+M |-> N -> M |->N' -> N = N'.
+intros; generalize dependent N'; induction H; intros; inversion H0; subst;
+auto. inversion H5. inversion H2. inversion H.
+rewrite IHstep_LF with M'0; auto.
+inversion H. rewrite IHstep_LF with M'0; auto.
+Qed.
+
 Lemma WHT_step:
 forall M M',
+  WHT M ->
   M |-> M' ->
-WHT M -> WHT M'.
-Admitted.
+  WHT M'.
+intros; inversion H; subst.
+apply value_no_step with (N:=M') in H1; auto; contradiction.
+destruct H1 as (V, (H1, H2)).
+inversion H2; subst.
+apply step_LF_unique with (N':=V) in H0; subst; auto. constructor; auto.
+apply step_WHT; exists V; split; auto.
+apply step_LF_unique with (N':=M'0) in H0; subst; auto.
+Qed.
 
 Lemma WHT_step_back:
 forall M M',
   M |-> M' ->
 WHT M' -> WHT M.
-Admitted.
+intros; apply step_WHT.
+inversion H0; subst.
+exists M'; split; auto; constructor; auto.
+destruct H1; destruct p.
+exists x; split; auto; apply multi_step_LF with (M':=M'); auto.
+Qed.
 
 Hint Resolve WHT_step WHT_step_back.
 
@@ -267,7 +289,6 @@ Qed.
 Theorem property_3:
 forall A M M'
   (H_lc: lc_t_LF M),
-  neutral_LF M ->
   M |-> M' ->
   Red M' A ->
   Red M A.
@@ -543,6 +564,18 @@ rewrite closed_subst_t_free_LF; auto.
 apply notin_FV_notin_elem with L0 v a; eauto.
 apply find_var_Mem; eauto.
 Qed.
+
+Theorem main_theorem:
+forall G M A,
+  lc_t_LF M ->
+  emptyEquiv_LF G |= nil |- M ::: A -> Red M A.
+intros. remember nil as Gamma.
+remember (emptyEquiv_LF G) as G'; generalize dependent G.
+induction X; intros; subst.
+rewrite Mem_nil_eq in H0; contradiction.
+repeat constructor; intros.
+apply property_3 with (M':=M ^t^ N).
+Abort.
 
 Theorem main_theorem:
 forall G Gamma M A,

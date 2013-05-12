@@ -80,7 +80,7 @@ match M with
 end.
 
 Definition used_vars_context_L (Gamma: ctx_L) : fset var :=
-  from_list (map (fun x => fst (snd x)) Gamma).
+  from_list (map (fun x => snd (fst x)) Gamma).
 
 Lemma closed_w_succ_L:
 forall M n,
