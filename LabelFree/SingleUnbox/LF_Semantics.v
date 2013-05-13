@@ -113,7 +113,7 @@ Inductive step_LF: te_LF -> te_LF -> Prop :=
   lc_t_LF M -> lc_t_n_LF 1 N ->
   M |-> M'->
   letdia_LF A M N |-> letdia_LF A M' N
-
+(*
 (* NEW *)
 | red_here_letd_LF: forall M N A,
   lc_t_LF M -> lc_t_n_LF 1 N -> value_LF M ->
@@ -122,6 +122,7 @@ Inductive step_LF: te_LF -> te_LF -> Prop :=
 | red_letd_here_LF: forall M N P A B,
   lc_t_LF M -> lc_t_n_LF 1 N -> lc_t_n_LF 1 P -> value_LF M ->
   letdia_LF A (letdia_LF B M N) P |-> letdia_LF B M (letdia_LF A N P)
+*)
 
 where " M |-> N " := (step_LF M N ).
 
@@ -1499,7 +1500,8 @@ remember (emptyEquiv_LF G) as G';
 remember (@nil (var*ty)) as Gamma.
 generalize dependent G.
 induction HT; intros.
-
+Admitted.
+(*
 inversion HS.
 inversion HS.
 (* @appl *)
@@ -1764,4 +1766,4 @@ subst.
 rewrite <- H2. rewrite <- H0.
 apply HT2; eauto.
 Qed.
-*)
+*)*)
