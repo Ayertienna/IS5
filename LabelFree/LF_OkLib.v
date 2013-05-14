@@ -1,4 +1,4 @@
-Add LoadPath "../..".
+Add LoadPath "..".
 Require Export LF_PPermutLib.
 Require Export ListLib.
 Require Export LF_EmptyEquivLib.

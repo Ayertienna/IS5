@@ -1,4 +1,4 @@
-Add LoadPath "../..".
+Add LoadPath "..".
 Require Import LF_Syntax.
 Require Import LF_Substitution.
 Require Import LF_OkLib.
@@ -14,12 +14,12 @@ Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
 | t_hyp_LF: forall A G Gamma v
   (Ok: ok_Bg_LF (Gamma::G))
   (H: Mem (v, A) Gamma),
-  G |= Gamma |- hyp_LF (fte v) ::: A
+  G |= Gamma |- hyp_LF A (fte v) ::: A
 
 | t_lam_LF: forall L A B G Gamma M
   (Ok: ok_Bg_LF (Gamma::G))
   (H: forall v, v \notin L ->
-    G |= (v, A)::Gamma |- M ^t^ (hyp_LF (fte v)) ::: B),
+    G |= (v, A)::Gamma |- M ^t^ (hyp_LF A (fte v)) ::: B),
   G |= Gamma |- lam_LF A M ::: A ---> B
 
 | t_appl_LF: forall A B G Gamma M N
@@ -60,7 +60,7 @@ Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
   (HT1: G |= Gamma |- M ::: <*> A)
   (HT2: forall G' v, v \notin L ->
     ((v, A) :: nil) :: G ~=~ G' ->
-    G' |= Gamma |- N ^t^ (hyp_LF (fte v)) ::: B),
+    G' |= Gamma |- N ^t^ (hyp_LF A (fte v)) ::: B),
   G |= Gamma |- letdia_LF A M N ::: B
 
 | t_letdia_get_LF: forall L A B G Gamma Gamma' M N
@@ -68,7 +68,7 @@ Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
   (HT1: G & Gamma' |= Gamma |- M ::: <*> A)
   (HT2: forall v, v \notin L ->
     ((v, A) :: nil) :: G & Gamma |= Gamma' |-
-      N ^t^ (hyp_LF (fte v))::: B),
+      N ^t^ (hyp_LF A (fte v))::: B),
   forall G0, G & Gamma ~=~ G0 ->
     G0 |= Gamma' |- letdia_LF A M N ::: B
 
@@ -837,16 +837,16 @@ rewrite H3; auto.
 auto. auto.
 
 eapply t_letdia_LF with
-  (L := L \u \{v}) (A:=A).
+  (L := L \u \{v}).
 apply ok_Bg_LF_PPermut with (G:= (Gamma :: G0) & Gamma').
 apply ok_Bg_LF_permut_no_last with (v:=v) (A:=A0).
 rew_app. apply ok_Bg_LF_PPermut with (G:=Gamma :: G); auto.
 rewrite H2; rew_app; auto.
-eapply IHHT; eauto.
+eapply IHHT with (A0:=A0) ; eauto.
 intros; unfold open_LF in *.
 rewrite notin_union in H4; rewrite notin_singleton in H4; destruct H4;
 rewrite <- subst_t_comm_LF; auto.
-destruct H with (v:=v0) (M:=M0) (A:=A0) (v0:=v) (G':=((v0,A)::nil)::G); auto.
+destruct H with (v:=v0) (M:=M0) (A0:=A0) (v0:=v) (G':=((v0,A)::nil)::G); auto.
 apply PPermutationG_LF with (G:=((v0,A)::nil)::G0 & Gamma').
 eapply H8 with (G0:=G0 & ((v0, A)::nil)) (Gamma':=Gamma').
 rewrite H0; PPermut_LF_simpl. eauto. PPermut_LF_simpl.
@@ -1412,7 +1412,7 @@ induction M; intros; eauto using value_LF;
 inversion HeqCtx; subst.
 (* hyp *)
 inversion HT; subst.
-rewrite Mem_nil_eq in H3;
+rewrite Mem_nil_eq in H5;
 contradiction.
 (* appl *)
 right; inversion HT; subst;
@@ -1499,27 +1499,20 @@ intros; generalize dependent N.
 remember (emptyEquiv_LF G) as G';
 remember (@nil (var*ty)) as Gamma.
 generalize dependent G.
-induction HT; intros.
-Admitted.
-(*
-inversion HS.
-inversion HS.
-(* @appl *)
-inversion HS; subst.
+induction HT; intros;
+inversion HS; subst;
+try (econstructor; eauto).
+
 (* appl_lam *)
 inversion HT1; subst;
 unfold open_LF in *;
 assert (exists v, v \notin L \u used_vars_te_LF M0) as HF by apply Fresh;
 destruct HF as (v_fresh);
-rewrite subst_t_neutral_free_LF with (v:=v_fresh);
+rewrite subst_t_neutral_free_LF with (v:=v_fresh) (A:=A);
 [ eapply subst_t_LF_preserv_types_inner; eauto |
   rewrite notin_union in H; destruct H]; auto;
 rewrite <- double_emptyEquiv_LF; auto.
-(* appl *)
-econstructor; eauto.
-inversion HS.
-(* @unbox *)
-inversion HS; subst.
+
 (* unbox_box *)
 inversion HT; subst;
 replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
@@ -1529,19 +1522,14 @@ rew_app; auto.
 transitivity (emptyEquiv_LF (G0&nil)).
   rewrite emptyEquiv_LF_rewrite; auto.
   transitivity (emptyEquiv_LF (nil :: G0)); auto.
+
 apply PPermut_emptyEquiv_LF; PPermut_LF_simpl.
-(* unbox *)
-constructor; auto; apply IHHT with G0; auto.
-(* @unbox_fetch *)
-inversion HS; subst.
-(* unbox_box *)
+
 inversion HT; subst;
 replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
   by (rew_app; auto);
 apply merge_LF_preserv_types_old with (G:=G & nil & Gamma);
-auto; rewrite <- H; auto.
-(* unbox *)
-constructor.
+auto. rewrite <- H; auto.
 apply ok_Bg_LF_nil; apply ok_Bg_LF_empty.
 assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in H; auto.
@@ -1549,107 +1537,23 @@ subst. replace (emptyEquiv_LF G0) with (G & nil).
 apply IHHT with (G0:=G0); auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
-(* @here *)
-inversion HS; subst.
-(* here *)
-constructor; auto; apply IHHT with (G:=G0); auto.
-(* here_letdia *)
-inversion HT; subst.
-(* in-place letdia *)
-apply t_letdia_LF with
-(L:=L \u  used_vars_ctx_LF (nil :: nil :: emptyEquiv_LF G0)); eauto;
-intros; unfold open_LF in *;
-simpl; constructor; auto.
-  rewrite <- H3.
-assert (((v, A0)::nil)::nil :: emptyEquiv_LF G0 ~=~
-                      nil :: ((v, A0) :: nil) :: emptyEquiv_LF G0)
-    by PPermut_LF_simpl.
-rewrite <- H4. apply ok_Bg_LF_fresh.
-apply ok_Bg_LF_nil; auto.
-rewrite notin_union in H; destruct H; auto.
-(* moving letdia *)
-apply t_letdia_get_LF with
-(L:=L \u  used_vars_ctx_LF (nil :: nil :: emptyEquiv_LF G0))
-(G:= G) (Gamma:=Gamma); eauto;
-intros; unfold open_LF in *;
-simpl; constructor; auto.
 
-rewrite H8.
-assert ( nil :: ((v, A0)::nil) :: emptyEquiv_LF G0 ~=~
-                      ((v, A0) :: nil) :: nil :: emptyEquiv_LF G0)
-    by PPermut_LF_simpl.
-rewrite H3. apply ok_Bg_LF_fresh.
-apply ok_Bg_LF_nil; auto.
-rewrite notin_union in H; destruct H; auto.
-inversion HS; subst.
-constructor.
-  assert (nil :: emptyEquiv_LF G0 ~=~ Gamma :: G & nil).
-  PPermut_LF_simpl. rewrite <- H.
-  PPermut_LF_simpl.
-rewrite H0; auto.
+(* here *)
+apply ok_Bg_LF_nil; apply ok_Bg_LF_empty.
 assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in H; auto.
-subst.
-rewrite <- H.
+subst. replace (emptyEquiv_LF G0) with (G & nil).
 apply IHHT with (G0:=G0); auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
-inversion HT; subst.
-(* in-place letdia *)
-apply t_letdia_LF with
-(L:=L \u  used_vars_ctx_LF (nil :: Gamma :: G & nil)); eauto;
-intros; unfold open_LF in *;
-simpl. assert (nil :: emptyEquiv_LF G0 ~=~ Gamma :: G & nil)
-       by (rewrite <-H; PPermut_LF_simpl). rewrite H0; auto.
-rewrite <- H; (assert (Gamma = nil)).
-  apply emptyEquiv_LF_PPermut in H; auto.
-subst; auto.
-constructor; auto.
-assert (nil :: G' ~=~  ((v, A0) :: nil) ::Gamma :: G & nil).
-  rewrite <- H4. rewrite <- H. PPermut_LF_simpl.
-rewrite H5; apply ok_Bg_LF_fresh; auto.
-rewrite notin_union in H0; destruct H0; auto.
-assert (Gamma = nil).
-  apply emptyEquiv_LF_PPermut in H; auto.
-subst; apply HT2; eauto.
-rewrite <- H4; rewrite H; auto.
-(* moving letdia *)
-apply t_letdia_get_LF with
-(L:=L \u  used_vars_ctx_LF (nil :: nil :: emptyEquiv_LF G0))
-(G:= G) (Gamma:=Gamma); eauto;
-intros; unfold open_LF in *;
-simpl.
-assert (Gamma = nil).
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-assert (Gamma0 = nil).
-  rewrite <- H9 in H.
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-rewrite <- H9; auto.
-constructor; auto.
-assert (Gamma = nil).
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-assert (Gamma0 = nil).
-  rewrite <- H9 in H.
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-assert ( nil :: ((v, A0)::nil) :: G & nil ~=~
-                      ((v, A0) :: nil) :: nil :: G & nil)
-    by PPermut_LF_simpl.
-rewrite H4. apply ok_Bg_LF_fresh.
-apply ok_Bg_LF_nil; auto. rewrite H.
-rewrite notin_union in H0; destruct H0; auto.
-assert (Gamma = nil).
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-assert (Gamma0 = nil).
-  rewrite <- H9 in H.
-  apply emptyEquiv_LF_PPermut in H; auto. subst.
-rewrite <- H9. apply HT2; auto.
-inversion HS; subst.
+apply emptyEquiv_LF_PPermut_equal; auto.
 inversion HT; subst;
 unfold open_LF in *;
 assert (exists v, v \notin L \u used_vars_te_LF N) as HF by apply Fresh;
 destruct HF as (v_fresh);
-rewrite subst_t_neutral_free_LF with (v:=v_fresh);
+rewrite subst_t_neutral_free_LF with (v:=v_fresh) (A:=A);
 replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
   by (rew_app; auto).
+
 apply merge_LF_preserv_types_old with (G:=emptyEquiv_LF G0 & nil);
 rew_app; auto.
 apply subst_t_LF_preserv_types_outer with
@@ -1683,22 +1587,11 @@ apply WeakeningG_LF; auto.
 rewrite emptyEquiv_LF_rewrite;simpl; auto.
 symmetry; apply PPermut_LF_first_last.
 eauto.
-econstructor; eauto.
-(* letdia assoc *)
-inversion HT; subst.
-apply t_letdia_LF with (L:=L0 \u used_vars_ctx_LF (nil :: emptyEquiv_LF G0));
-eauto; intros; unfold open_LF in *; simpl in *;
-econstructor; eauto. rewrite <- H1.
-apply ok_Bg_LF_nil; auto.
-apply ok_Bg_LF_fresh; auto.
-rewrite notin_union in *; destruct H0; eauto.
-intros; unfold open_LF in *; simpl in *.
-Admitted.
-
-(*
+inversion HT; subst;
+unfold open_LF in *;
 assert (exists v, v \notin L \u used_vars_te_LF N) as HF by apply Fresh;
 destruct HF as (v_fresh);
-rewrite subst_t_neutral_free_LF with (v:=v_fresh);
+rewrite subst_t_neutral_free_LF with (v:=v_fresh)(A:=A);
 replace (@nil (var * ty)) with (nil ++ (@nil (prod var ty)))
   by (rew_app; auto).
 apply merge_LF_preserv_types_old with (G:=emptyEquiv_LF G1 & nil);
@@ -1712,7 +1605,7 @@ assert (emptyEquiv_LF G1 & nil = emptyEquiv_LF (G1 & nil)).
 rewrite H2; rewrite <- double_emptyEquiv_LF; rewrite <- H2.
 assert (emptyEquiv_LF G1 & nil ~=~ nil::emptyEquiv_LF G1).
   PPermut_LF_simpl.
-rewrite H5.
+rewrite H3.
 apply WeakeningG_LF; auto.
 rewrite <- H0;
 assert (Gamma = nil).
@@ -1735,7 +1628,7 @@ assert (emptyEquiv_LF G1 & nil = emptyEquiv_LF (G1 & nil)).
 rewrite H2; rewrite <- double_emptyEquiv_LF; rewrite <- H2.
 assert (emptyEquiv_LF G1 & nil ~=~ nil::emptyEquiv_LF G1).
   symmetry; apply PPermut_LF_first_last.
-rewrite H5;
+rewrite H3;
 apply WeakeningG_LF; rewrite <- H0; auto.
 assert (Gamma = nil).
   apply emptyEquiv_LF_PPermut in H0; auto.
@@ -1745,7 +1638,7 @@ assert (Gamma0 = nil).
 subst.
 assert (G0 ~=~ G).
   apply PPermut_LF_last_rev_simpl with (a:=nil); auto.
-rewrite <- H7; auto.
+rewrite <- H9; auto.
 repeat apply ok_Bg_LF_nil; rewrite H0; apply ok_Bg_LF_empty.
 rewrite <- H0;
 apply HT2; eauto.
@@ -1766,4 +1659,3 @@ subst.
 rewrite <- H2. rewrite <- H0.
 apply HT2; eauto.
 Qed.
-*)*)

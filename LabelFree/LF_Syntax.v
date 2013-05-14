@@ -1,4 +1,4 @@
-Add LoadPath "../..".
+Add LoadPath "..".
 Require Export Shared.
 
 Inductive vctx_LF :=
@@ -7,7 +7,7 @@ Inductive vctx_LF :=
 .
 
 Inductive te_LF :=
-| hyp_LF: vte -> te_LF
+| hyp_LF: ty -> vte -> te_LF
 | lam_LF: ty -> te_LF -> te_LF
 | appl_LF: te_LF -> te_LF -> te_LF
 | box_LF: te_LF -> te_LF
@@ -17,8 +17,8 @@ Inductive te_LF :=
 .
 
 Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
- | lc_t_hyp_bte_LF: forall v n, n > v -> lc_t_n_LF n (hyp_LF (bte v))
- | lc_t_hyp_fte_LF: forall v n, lc_t_n_LF n (hyp_LF (fte v))
+ | lc_t_hyp_bte_LF: forall v n t, n > v -> lc_t_n_LF n (hyp_LF t (bte v))
+ | lc_t_hyp_fte_LF: forall v n t, lc_t_n_LF n (hyp_LF t (fte v))
  | lc_t_lam_LF: forall M t n,
      lc_t_n_LF (S n) M ->
      lc_t_n_LF n (lam_LF t M)
@@ -43,8 +43,8 @@ Definition lc_t_LF := lc_t_n_LF 0.
 
 Fixpoint used_vars_te_LF (M: te_LF) : fset var :=
 match M with
-| hyp_LF (fte v) => \{v}
-| hyp_LF (bte _) => \{}
+| hyp_LF _ (fte v) => \{v}
+| hyp_LF _ (bte _) => \{}
 | lam_LF _ M => used_vars_te_LF M
 | appl_LF M N => used_vars_te_LF M \u used_vars_te_LF N
 | box_LF M => used_vars_te_LF M
