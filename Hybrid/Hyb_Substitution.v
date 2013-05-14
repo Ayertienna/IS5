@@ -23,7 +23,7 @@ Term substitution
 *)
 Fixpoint subst_t_Hyb (M0: te_Hyb) (v0: vte) (N0: te_Hyb) :=
 match N0 with
-| hyp_Hyb v =>
+| hyp_Hyb A v =>
     if (eq_vte_dec v v0) then M0 else N0
 | lam_Hyb A M =>
     lam_Hyb A ([M0 // shift_vte v0] M)
@@ -35,8 +35,8 @@ match N0 with
     unbox_fetch_Hyb w ([M0//v0]M)
 | get_here_Hyb w M =>
     get_here_Hyb w ([M0//v0]M)
-| letdia_get_Hyb w M N =>
-    letdia_get_Hyb w ([M0//v0]M) ([M0//shift_vte v0]N)
+| letdia_get_Hyb A w M N =>
+    letdia_get_Hyb A w ([M0//v0]M) ([M0//shift_vte v0]N)
 end
 where " [ M // v ] N " := (subst_t_Hyb M v N) : hybrid_is5_scope.
 
@@ -48,7 +48,7 @@ World substitution
 *)
 Fixpoint subst_w_Hyb (w1: vwo) (w2: vwo) (M0: te_Hyb) :=
 match M0 with
-| hyp_Hyb n => hyp_Hyb n
+| hyp_Hyb A n => hyp_Hyb A n
 | lam_Hyb A M => lam_Hyb A ({{w1//w2}}M)
 | appl_Hyb M N => appl_Hyb ({{w1//w2}}M) ({{w1//w2}}N)
 | box_Hyb M =>
@@ -59,9 +59,9 @@ match M0 with
 | get_here_Hyb w M =>
   let w' := if (eq_vwo_dec w w2) then w1 else w in
     get_here_Hyb w' ({{w1//w2}}M)
-| letdia_get_Hyb w M N =>
+| letdia_get_Hyb A w M N =>
   let w' := if (eq_vwo_dec w w2) then w1 else w in
-    letdia_get_Hyb w' ({{w1//w2}} M) ({{shift_vwo w1 // shift_vwo w2}} N)
+    letdia_get_Hyb A w' ({{w1//w2}} M) ({{shift_vwo w1 // shift_vwo w2}} N)
 end
 where " {{ w1 // w2 }} M " := (subst_w_Hyb w1 w2 M) : hybrid_is5_scope.
 
@@ -190,11 +190,11 @@ auto.
 Qed.
 
 Lemma subst_t_Hyb_comm:
-forall M v v' n N
+forall M v v' n N A
   (Lc: lc_t_Hyb N),
   v <> v' ->
-  [ N // fte v] ([ hyp_Hyb (fte v') // bte n] M) =
-  [hyp_Hyb (fte v') // bte n] ([N // fte v] M).
+  [ N // fte v] ([ hyp_Hyb A (fte v') // bte n] M) =
+  [hyp_Hyb A (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
 [ repeat (case_if; simpl); auto;
   erewrite closed_subst_t_Hyb_bound; eauto; omega | | | | | |];
@@ -224,9 +224,9 @@ assert (w0 <> w0) as Neq by eauto; elim Neq; auto.
 Qed.
 
 Lemma subst_t_Hyb_neutral_free:
-forall M v n N
+forall M v n N A
   (HT: v \notin free_vars_Hyb M),
-  [ N // bte n] M = [N // fte v] [hyp_Hyb (fte v) // bte n] M.
+  [ N // bte n] M = [N // fte v] [hyp_Hyb A (fte v) // bte n] M.
 induction M; intros; simpl in *;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto);
 repeat (case_if; simpl); subst; auto;
@@ -286,9 +286,9 @@ Qed.
 *)
 
 Lemma subst_t_Hyb_preserv_free_worlds:
-forall N v k w,
+forall N v k w A,
   w \notin free_worlds_Hyb N ->
-  w \notin free_worlds_Hyb [ hyp_Hyb (fte v) // bte k ] N.
+  w \notin free_worlds_Hyb [ hyp_Hyb A (fte v) // bte k ] N.
 induction N; intros; simpl in *;
 repeat case_if;try destruct v;
 simpl; auto.
@@ -302,6 +302,11 @@ induction N; intros; simpl in *;
 repeat case_if; try destruct c;
 simpl; auto.
 Qed.
+
+(*
+   Other lemmas that proved to be needed in the development.
+   Warning: May contain repetitions.
+*)
 
 Lemma lc_w_subst_t_Hyb:
 forall N M v n,
@@ -359,7 +364,7 @@ lc_w_n_Hyb n (subst_w_Hyb (fwo w) (bwo n) N) ->
 lc_w_n_Hyb (S n) N.
 induction N; intros; simpl in *; try destruct v; constructor;
 inversion H; subst; try eapply IHN; eauto;
-repeat case_if; inversion H0; subst; try inversion H1; subst;
+repeat case_if; try inversion H0; subst; try inversion H1; subst;
 try omega.
 Qed.
 
@@ -427,11 +432,11 @@ subst; elim H; auto.
 Qed.
 
 Lemma subst_t_comm2_Hyb:
-forall M v' m n N
+forall M v' m n N A
   (Neq: m <> n)
   (Lc: lc_t_Hyb N),
-  subst_t_Hyb N (bte m) (subst_t_Hyb (hyp_Hyb (fte v')) (bte n) M) =
-  subst_t_Hyb (hyp_Hyb (fte v')) (bte n) (subst_t_Hyb N (bte m) M).
+  subst_t_Hyb N (bte m) (subst_t_Hyb (hyp_Hyb A (fte v')) (bte n) M) =
+  subst_t_Hyb (hyp_Hyb A (fte v')) (bte n) (subst_t_Hyb N (bte m) M).
 induction M; intros; subst; simpl;
 repeat (case_if; subst; simpl); auto;
 try rewrite IHM; eauto; try omega.
@@ -449,6 +454,9 @@ try rewrite IHM;
 try rewrite IHM1; try rewrite IHM2; eauto.
 Qed.
 
-
+Hint Resolve lc_t_n_Hyb_subst_t lc_t_n_Hyb_subst_w lc_t_subst_Hyb
+     lc_t_subst_w_Hyb lc_w_n_Hyb_subst_w lc_w_n_Hyb_subst_t
+     lc_w_subst_Hyb_same_n_bwo lc_w_subst_Hyb_same_n_fwo
+     lc_w_subst_Hyb lc_t_subst_Hyb.
 
 Close Scope hybrid_is5_scope.

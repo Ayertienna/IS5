@@ -644,10 +644,6 @@ rewrite H4 in H; inversion H; subst; inversion H10; subst.
 elim H11; apply Mem_here.
 Qed.
 
-(* FIXME: generalize all the ok_Bg_Hyb_split* into :
-   ok_Bg_Hyb G <- ok_Bg_Hyb reorder_G <- ok_Bg_Hyb reorder_G' <- ok_Bg_Hyb G':
-   reorder X ~=~ X and all the singletons are in the front *)
-
 Lemma ok_Bg_Hyb_split1:
 forall G w w' C C',
   ok_Bg_Hyb ((w,C)::G & (w',C')) ->

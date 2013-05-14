@@ -27,12 +27,12 @@ Inductive types_Hyb: bg_Hyb -> ctx_Hyb -> te_Hyb -> ty -> Prop :=
 | t_hyp_Hyb: forall A G w (Gamma: list (prod var ty)) v
   (Ok_Bg: ok_Bg_Hyb ((w, Gamma) :: G))
   (HT: Mem (v, A) Gamma),
-  G |= (w, Gamma) |- hyp_Hyb (fte v) ::: A
+  G |= (w, Gamma) |- hyp_Hyb A (fte v) ::: A
 
 | t_lam_Hyb: forall L A B G w Gamma M
   (Ok_Bg: ok_Bg_Hyb ((w, Gamma) :: G))
   (HT: forall v', v' \notin L ->
-    G |= (w, (v', A) :: Gamma) |- M ^t^ (hyp_Hyb (fte v')) ::: B),
+    G |= (w, (v', A) :: Gamma) |- M ^t^ (hyp_Hyb A (fte v')) ::: B),
   G |= (w, Gamma) |- (lam_Hyb A M) ::: A ---> B
 
 | t_appl_Hyb: forall A B G w Gamma M N
@@ -74,17 +74,17 @@ Inductive types_Hyb: bg_Hyb -> ctx_Hyb -> te_Hyb -> ty -> Prop :=
   (HT1: G |= (w, Gamma) |- M ::: <*> A)
   (HT2: forall v', v' \notin L_t -> forall w', w' \notin L_w ->
     (w', (v', A) :: nil) :: G |=
-      (w, Gamma) |- (N ^w^ (fwo w')) ^t^ (hyp_Hyb (fte v')) ::: B),
-  G |= (w, Gamma) |- letdia_get_Hyb (fwo w) M N ::: B
+      (w, Gamma) |- (N ^w^ (fwo w')) ^t^ (hyp_Hyb A (fte v')) ::: B),
+  G |= (w, Gamma) |- letdia_get_Hyb A (fwo w) M N ::: B
 
 | t_letdia_get_Hyb: forall L_w L_t A B G w (Gamma: list (prod var ty)) Ctx' M N
   (Ok_Bg: ok_Bg_Hyb ((w, Gamma) :: G & Ctx'))
   (HT1: G & Ctx' |= (w, Gamma) |- M ::: <*> A)
   (HT2: forall v', v' \notin L_t -> forall w', w' \notin L_w ->
     (w', ((v', A) :: nil)) :: G & (w, Gamma) |=
-      Ctx' |- (N ^w^ (fwo w')) ^t^ (hyp_Hyb (fte v')) ::: B),
+      Ctx' |- (N ^w^ (fwo w')) ^t^ (hyp_Hyb A (fte v')) ::: B),
   forall G0, (G & (w, Gamma)) ~=~ G0 ->
-    G0 |= Ctx' |- letdia_get_Hyb (fwo w) M N ::: B
+    G0 |= Ctx' |- letdia_get_Hyb A (fwo w) M N ::: B
 
 where " G '|=' Ctx '|-' M ':::' A " := (types_Hyb G Ctx M A)
   : hybrid_is5_scope.
@@ -118,11 +118,11 @@ Inductive step_Hyb: (te_Hyb * vwo) -> (te_Hyb * vwo) -> Prop :=
   lc_t_Hyb M ->
   (unbox_fetch_Hyb ctx' (box_Hyb M), ctx) |-> (M ^w^ ctx, ctx)
 
-| red_letdia_get_get_here_Hyb: forall ctx ctx' ctx'' M N,
+| red_letdia_get_get_here_Hyb: forall ctx ctx' ctx'' M N A,
   lc_w_Hyb M -> lc_t_Hyb M ->
   lc_w_n_Hyb 1 N ->
   lc_t_n_Hyb 1 N -> value_Hyb M ->
-  (letdia_get_Hyb ctx' (get_here_Hyb ctx'' M) N, ctx) |->
+  (letdia_get_Hyb A ctx' (get_here_Hyb ctx'' M) N, ctx) |->
     ((N ^w^ ctx'') ^t^ M, ctx)
 
 | red_appl_Hyb: forall ctx M N M'
@@ -141,14 +141,15 @@ Inductive step_Hyb: (te_Hyb * vwo) -> (te_Hyb * vwo) -> Prop :=
   lc_w_Hyb M -> lc_t_Hyb M ->
   (get_here_Hyb ctx M, ctx') |-> (get_here_Hyb ctx M', ctx')
 
-| red_letdia_get_Hyb: forall ctx ctx' M N M'
+| red_letdia_get_Hyb: forall ctx ctx' M N M' A
   (HT: (M, ctx) |-> (M', ctx)),
   lc_w_Hyb M -> lc_t_Hyb M ->
   lc_w_n_Hyb 1 N ->
   lc_t_n_Hyb 1 N ->
-  (letdia_get_Hyb ctx M N, ctx') |-> (letdia_get_Hyb ctx M' N, ctx')
+  (letdia_get_Hyb A ctx M N, ctx') |-> (letdia_get_Hyb A ctx M' N, ctx')
 
 where " M |-> N " := (step_Hyb M N ) : hybrid_is5_scope.
+
 
 Inductive steps_Hyb : te_Hyb * vwo -> te_Hyb * vwo -> Prop :=
 | single_step_Hyb: forall M M' w, (M, w) |-> (M', w) -> steps_Hyb (M, w) (M', w)
@@ -156,6 +157,8 @@ Inductive steps_Hyb : te_Hyb * vwo -> te_Hyb * vwo -> Prop :=
   (M, w) |-> (M', w) -> steps_Hyb (M', w) (M'', w)
   -> steps_Hyb (M, w) (M'', w)
 .
+
+Notation " M |->+ N " := (steps_Hyb M N) (at level 70) : hybrid_is5_scope.
 
 
 (*** Properties ***)
@@ -1912,14 +1915,14 @@ right; inversion HT; subst;
 inversion H_lc_w; subst;
 inversion H_lc_t; subst.
 (* letdia *)
-edestruct IHM1 with (A := <*>A0); eauto;
+edestruct IHM1 with (A := <*>t); eauto;
 [ inversion H0; subst; inversion HT1; subst |
   destruct H0];
 eexists; constructor; eauto.
-inversion H5; subst; auto.
-inversion H7; subst; auto.
-inversion H5; subst; auto.
-inversion H7; subst; auto.
+inversion H6; subst; auto.
+inversion H8; subst; auto.
+inversion H6; subst; auto.
+inversion H8; subst; auto.
 (* letdia_get *)
 assert (Gamma = nil) by
   ( apply emptyEquiv_Hyb_permut_empty
@@ -1928,24 +1931,23 @@ assert (Gamma = nil) by
 edestruct IHM1 with (G := G0 & (w, nil))
                     (w := w0)
                     (Ctx := (w0, (@nil ty)))
-                    (A := <*>A0); eauto;
+                    (A := <*>t); eauto;
 assert ( emptyEquiv_Hyb (G0 & (w, nil)) = G0 & (w, nil)) by
    ( repeat rewrite emptyEquiv_Hyb_rewrite; simpl;
-     apply emptyEquiv_Hyb_permut_split_last in H6; rewrite H6; reflexivity).
+     apply emptyEquiv_Hyb_permut_split_last in H7; rewrite H7; reflexivity).
 rewrite H0; auto.
 inversion H0; subst; inversion HT1; subst;
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;
-inversion H5; inversion H8; subst; auto.
+inversion H6; inversion H9; subst; auto.
 destruct H0;
 eexists; constructor; eauto;
 try apply closed_t_succ; auto;
-inversion H5; inversion H8; subst; auto.
+inversion H6; inversion H9; subst; auto.
 Qed.
 
 (*
    Proof sketch: double induction on typing and making a step
-   * FIXME: eauto takes ages :(
    * for beta reduction we take a fresh variable and expand the
    substitution a little bit, then apply the previously proven lemma
    that substitution preserves types
@@ -1973,7 +1975,7 @@ inversion HT1; subst;
 unfold open_t_Hyb in *;
 assert (exists v, v \notin L \u free_vars_Hyb M0) as HF by apply Fresh;
 destruct HF as (v_fresh).
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ eapply subst_t_Hyb_preserv_types_inner; eauto |
   rewrite notin_union in H; destruct H]; auto.
 rewrite <- double_emptyEquiv_Hyb; auto.
@@ -2023,7 +2025,7 @@ inversion HT; subst.
 (* letdia #1 *)
 rewrite notin_union in *; destruct H0; destruct H1;
 unfold open_t_Hyb in *; unfold open_w_Hyb in *;
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ rewrite subst_Hyb_order_irrelevant_bound |
   apply subst_w_Hyb_preserv_free_vars]; auto;
 [ rewrite <- subst_w_Hyb_neutral_free with (w0:=w_fresh) |
@@ -2039,7 +2041,7 @@ apply rename_w_Hyb_preserv_types_new with
 (* letdia #2 *)
 rewrite notin_union in *; destruct H0; destruct H1;
 unfold open_t_Hyb in *; unfold open_w_Hyb in *;
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ rewrite subst_Hyb_order_irrelevant_bound |
   apply subst_w_Hyb_preserv_free_vars]; auto;
 [ rewrite <- subst_w_Hyb_neutral_free with (w0:=w_fresh) |
@@ -2054,7 +2056,7 @@ assert ( emptyEquiv_Hyb (G & (w0, nil)) = G & (w0, nil)) by
 assert (Gamma = nil) by
   ( apply emptyEquiv_Hyb_permut_empty with (G:= (G & (w, Gamma)))
     (G':=G0) (w:=w); auto; apply Mem_last).
-subst; rew_app; rewrite <- H10 in HT0; auto.
+subst; rew_app. rewrite <- H5 in HT0; auto.
 apply rename_w_Hyb_preserv_types_outer with (G0:=G)
   (Gamma'':=(v_fresh,A) :: nil)
   (Gamma':=Gamma) (G:=G & (w, Gamma) & (w_fresh, (v_fresh,A)::nil));
@@ -2072,7 +2074,7 @@ inversion HT; subst.
 (* letdia #1 *)
 rewrite notin_union in *; destruct H1; destruct H2;
 unfold open_t_Hyb in *; unfold open_w_Hyb in *;
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ rewrite subst_Hyb_order_irrelevant_bound |
   apply subst_w_Hyb_preserv_free_vars]; auto;
 [ rewrite <- subst_w_Hyb_neutral_free with (w0:=w_fresh) |
@@ -2106,7 +2108,7 @@ subst.
 assert (G0  ~=~ G /\ Gamma0 *=* nil) by
   (apply ok_Bg_Hyb_impl_ppermut with (w:=w0); eauto);
 destruct H13; symmetry in H14; apply permut_nil_eq in H14;
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ eapply subst_t_Hyb_preserv_types_inner with (A:=A) |
   apply subst_w_Hyb_preserv_free_vars]; eauto;
 [ rewrite subst_Hyb_order_irrelevant_bound |
@@ -2136,7 +2138,7 @@ rewrite H13; auto); subst; assert (exists Gamma'', exists GH, exists GT,
     [ symmetry | right; intro; subst; elim n]; auto);
 destruct H13 as (Gamma'', (GH, (GT, (H12a, H12b))));
 symmetry in H12a; apply permut_nil_eq in H12a; subst;
-rewrite subst_t_Hyb_neutral_free with (v:=v_fresh);
+rewrite subst_t_Hyb_neutral_free with (v:=v_fresh) (A:=A);
 [ apply subst_t_Hyb_preserv_types_outer with (A:=A) (G0 :=GH ++ GT & (w, nil))
           (G := GH ++ GT & (w,nil) & (w1, (v_fresh, A) :: nil))
        (G' := GH ++ GT & (w,nil) & (w0, nil)) (w' :=w1) (Gamma':=nil) |
@@ -2189,6 +2191,10 @@ assert (emptyEquiv_Hyb G = G) by
 rewrite emptyEquiv_Hyb_rewrite; simpl; rewrite H1; reflexivity.
 Qed.
 
+(*
+   Lemmas needed for properties like termination or lang. equivalence.
+*)
+
 Lemma types_Hyb_lc_w_Hyb:
 forall G Gamma M A w,
   G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
@@ -2236,62 +2242,94 @@ Qed.
 Lemma lc_w_step_Hyb_preserv:
 forall M M' w,
   lc_w_Hyb M ->
-  step_Hyb (M, w) (M', w) ->
+  step_Hyb (M, fwo w) (M', fwo w) ->
   lc_w_Hyb M'.
-Admitted.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_Hyb in *; unfold open_w_Hyb in *; simpl in *.
+apply lc_w_subst_t_Hyb; auto.
+constructor; [eapply IHM1 |]; eauto.
+inversion H; subst; try omega; auto.
+destruct v; [inversion H; subst; omega | constructor; eapply IHM; eauto].
+inversion H; subst; try omega; constructor; eauto.
+apply IHM with w0; auto.
+inversion H; subst; try omega; inversion H12; subst; try omega;
+apply lc_w_subst_t_Hyb; auto;
+apply lc_w_n_L_subst_w; auto.
+inversion H; subst; try omega; constructor; auto.
+apply IHM1 with w0; auto.
+Qed.
 
 Lemma lc_t_step_Hyb_preserv:
 forall M M' w,
   lc_t_Hyb M ->
   step_Hyb (M, w) (M', w) ->
   lc_t_Hyb M'.
-Admitted.
+induction M; intros; inversion H0; subst; auto;
+unfold open_t_Hyb in *; unfold open_w_Hyb in *; simpl in *.
+apply lc_t_subst_Hyb; auto.
+constructor; [eapply IHM1 |]; eauto.
+inversion H; subst; try omega; auto.
+inversion H; subst; try omega; constructor; eapply IHM; eauto.
+inversion H; subst; try omega; constructor; eapply IHM; eauto.
+inversion H; subst; try omega; inversion H12; subst; try omega;
+apply lc_t_subst_Hyb; auto;
+apply lc_t_n_L_subst_w; auto.
+inversion H; subst; try omega; constructor; auto.
+apply IHM1 with v; auto.
+Qed.
 
 Lemma lc_w_steps_Hyb_preserv:
 forall M M' w,
   lc_w_Hyb M ->
-  steps_Hyb (M, w) (M', w) ->
+  steps_Hyb (M, fwo w) (M', fwo w) ->
   lc_w_Hyb M'.
-Admitted.
+intros; remember (M, fwo w) as M0; remember (M', fwo w) as M1;
+generalize dependent M; generalize dependent M'; generalize dependent w.
+induction H0; intros; inversion HeqM0; inversion HeqM1; subst;
+apply lc_w_step_Hyb_preserv in H; eauto.
+Qed.
 
 Lemma lc_t_steps_Hyb_preserv:
 forall M M' w,
   lc_t_Hyb M ->
-  steps_Hyb (M, w) (M', w) ->
+  steps_Hyb (M, fwo w) (M', fwo w) ->
   lc_t_Hyb M'.
-Admitted.
-
+intros; remember (M, fwo w) as M0; remember (M', fwo w) as M1;
+generalize dependent M; generalize dependent M'; generalize dependent w.
+induction H0; intros; inversion HeqM0; inversion HeqM1; subst;
+apply lc_t_step_Hyb_preserv in H; eauto.
+Qed.
 
 Lemma steps_Hyb_unbox:
 forall M w' w M',
  lc_w_Hyb M -> lc_t_Hyb M ->
- steps_Hyb (M, w') (M', w') ->
+ steps_Hyb (M, fwo w') (M', fwo w') ->
  steps_Hyb
-   (unbox_fetch_Hyb w' M, w)
-   (unbox_fetch_Hyb w' M', w).
-intros; remember (M, w') as M0; remember (M', w') as M1;
+   (unbox_fetch_Hyb (fwo w') M, w)
+   (unbox_fetch_Hyb (fwo w') M', w).
+intros; remember (M, fwo w') as M0; remember (M', fwo w') as M1;
 generalize dependent M;
 generalize dependent M';
 generalize dependent w';
 generalize dependent w;
 induction H1; intros; inversion HeqM1; inversion HeqM0; subst;
 [constructor; constructor; auto | ];
-apply multi_step_Hyb with (M':=unbox_fetch_Hyb w' M');
+apply multi_step_Hyb with (M':=unbox_fetch_Hyb (fwo w') M');
 [ constructor | eapply IHsteps_Hyb ]; eauto;
 [eapply lc_w_step_Hyb_preserv | eapply lc_t_step_Hyb_preserv]; eauto.
 Qed.
 
 Lemma steps_Hyb_get:
-forall M M'' w0 w1 w M' w'0,
+forall M M'' w0 w1 w M' w'0 A,
   (w0 = fwo w'0 \/ w0 = bwo 0) ->
   lc_w_Hyb M' -> lc_t_Hyb M' ->
   lc_w_n_Hyb 1 M -> lc_t_n_Hyb 1 M ->
-  steps_Hyb (M', w) (M'', w) ->
+  steps_Hyb (M', fwo w) (M'', fwo w) ->
   steps_Hyb
-    (letdia_get_Hyb w M' (get_here_Hyb w0 M), w1)
-    (letdia_get_Hyb w M'' (get_here_Hyb w0 M), w1).
+    (letdia_get_Hyb A (fwo w) M' (get_here_Hyb w0 M), w1)
+    (letdia_get_Hyb A (fwo w) M'' (get_here_Hyb w0 M), w1).
 intros.
-remember (M', w) as M0; remember (M'', w) as M1;
+remember (M', fwo w) as M0; remember (M'', fwo w) as M1;
 generalize dependent M;
 generalize dependent M';
 generalize dependent M''.
@@ -2303,7 +2341,8 @@ induction H4; intros; inversion HeqM1; inversion HeqM0; subst;
 [constructor; constructor; auto |].
 inversion H0; subst; constructor; try omega; auto.
 constructor; auto.
-apply multi_step_Hyb with (M':= letdia_get_Hyb w2 M' (get_here_Hyb w0 M0));
+apply multi_step_Hyb
+with (M':= letdia_get_Hyb A (fwo w2) M' (get_here_Hyb w0 M0));
 [ constructor | eapply IHsteps_Hyb ]; eauto.
 inversion H0; subst; constructor; try omega; auto.
 constructor; auto.
