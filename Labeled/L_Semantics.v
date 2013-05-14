@@ -1,4 +1,4 @@
-Add LoadPath "../..".
+Add LoadPath "..".
 Require Import L_Substitution.
 Require Import PermutLib.
 Require Import LibTactics.
@@ -17,12 +17,12 @@ Inductive types_L: worlds_L -> ctx_L -> te_L -> ty -> var -> Prop :=
   (Ok: ok_L Omega Gamma)
   (World: Mem w Omega)
   (HT: Mem (w, (v, A)) Gamma),
-  Omega; Gamma |- hyp_L (fte v) ::: A @ w
+  Omega; Gamma |- hyp_L A (fte v) ::: A @ w
 
 | t_lam_L: forall L Omega Gamma w A B M
   (Ok: ok_L Omega Gamma)
   (HT: forall x, x \notin L ->
-    Omega; (w, (x,A))::Gamma |- (M ^t^ (hyp_L (fte x))) ::: B @ w),
+    Omega; (w, (x,A))::Gamma |- (M ^t^ (hyp_L A (fte x))) ::: B @ w),
   Omega; Gamma |- lam_L A M ::: A ---> B @ w
 
 | t_appl_L: forall Omega Gamma w A B M N
@@ -65,8 +65,8 @@ Inductive types_L: worlds_L -> ctx_L -> te_L -> ty -> var -> Prop :=
   (HT1: Omega; Gamma |- M ::: <*>A @ w)
   (HT2: forall t, t \notin Lt -> forall w', w' \notin Lw ->
     w' :: Omega; (w', (t, A)) :: Gamma |-
-      ((N ^w^ (fwo w')) ^t^ (hyp_L (fte t)))  ::: B @ w),
-  Omega; Gamma |-letd_L M N ::: B @ w
+      ((N ^w^ (fwo w')) ^t^ (hyp_L A (fte t)))  ::: B @ w),
+  Omega; Gamma |-letd_L A M N ::: B @ w
 
 where " Omega ';' Gamma '|-' M ':::' A '@' w " := (types_L Omega Gamma M A w):
   labeled_is5_scope.
@@ -87,10 +87,10 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
 | red_unbox_box_L: forall M w,
    lc_t_L M -> lc_w_L (M ^w^ w) ->
    (unbox_L (box_L M), w) |-> (M ^w^ w, w)
-| red_letd_get_here_L: forall M N w w',
+| red_letd_get_here_L: forall M N w w' A,
    lc_t_L M -> lc_w_L M ->
    lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w') -> value_L M ->
-   (letd_L (get_L w' (here_L M)) N, w) |-> ((N ^w^ w') ^t^ M, w)
+   (letd_L A (get_L w' (here_L M)) N, w) |-> ((N ^w^ w') ^t^ M, w)
 | red_appl_L: forall M N M' w (HRed: (M, w) |-> (M', w)),
    lc_t_L M -> lc_w_L M ->
    lc_t_L N -> lc_w_L N ->
@@ -109,10 +109,10 @@ Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
    (here_L N, w) |-> (here_L N', w)
 | red_here_val_L: forall M w (HVal: value_L M),
    (here_L M, w) |-> (get_L w (here_L M), w)
-| red_letd_L: forall M M' N w (HRed: (M, w) |-> (M', w)),
+| red_letd_L: forall M M' N w A (HRed: (M, w) |-> (M', w)),
    lc_t_L M -> lc_w_L M ->
    lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w) ->
-   (letd_L M N, w) |-> (letd_L M' N, w)
+   (letd_L A M N, w) |-> (letd_L A M' N, w)
 | red_get_L: forall w M M' w' (HRed: (M, w) |-> (M', w)),
    lc_t_L M -> lc_w_L M ->
    (get_L w M, w') |-> (get_L w M', w')
@@ -593,10 +593,11 @@ destruct (IHM (<*>A0) w0 H1 H5 HT).
 *)
 (* letd *)
 right; inversion H_lc; inversion H_lc'; subst.
-destruct (IHM1 (<*>A0) w H3 H8 HT1).
+destruct (IHM1 (<*>t) w H4 H10 HT1).
   inversion H; subst; inversion HT1; subst.
-  inversion H3; inversion H8; subst;
-  inversion H4; inversion H10; subst;
+  inversion H; subst.
+  inversion H4; inversion H3; subst;
+  inversion H10; inversion H5; subst;
   eexists; constructor; eauto.
   apply lc_t_subst_L; auto.
   apply lc_w_subst_L; auto.
@@ -630,7 +631,7 @@ inversion HType1; subst; unfold open_t_L in *.
 assert (exists x, x \notin L \u used_vars_term_L M0 \u \{w'}) as HF
   by apply Fresh.
 destruct HF as (v_f).
-replace ([N // bte 0] M0) with ([N // fte v_f] ([hyp_L (fte v_f) // bte 0] M0)).
+replace ([N // bte 0] M0) with ([N // fte v_f] ([hyp_L A (fte v_f) // bte 0] M0)).
 eapply subst_t_L_types_preserv with (B:=A); eauto.
 rewrite <- subst_t_neutral_free_L with (n:=0); auto.
 (* red_unbox_box *)
@@ -657,19 +658,20 @@ inversion HType; subst; unfold open_w_L in *; unfold open_t_L in *;
 assert (exists x, x \notin Lt \u used_vars_term_L {{fwo w // bwo 0}}N)
   as HF by apply Fresh;
 destruct HF as (v_f);
-assert (exists x, x \notin Lw \u used_worlds_term_L [hyp_L (fte v_f) // bte 0]N
+assert (exists x, x \notin Lw \u
+                    used_worlds_term_L [hyp_L A (fte v_f) // bte 0]N
                            \u \{w} \u \{w'})
   as HF by apply Fresh;
 destruct HF as (w_f).
 replace ([M0 // bte 0] ({{fwo w // bwo 0}}N)) with
-  ([M0 // fte v_f] ([hyp_L (fte v_f) // bte 0] ({{fwo w// bwo 0}} N))) by
+  ([M0 // fte v_f] ([hyp_L A (fte v_f) // bte 0] ({{fwo w// bwo 0}} N))) by
   (rewrite <- subst_t_neutral_free_L; auto);
 apply subst_t_L_types_preserv with (Gamma:=(w, (v_f, A)) :: nil)
                                      (Gamma0:=nil) (w':=w)
                                                 (B:=A); eauto.
 rewrite <- subst_order_irrelevant_bound_L; [ | constructor];
-replace ( {{fwo w // bwo 0}}([hyp_L (fte v_f) // bte 0]N)) with
-  ({{fwo w // fwo w_f}} ({{fwo w_f // bwo 0}} ([hyp_L (fte v_f) // bte 0] N)))
+replace ( {{fwo w // bwo 0}}([hyp_L A (fte v_f) // bte 0]N)) with
+  ({{fwo w // fwo w_f}} ({{fwo w_f // bwo 0}} ([hyp_L A (fte v_f) // bte 0] N)))
   by (rewrite <- subst_w_neutral_free_L; auto).
 replace ((w, (v_f, A)) :: nil)
   with (rename_context_L  w_f w ((w_f, (v_f, A))::nil)) by
@@ -707,17 +709,16 @@ apply lc_t_n_L_subst_w; auto.
 constructor; eapply IHM; eauto.
 constructor; eapply IHM; eauto.
 inversion H; subst; inversion H4; subst; constructor; auto.
-inversion H; subst; inversion H9; subst.
+inversion H; subst; inversion H11; subst.
 apply lc_t_subst_L; auto;
 apply lc_t_n_L_subst_w; auto.
-apply lc_t_subst_L; auto;
-apply lc_t_n_L_subst_w; auto.
-apply lc_t_subst_L; auto;
-apply lc_t_n_L_subst_w; auto.
-inversion H; subst; constructor; auto; eapply IHM1; eauto.
-constructor; eapply IHM; eauto.
-inversion H; subst; repeat constructor; auto.
-inversion H; subst; constructor; eapply IHM; eauto.
+inversion H; subst; constructor; auto.
+apply IHM1 with w; auto.
+inversion H; subst; constructor; auto.
+apply IHM with w; auto.
+inversion H; subst; constructor; auto.
+inversion H; subst; constructor; auto.
+apply IHM with v; auto.
 Qed.
 
 Lemma lc_w_step_L_preserv:
@@ -807,16 +808,17 @@ apply lc_w_step_L_preserv with (M:=M) (w:=v); subst; eauto.
 Qed.
 
 Lemma steps_L_letd_L_get_L:
-forall M M' N w v,
+forall M M' N w v A,
   lc_t_L M -> lc_t_n_L 1 N -> lc_w_L M -> lc_w_n_L 1 N ->
   steps_L M M' (fwo v) ->
-  steps_L (letd_L (get_L (fwo v) M) N) (letd_L (get_L (fwo v) M') N) (fwo w).
+  steps_L (letd_L A (get_L (fwo v) M) N)
+          (letd_L A (get_L (fwo v) M') N) (fwo w).
 intros; remember (fwo v) as v'; generalize dependent v.
 remember (fwo w) as w'; generalize dependent w.
 induction H3; intros; subst.
 repeat constructor; unfold open_t_L; unfold open_w_L; auto;
 [ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]; auto.
-apply stepm_L with (M':=letd_L (get_L (fwo v) M') N);
+apply stepm_L with (M':=letd_L A (get_L (fwo v) M') N);
 [repeat constructor; unfold open_t_L; unfold open_w_L; auto;
 [ apply lc_t_subst_L; try constructor | apply lc_w_subst_L]
 | eapply IHsteps_L ]; auto.
@@ -835,12 +837,12 @@ induction H; intros.
 inversion H0; subst.
 unfold ok_L in ; destruct Ok.
 apply Mem_split in HT; destruct HT as (Gamma0, (Gamma1, HT)); subst.
-apply ok_Gamma_L_permut with (G2:=(w, (v,A)) :: Gamma0 ++ Gamma1) in H1;
+apply ok_Gamma_L_permut with (G2:=(w, (v,B)) :: Gamma0 ++ Gamma1) in H1;
 try permut_simpl;
-apply Mem_permut with (l':=(w, (v,A)) :: Gamma0 ++ Gamma1) in HT0;
+apply Mem_permut with (l':=(w, (v,B)) :: Gamma0 ++ Gamma1) in HT0;
 try permut_simpl.
 rewrite Mem_cons_eq in HT0; destruct HT0. inversion H2; subst; auto.
-apply ok_L_Mem_contradiction with (Omega:=Omega) (B:=A) in H2.
+apply ok_L_Mem_contradiction with (Omega:=Omega) (B:=B) in H2.
 contradiction. split; auto.
 (* lam *)
 inversion H0; subst.
@@ -871,47 +873,7 @@ subst; auto.
 inversion H0; subst; rewrite IHtypes_L with (<*>A0); auto.
 (* letd *)
 inversion H1; subst.
-assert (A = A0).
-  assert (<*>A = <*>A0).
-  apply IHtypes_L; auto.
-  inversion H2; auto.
-assert (exists x, x \notin Lw \u Lw0) by apply Fresh; destruct H3.
-assert (exists x, x \notin Lt \u Lt0) by apply Fresh; destruct H4.
-subst; apply H0 with x0 x; auto.
+assert (exists x, x \notin Lw \u Lw0) by apply Fresh; destruct H2.
+assert (exists x, x \notin Lt \u Lt0) by apply Fresh; destruct H3.
+apply H0 with x0 x; auto.
 Qed.
-
-Lemma typing_dec_attempt_1:
-forall M Omega Gamma A w,
-  Mem w Omega ->
-  ok_L Omega Gamma ->
-  {Omega; Gamma |- M ::: A @ w} +
-  { ~ Omega; Gamma |- M ::: A @ w}.
-induction M; intros.
-(* hyp *)
-destruct v.
-right; intro nn; inversion nn.
-destruct (Mem_dec (prod var (prod var ty)) Gamma (w, (v, A))).
-intros; repeat decide equality; apply eq_var_dec || apply eq_ty_dec.
-left; constructor; auto.
-right; intro nn; inversion nn; contradiction.
-(* lam *)
-destruct A; [right |  | right | right ]; try intro;
-try inversion H1;
-destruct (eq_ty_dec t A1); subst;
-[ | right; intro; inversion H1; subst; elim n; auto].
-remember (forall L,
-          forall v, v \notin L ->
-             Omega; (w, (v, A1)) :: Gamma |- M ^t^ (hyp_L (fte v)) ::: A2 @ w)
-         as P.
-assert ({ P } + { ~ P}). skip.
-destruct H1; [ left | right]; subst.
-econstructor; [auto | intros; eapply p; eauto].
-intro nn; inversion nn; subst. elim n; intros; eauto.
-specialize X with (used_vars_term_L M \u used_vars_context_L Gamma); destruct X.
-
-
-destruct IHM with Omega ((w, (x, A1))::Gamma) A2 w; auto.
-apply ok_L_extend_fresh; auto.
-left; apply t_lam_L
-      with (L:=  used_vars_term_L M \u used_vars_context_L Gamma); auto.
-intros.
