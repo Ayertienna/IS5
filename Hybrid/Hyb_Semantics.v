@@ -2349,39 +2349,72 @@ constructor; auto.
 eapply lc_w_step_Hyb_preserv in H1; eauto.
 eapply lc_t_step_Hyb_preserv in H2; eauto.
 Qed.
-(*
-Lemma steps_Hyb_appl:
-forall M N w M',
- steps_Hyb (M, w) (N, w) ->
- steps_Hyb
-   (appl_Hyb M M', w)
-   (appl_Hyb N M', w).
-Admitted.
 
-Lemma steps_Hyb_here:
-forall M w' w M',
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (get_here_Hyb w' M, w)
-   (get_here_Hyb w' M', w).
-Admitted.
+Lemma steps_Hyb_letdia_here0:
+forall M N w0 w1 w M',
+  lc_w_Hyb (letdia_get_Hyb w (get_here_Hyb w0 M) M') ->
+  lc_t_Hyb (letdia_get_Hyb w (get_here_Hyb w0 M) M') ->
+  steps_Hyb (M, w0) (N, w0) -> value_Hyb N ->
+  steps_Hyb
+    (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
+    (letdia_get_Hyb w (get_here_Hyb w0 N) M', w1).
+intros.
+remember (M, w0) as M0; remember (N, w0) as M1;
+generalize dependent M;
+generalize dependent N;
+generalize dependent w0.
+generalize dependent w1;
+generalize dependent w.
+generalize dependent M'.
+induction H1; intros; inversion HeqM1; inversion HeqM0; subst.
+inversion H0; inversion H1; inversion H9; inversion H15; subst; try omega;
+repeat constructor; auto.
+inversion H0; inversion H3; inversion H10; inversion H16; subst; try omega.
+apply multi_step_Hyb
+with (M':= letdia_get_Hyb (fwo w) (get_here_Hyb (fwo w4) M') M'0).
+repeat constructor; auto.
+apply IHsteps_Hyb; auto; repeat constructor; auto.
+eapply lc_w_step_Hyb_preserv in H; eauto.
+eapply lc_t_step_Hyb_preserv in H; eauto.
+Qed.
 
-Lemma steps_Hyb_letdia:
-forall M w' w M' N,
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (letdia_get_Hyb w' M N, w)
-   (letdia_get_Hyb w' M' N, w).
-Admitted.
+Lemma steps_reorder:
+forall M M' M'' w,
+  (M, w) |->+ (M', w) -> (M', w)|-> (M'', w) -> (M, w) |->+ (M'', w).
+intros.
+remember (M, w) as M0; remember (M', w) as M1;
+generalize dependent M;
+generalize dependent M';
+generalize dependent M'';
+generalize dependent w.
+induction H; intros; inversion HeqM0; inversion HeqM1; subst.
+apply multi_step_Hyb with (M':=M'0); auto; repeat constructor; auto.
+apply multi_step_Hyb with (M':=M'); auto.
+apply IHsteps_Hyb with (M:=M') (M'1:=M'0); auto.
+Qed.
 
 Lemma steps_Hyb_letdia_here:
 forall M N w0 w1 w M',
- steps_Hyb (M, w0) (N, w0) ->
- steps_Hyb
-   (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
-   ((M' ^w^ w0) ^t^ N, w1).
-Admitted.
-*)
+  lc_w_Hyb (letdia_get_Hyb w (get_here_Hyb w0 M) M') ->
+  lc_t_Hyb (letdia_get_Hyb w (get_here_Hyb w0 M) M') ->
+  steps_Hyb (M, w0) (N, w0) -> value_Hyb N ->
+  steps_Hyb
+    (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
+    ((M' ^w^ w0) ^t^ N, w1).
+intros.
+assert ((letdia_get_Hyb w (get_here_Hyb w0 M) M', w1) |->+
+ (letdia_get_Hyb w (get_here_Hyb w0 N) M', w1)).
+apply steps_Hyb_letdia_here0; auto.
+assert ((letdia_get_Hyb w (get_here_Hyb w0 N) M', w1) |->
+((M' ^w^ w0 ) ^t^ N, w1)).
+inversion H; inversion H0; inversion H9; inversion H15; subst; try omega;
+constructor; auto.
+eapply lc_w_steps_Hyb_preserv in H1; eauto.
+eapply lc_t_steps_Hyb_preserv in H1; eauto.
+apply steps_reorder with (M':=(letdia_get_Hyb w (get_here_Hyb w0 N) M'));
+auto.
+Qed.
+
 Close Scope hybrid_is5_scope.
 Close Scope is5_scope.
 Close Scope permut_scope.
