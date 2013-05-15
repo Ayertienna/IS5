@@ -1,5 +1,5 @@
 Add LoadPath "..".
-Add LoadPath "../Labeled/Lists".
+Add LoadPath "../Labeled".
 Add LoadPath "../Hybrid".
 
 Require Import Shared.
@@ -11,119 +11,6 @@ Open Scope is5_scope.
 Open Scope permut_scope.
 Open Scope labeled_is5_scope.
 Open Scope hybrid_is5_scope.
-
-(* FIXME: Prove & Move *)
-
-Lemma lc_w_step_Hyb_preserv:
-forall M M' w,
-  lc_w_Hyb M ->
-  step_Hyb (M, w) (M', w) ->
-  lc_w_Hyb M'.
-Admitted.
-
-Lemma lc_t_step_Hyb_preserv:
-forall M M' w,
-  lc_t_Hyb M ->
-  step_Hyb (M, w) (M', w) ->
-  lc_t_Hyb M'.
-Admitted.
-
-Lemma lc_w_steps_Hyb_preserv:
-forall M M' w,
-  lc_w_Hyb M ->
-  steps_Hyb (M, w) (M', w) ->
-  lc_w_Hyb M'.
-Admitted.
-
-Lemma lc_t_steps_Hyb_preserv:
-forall M M' w,
-  lc_t_Hyb M ->
-  steps_Hyb (M, w) (M', w) ->
-  lc_t_Hyb M'.
-Admitted.
-
-(* Lemmas regarding multi-step reductions *)
-
-Lemma steps_Hyb_unbox:
-forall M w' w M',
- lc_w_Hyb M -> lc_t_Hyb M ->
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (unbox_fetch_Hyb w' M, w)
-   (unbox_fetch_Hyb w' M', w).
-intros; remember (M, w') as M0; remember (M', w') as M1;
-generalize dependent M;
-generalize dependent M';
-generalize dependent w';
-generalize dependent w;
-induction H1; intros; inversion HeqM1; inversion HeqM0; subst;
-[constructor; constructor; auto | ];
-apply multi_step_Hyb with (M':=unbox_fetch_Hyb w' M');
-[ constructor | eapply IHsteps_Hyb ]; eauto;
-[eapply lc_w_step_Hyb_preserv | eapply lc_t_step_Hyb_preserv]; eauto.
-Qed.
-
-Lemma steps_Hyb_get:
-forall M M'' w0 w1 w M' w'0,
-  (w0 = fwo w'0 \/ w0 = bwo 0) ->
-  lc_w_Hyb M' -> lc_t_Hyb M' ->
-  lc_w_n_Hyb 1 M -> lc_t_n_Hyb 1 M ->
-  steps_Hyb (M', w) (M'', w) ->
-  steps_Hyb
-    (letdia_get_Hyb w M' (get_here_Hyb w0 M), w1)
-    (letdia_get_Hyb w M'' (get_here_Hyb w0 M), w1).
-intros.
-remember (M', w) as M0; remember (M'', w) as M1;
-generalize dependent M;
-generalize dependent M';
-generalize dependent M''.
-generalize dependent w;
-generalize dependent w0;
-generalize dependent w'0;
-generalize dependent w1.
-induction H4; intros; inversion HeqM1; inversion HeqM0; subst;
-[constructor; constructor; auto |].
-inversion H0; subst; constructor; try omega; auto.
-constructor; auto.
-apply multi_step_Hyb with (M':= letdia_get_Hyb w2 M' (get_here_Hyb w0 M0));
-[ constructor | eapply IHsteps_Hyb ]; eauto.
-inversion H0; subst; constructor; try omega; auto.
-constructor; auto.
-eapply lc_w_step_Hyb_preserv in H1; eauto.
-eapply lc_t_step_Hyb_preserv in H2; eauto.
-Qed.
-
-Lemma steps_Hyb_appl:
-forall M N w M',
- steps_Hyb (M, w) (N, w) ->
- steps_Hyb
-   (appl_Hyb M M', w)
-   (appl_Hyb N M', w).
-Admitted.
-
-Lemma steps_Hyb_here:
-forall M w' w M',
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (get_here_Hyb w' M, w)
-   (get_here_Hyb w' M', w).
-Admitted.
-
-Lemma steps_Hyb_letdia:
-forall M w' w M' N,
- steps_Hyb (M, w') (M', w') ->
- steps_Hyb
-   (letdia_get_Hyb w' M N, w)
-   (letdia_get_Hyb w' M' N, w).
-Admitted.
-
-Lemma steps_Hyb_letdia_here:
-forall M N w0 w1 w M',
- steps_Hyb (M, w0) (N, w0) ->
- steps_Hyb
-   (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
-   ((M' ^w^ w0) ^t^ N, w1).
-Admitted.
 
 (* Context conversion *)
 
@@ -323,7 +210,7 @@ Lemma ok_L_to_Hyb_ctx_ok_Hyb:
 forall Omega Gamma w G Gamma',
   ok_L Omega Gamma ->
   L_to_Hyb_ctx Omega Gamma w = (G, Some (w, Gamma')) ->
-  ok_Bg_Hyb ((w, Gamma')::G). (* FIXME: rename ok_Bg_Hyb to ok_Hyb *)
+  ok_Bg_Hyb ((w, Gamma')::G).
 unfold ok_L; unfold ok_Bg_Hyb; unfold L_to_Hyb_ctx;
 intros; destruct H; split;
 [eapply ok_Omega_to_ok_Hyb_worlds |
@@ -380,18 +267,19 @@ Qed.
 
 Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb :=
 match M0 with
-| hyp_L v => hyp_Hyb v
+| hyp_L A v => hyp_Hyb A v
 | lam_L A M => lam_Hyb A (L_to_Hyb_term w M)
 | appl_L M1 M2 => appl_Hyb (L_to_Hyb_term w M1) (L_to_Hyb_term w M2)
 | box_L M => box_Hyb (L_to_Hyb_term (bwo 0) M)
 | unbox_L M =>  unbox_fetch_Hyb w (L_to_Hyb_term w M)
 | here_L M => get_here_Hyb w (L_to_Hyb_term w M)
-| letd_L M1 M2 => letdia_get_Hyb w (L_to_Hyb_term w M1)
+| letd_L A M1 M2 => letdia_get_Hyb A w (L_to_Hyb_term w M1)
                           (L_to_Hyb_term (shift_vwo w) M2)
-| fetch_L w' M => letdia_get_Hyb w' (get_here_Hyb w' (L_to_Hyb_term w' M))
-                          (box_Hyb (unbox_fetch_Hyb (bwo 1) (hyp_Hyb (bte 0))))
-| get_L w' M => letdia_get_Hyb w' (L_to_Hyb_term w' M)
-                               (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))
+| fetch_L w' M => letdia_get_Hyb tvar w' (get_here_Hyb w' (L_to_Hyb_term w' M))
+                          (box_Hyb (unbox_fetch_Hyb (bwo 1)
+                                                    (hyp_Hyb tvar (bte 0))))
+| get_L w' M => letdia_get_Hyb tvar w' (L_to_Hyb_term w' M)
+                               (get_here_Hyb (bwo 0) (hyp_Hyb tvar (bte 0)))
 end.
 
 Lemma L_to_Hyb_term_subst_t:
@@ -442,7 +330,7 @@ auto; eapply Mem_L_to_Hyb_ctx; eauto.
 apply t_lam_Hyb with (L:=L);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros]; unfold open_t_Hyb in *;
 unfold open_t_L in *.
-rewrite <- L_to_Hyb_term_subst_t with (C1:=hyp_L (fte v')); auto;
+rewrite <- L_to_Hyb_term_subst_t with (C1:=hyp_L A (fte v')); auto;
 apply H with (x:=v'); auto;
 destruct Ok; apply split_at_Hyb_cons; auto.
 (* appl *)

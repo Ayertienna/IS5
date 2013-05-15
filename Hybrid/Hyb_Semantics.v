@@ -2350,6 +2350,38 @@ eapply lc_w_step_Hyb_preserv in H1; eauto.
 eapply lc_t_step_Hyb_preserv in H2; eauto.
 Qed.
 
+Lemma steps_Hyb_appl:
+forall M N w M',
+ steps_Hyb (M, w) (N, w) ->
+ steps_Hyb
+   (appl_Hyb M M', w)
+   (appl_Hyb N M', w).
+Admitted.
+
+Lemma steps_Hyb_here:
+forall M w' w M',
+ steps_Hyb (M, w') (M', w') ->
+ steps_Hyb
+   (get_here_Hyb w' M, w)
+   (get_here_Hyb w' M', w).
+Admitted.
+
+Lemma steps_Hyb_letdia:
+forall M w' w M' N,
+ steps_Hyb (M, w') (M', w') ->
+ steps_Hyb
+   (letdia_get_Hyb w' M N, w)
+   (letdia_get_Hyb w' M' N, w).
+Admitted.
+
+Lemma steps_Hyb_letdia_here:
+forall M N w0 w1 w M',
+ steps_Hyb (M, w0) (N, w0) ->
+ steps_Hyb
+   (letdia_get_Hyb w (get_here_Hyb w0 M) M', w1)
+   ((M' ^w^ w0) ^t^ N, w1).
+Admitted.
+
 Close Scope hybrid_is5_scope.
 Close Scope is5_scope.
 Close Scope permut_scope.
