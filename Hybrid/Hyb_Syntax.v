@@ -16,20 +16,20 @@ Terms in label-free IS5 system:
   different world)
 *)
 Inductive te_Hyb :=
-| hyp_Hyb: ty -> vte -> te_Hyb
+| hyp_Hyb: vte -> te_Hyb
 | lam_Hyb: ty -> te_Hyb -> te_Hyb
 | appl_Hyb: te_Hyb -> te_Hyb -> te_Hyb
 | box_Hyb: te_Hyb -> te_Hyb
 | unbox_fetch_Hyb: vwo -> te_Hyb -> te_Hyb
 | get_here_Hyb: vwo -> te_Hyb -> te_Hyb
-| letdia_get_Hyb: ty -> vwo -> te_Hyb -> te_Hyb -> te_Hyb
+| letdia_get_Hyb: vwo -> te_Hyb -> te_Hyb -> te_Hyb
 .
 
 
 (* Calculate set of free worlds used in term M *)
 Fixpoint free_worlds_Hyb (M: te_Hyb) : fset var :=
 match M with
-| hyp_Hyb _ _ => \{}
+| hyp_Hyb _ => \{}
 | lam_Hyb _ M => free_worlds_Hyb M
 | appl_Hyb M N => free_worlds_Hyb M \u free_worlds_Hyb N
 | box_Hyb M => free_worlds_Hyb M
@@ -37,21 +37,21 @@ match M with
 | unbox_fetch_Hyb _ M => free_worlds_Hyb M
 | get_here_Hyb (fwo w) M => \{w} \u free_worlds_Hyb M
 | get_here_Hyb _ M => free_worlds_Hyb M
-| letdia_get_Hyb _ (fwo w) M N => \{w} \u free_worlds_Hyb M \u free_worlds_Hyb N
-| letdia_get_Hyb _ _ M N => free_worlds_Hyb M \u free_worlds_Hyb N
+| letdia_get_Hyb (fwo w) M N => \{w} \u free_worlds_Hyb M \u free_worlds_Hyb N
+| letdia_get_Hyb _ M N => free_worlds_Hyb M \u free_worlds_Hyb N
 end.
 
 (* Calculate set of free variables used in term M *)
 Fixpoint free_vars_Hyb (M: te_Hyb) : fset var :=
 match M with
-| hyp_Hyb _ (fte v) => \{v}
-| hyp_Hyb _ (bte _) => \{}
+| hyp_Hyb (fte v) => \{v}
+| hyp_Hyb (bte _) => \{}
 | lam_Hyb _ M => free_vars_Hyb M
 | appl_Hyb M N => free_vars_Hyb M \u free_vars_Hyb N
 | box_Hyb M => free_vars_Hyb M
 | unbox_fetch_Hyb _ M => free_vars_Hyb M
 | get_here_Hyb _ M => free_vars_Hyb M
-| letdia_get_Hyb _ _ M N => free_vars_Hyb M \u free_vars_Hyb N
+| letdia_get_Hyb _ M N => free_vars_Hyb M \u free_vars_Hyb N
 end.
 
 
@@ -61,8 +61,8 @@ Property: term is locally closed
 *)
 
 Inductive lc_t_n_Hyb : nat -> te_Hyb -> Prop :=
- | lct_hyp_bte_Hyb: forall v n t , n > v -> lc_t_n_Hyb n (hyp_Hyb t (bte v))
- | lct_hyp_fte_Hyb: forall v n t, lc_t_n_Hyb n (hyp_Hyb t (fte v))
+ | lct_hyp_bte_Hyb: forall v n, n > v -> lc_t_n_Hyb n (hyp_Hyb (bte v))
+ | lct_hyp_fte_Hyb: forall v n, lc_t_n_Hyb n (hyp_Hyb (fte v))
  | lct_lam_Hyb: forall M t n,
      lc_t_n_Hyb (S n) M ->
      lc_t_n_Hyb n (lam_Hyb t M)
@@ -78,16 +78,16 @@ Inductive lc_t_n_Hyb : nat -> te_Hyb -> Prop :=
  | lct_get_here_Hyb: forall M w n,
      lc_t_n_Hyb n M ->
      lc_t_n_Hyb n (get_here_Hyb w M)
- | lct_letdia_get_Hyb: forall M N w n t,
+ | lct_letdia_get_Hyb: forall M N w n,
      lc_t_n_Hyb (S n) N -> lc_t_n_Hyb n M ->
-     lc_t_n_Hyb n (letdia_get_Hyb t w M N)
+     lc_t_n_Hyb n (letdia_get_Hyb w M N)
 .
 
 Definition lc_t_Hyb M := lc_t_n_Hyb 0 M.
 
 
 Inductive lc_w_n_Hyb: nat -> te_Hyb -> Prop :=
-| lcw_hyp_Hyb: forall v n t, lc_w_n_Hyb n (hyp_Hyb t v)
+| lcw_hyp_Hyb: forall v n, lc_w_n_Hyb n (hyp_Hyb v)
 | lcw_lam_Hyb: forall t M n,
     lc_w_n_Hyb n M ->
     lc_w_n_Hyb n (lam_Hyb t M)
@@ -109,14 +109,14 @@ Inductive lc_w_n_Hyb: nat -> te_Hyb -> Prop :=
 | lcw_get_here_bwo_Hyb: forall M n m,
     lc_w_n_Hyb n M -> n > m ->
     lc_w_n_Hyb n (get_here_Hyb (bwo m) M)
-| lcw_letdia_get_fwo_Hyb: forall M N w n t,
+| lcw_letdia_get_fwo_Hyb: forall M N w n,
     lc_w_n_Hyb (S n) N ->
     lc_w_n_Hyb n M ->
-    lc_w_n_Hyb n (letdia_get_Hyb t (fwo w) M N)
-| lcw_letdia_get_bwo_Hyb: forall M N n m t,
+    lc_w_n_Hyb n (letdia_get_Hyb (fwo w) M N)
+| lcw_letdia_get_bwo_Hyb: forall M N n m,
     lc_w_n_Hyb (S n) N ->
     lc_w_n_Hyb n M -> n > m ->
-    lc_w_n_Hyb n (letdia_get_Hyb t (bwo m) M N)
+    lc_w_n_Hyb n (letdia_get_Hyb (bwo m) M N)
 .
 
 Definition lc_w_Hyb M := lc_w_n_Hyb 0 M.
