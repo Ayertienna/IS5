@@ -10,13 +10,13 @@ Reserved Notation " [ M // x ] N " (at level 5).
 
 Fixpoint subst_t_LF M x N :=
 match N with
-| hyp_LF _ v => if (eq_vte_dec x v) then M else N
+| hyp_LF v => if (eq_vte_dec x v) then M else N
 | lam_LF t N' => lam_LF t [M//shift_vte x]N'
 | appl_LF N' N'' => appl_LF [M//x]N' [M//x]N''
 | box_LF N' => box_LF [M//x]N'
 | unbox_LF N' => unbox_LF [M//x]N'
 | here_LF N' => here_LF [M//x]N'
-| letdia_LF A N' N'' => letdia_LF A [M//x]N' [M//shift_vte x]N''
+| letdia_LF N' N'' => letdia_LF [M//x]N' [M//shift_vte x]N''
 end
 where " [ M // x ] N " := (subst_t_LF M x N).
 
@@ -47,11 +47,11 @@ omega. omega.
 Qed.
 
 Lemma subst_t_comm_LF:
-forall M v v' n N A
+forall M v v' n N
   (Lc: lc_t_LF N),
   v <> v' ->
-  [ N // fte v] ([ hyp_LF A (fte v') // bte n] M) =
-  [hyp_LF A (fte v') // bte n] ([N // fte v] M).
+  [ N // fte v] ([ hyp_LF (fte v') // bte n] M) =
+  [hyp_LF (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
 [ repeat (case_if; simpl); auto;
   erewrite closed_subst_t_bound_LF; eauto; omega | | | | | |];
@@ -66,9 +66,9 @@ apply closed_t_addition; auto.
 Qed.
 
 Lemma subst_t_neutral_free_LF:
-forall M v n N A
+forall M v n N
   (HT: v \notin used_vars_te_LF M),
-  [ N // bte n] M = [N // fte v] [hyp_LF A (fte v) // bte n] M.
+  [ N // bte n] M = [N // fte v] [hyp_LF (fte v) // bte n] M.
 induction M; intros; simpl in *;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto);
 repeat (case_if; simpl); subst; auto;
@@ -76,11 +76,11 @@ assert (v0 <> v0) as Neq by eauto; elim Neq; auto.
 Qed.
 
 Lemma subst_t_comm2_LF:
-forall M v' m n N A
+forall M v' m n N
   (Neq: m <> n)
   (Lc: lc_t_LF N),
-  subst_t_LF N (bte m) (subst_t_LF (hyp_LF A (fte v')) (bte n) M) =
-  subst_t_LF (hyp_LF A (fte v')) (bte n) (subst_t_LF N (bte m) M).
+  subst_t_LF N (bte m) (subst_t_LF (hyp_LF (fte v')) (bte n) M) =
+  subst_t_LF (hyp_LF (fte v')) (bte n) (subst_t_LF N (bte m) M).
 induction M; intros; subst; simpl;
 repeat (case_if; subst; simpl); auto;
 try rewrite IHM; eauto; try omega.
