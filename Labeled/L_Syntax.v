@@ -7,20 +7,20 @@ Require Export LibList.
 Definition worlds_L := list var.
 
 Inductive te_L :=
-| hyp_L: ty -> vte -> te_L
+| hyp_L: vte -> te_L
 | lam_L: ty -> te_L -> te_L
 | appl_L: te_L -> te_L -> te_L
 | box_L: te_L -> te_L
 | unbox_L: te_L -> te_L
 | get_L: vwo -> te_L -> te_L
-| letd_L: ty -> te_L -> te_L -> te_L
+| letd_L: te_L -> te_L -> te_L
 | here_L: te_L -> te_L
 | fetch_L: vwo -> te_L -> te_L
 .
 
 Inductive lc_t_n_L : nat -> te_L -> Prop :=
- | lct_hyp_fte_L: forall v n t, lc_t_n_L n (hyp_L t (fte v))
- | lct_hyp_bte_L: forall v n t, n > v -> lc_t_n_L n (hyp_L t (bte v))
+ | lct_hyp_fte_L: forall v n, lc_t_n_L n (hyp_L (fte v))
+ | lct_hyp_bte_L: forall v n, n > v -> lc_t_n_L n (hyp_L (bte v))
  | lct_lam_L: forall t M n,
      lc_t_n_L (S n) M ->
      lc_t_n_L n (lam_L t M)
@@ -42,13 +42,13 @@ Inductive lc_t_n_L : nat -> te_L -> Prop :=
  | lct_get_L: forall M w n,
      lc_t_n_L n M ->
      lc_t_n_L n (get_L w M)
- | lct_letd_L: forall M N n t,
+ | lct_letd_L: forall M N n,
      lc_t_n_L (S n) N -> lc_t_n_L n M ->
-     lc_t_n_L n (letd_L t M N)
+     lc_t_n_L n (letd_L M N)
 .
 
 Inductive lc_w_n_L: nat -> te_L -> Prop :=
-| lcw_hyp_L: forall v n t, lc_w_n_L n (hyp_L t v)
+| lcw_hyp_L: forall v n, lc_w_n_L n (hyp_L v)
 | lcw_lam_L: forall t M n,
     lc_w_n_L n M ->
     lc_w_n_L n (lam_L t M)
@@ -76,9 +76,9 @@ Inductive lc_w_n_L: nat -> te_L -> Prop :=
 | lcw_get_bwo_L: forall M n m,
     lc_w_n_L n M -> n > m ->
     lc_w_n_L n (get_L (bwo m) M)
-| lcw_letd_L: forall M N n t,
+| lcw_letd_L: forall M N n,
     lc_w_n_L (S n) N -> lc_w_n_L n M ->
-    lc_w_n_L n (letd_L t M N)
+    lc_w_n_L n (letd_L M N)
 .
 
 Definition lc_w_L w := lc_w_n_L 0 w.
@@ -86,27 +86,27 @@ Definition lc_t_L t := lc_t_n_L 0 t.
 
 Fixpoint used_vars_term_L (M: te_L) :=
 match M with
-| hyp_L _ (bte _) => \{}
-| hyp_L _ (fte w) => \{w}
+| hyp_L (bte _) => \{}
+| hyp_L (fte w) => \{w}
 | lam_L A M => used_vars_term_L M
 | appl_L M N => used_vars_term_L M \u used_vars_term_L N
 | box_L M => used_vars_term_L M
 | unbox_L M => used_vars_term_L M
 | here_L M => used_vars_term_L M
-| letd_L _ M N => used_vars_term_L M \u used_vars_term_L N
+| letd_L M N => used_vars_term_L M \u used_vars_term_L N
 | get_L w M => used_vars_term_L M
 | fetch_L w M => used_vars_term_L M
 end.
 
 Fixpoint used_worlds_term_L (M: te_L) :=
 match M with
-| hyp_L _ _ => \{}
+| hyp_L _ => \{}
 | lam_L A M => used_worlds_term_L M
 | appl_L M N => used_worlds_term_L M \u used_worlds_term_L N
 | box_L M => used_worlds_term_L M
 | unbox_L M => used_worlds_term_L M
 | here_L M => used_worlds_term_L M
-| letd_L _ M N => used_worlds_term_L M \u used_worlds_term_L N
+| letd_L M N => used_worlds_term_L M \u used_worlds_term_L N
 | get_L (fwo w) M => \{w} \u used_worlds_term_L M
 | get_L (bwo _) M => used_worlds_term_L M
 | fetch_L (fwo w) M => \{w} \u used_worlds_term_L M

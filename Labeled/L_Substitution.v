@@ -12,7 +12,7 @@ Global Reserved Notation " {{ w1 // w2 }} N " (at level 5).
 
 Fixpoint subst_t_L (M0: te_L) (v0: vte) (N0: te_L) :=
 match N0 with
-| hyp_L A v =>
+| hyp_L v =>
     if (eq_vte_dec v v0) then M0 else N0
 | lam_L A M =>
     lam_L A ([M0 // shift_vte v0] M)
@@ -28,14 +28,14 @@ match N0 with
     get_L w ([M0//v0]M)
 | here_L M =>
     here_L ([M0//v0]M)
-| letd_L A M N =>
-    letd_L A ([M0//v0]M) ([M0//shift_vte v0]N)
+| letd_L M N =>
+    letd_L ([M0//v0]M) ([M0//shift_vte v0]N)
 end
 where " [ M // v ] N " := (subst_t_L M v N) : labeled_is5_scope.
 
 Fixpoint subst_w_L (M0: te_L) (w1: vwo) (w2: vwo) :=
 match M0 with
-| hyp_L A n => hyp_L A n
+| hyp_L n => hyp_L n
 | lam_L A M => lam_L A ({{w1//w2}}M)
 | appl_L M N => appl_L ({{w1//w2}}M) ({{w1//w2}}N)
 | box_L M => box_L ({{ shift_vwo w1 // shift_vwo w2 }} M)
@@ -47,8 +47,8 @@ match M0 with
   let w' := if (eq_vwo_dec w3 w2) then w1 else w3 in
     get_L w' ({{w1//w2}}M)
 | here_L M => here_L ({{w1//w2}}M)
-| letd_L A M N =>
-    letd_L A ({{w1//w2}} M) ({{shift_vwo w1 // shift_vwo w2}} N)
+| letd_L M N =>
+    letd_L ({{w1//w2}} M) ({{shift_vwo w1 // shift_vwo w2}} N)
 end
 where " {{ w1 // w2 }} M " := (subst_w_L M w1 w2) : labeled_is5_scope.
 
@@ -62,9 +62,9 @@ Notation " M '^w^' w  " := (open_w_L M w) (at level 67) : labeled_is5_scope.
 Open Scope labeled_is5_scope.
 
 Lemma subst_t_neutral_free_L:
-forall M N n w A,
+forall M N n w,
   w \notin used_vars_term_L M ->
-  [N // bte n] M = [N // fte w] ([hyp_L A (fte w) // bte n] M).
+  [N // bte n] M = [N // fte w] ([hyp_L (fte w) // bte n] M).
 induction M; intros; simpl in *;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto);
 repeat (case_if; simpl); subst; auto;
@@ -163,11 +163,11 @@ try (destruct (eq_nat_dec m k); subst; [elim H0; auto | omega]).
 Qed.
 
 Lemma subst_t_comm_L:
-forall M v v' n N A
+forall M v v' n N
   (Neq: v <> v')
   (Lc: lc_t_L N),
-  [ N // fte v] ([ hyp_L A (fte v') // bte n] M) =
-  [hyp_L A (fte v') // bte n] ([N // fte v] M).
+  [ N // fte v] ([ hyp_L (fte v') // bte n] M) =
+  [hyp_L (fte v') // bte n] ([N // fte v] M).
 induction M; intros; simpl;
 [ repeat (case_if; simpl); auto;
   erewrite closed_subst_t_bound_L; eauto; omega | | | | | | | | ];
