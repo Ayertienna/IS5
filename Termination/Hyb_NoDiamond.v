@@ -7,20 +7,22 @@ Open Scope is5_scope.
 Open Scope hybrid_is5_scope.
 Open Scope permut_scope.
 
-Inductive WHT: te_Hyb -> Prop :=
-| val_WHT: forall M, value_Hyb M -> WHT M
-| step_WHT: forall M w,
-              (exists V, value_Hyb V /\ steps_Hyb (M, w) (V, w)) -> WHT M.
+(* FIXME: Finish this variant of the formalization *)
 
-Fixpoint Red (M: te_Hyb) (A: ty): Prop :=
+Inductive WHT: te_Hyb -> vwo -> Prop :=
+| val_WHT: forall M w, value_Hyb M -> WHT M w
+| step_WHT: forall M w,
+              (exists V, value_Hyb V /\ steps_Hyb (M, w) (V, w)) -> WHT M w.
+
+Fixpoint Red (M: te_Hyb) (A: ty) (w: vwo): Prop :=
 match A with
-| tvar => WHT M
+| tvar => WHT M w
 | tarrow A1 A2 =>
-  WHT M /\
-  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 ->
-            Red (appl_Hyb M N) A2)
-| tbox A1 => WHT M /\ forall w',
-               Red (unbox_fetch_Hyb (fwo w') M) A1
+  WHT M w /\
+  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 w ->
+            Red (appl_Hyb M N) A2 w)
+| tbox A1 => WHT M w /\
+             Red (unbox_fetch_Hyb w M) A1 w
 end.
 
 Lemma step_LF_unique:
@@ -41,9 +43,9 @@ Qed.
 
 Lemma WHT_step:
 forall M M' w,
-  WHT M ->
+  WHT M w ->
   (M, w) |-> (M', w) ->
-  WHT M'.
+  WHT M' w.
 intros; inversion H; subst.
 apply value_no_step with (N:=M')(w:=w) in H1; auto; contradiction.
 destruct H1 as (V, (H1, H2)).
@@ -54,14 +56,14 @@ apply step_LF_unique with (N':=M'0) in H0; subst; auto.
 Qed.
 
 Lemma WHT_step_back:
-forall M M',
-  M |-> M' ->
-WHT M' -> WHT M.
+forall M M' w,
+  (M, w) |-> (M', w) ->
+WHT M' w -> WHT M w.
 intros; apply step_WHT.
 inversion H0; subst.
 exists M'; split; auto; constructor; auto.
-destruct H1; destruct p.
-exists x; split; auto; apply multi_step_LF with (M':=M'); auto.
+destruct H1 as (V, (H1, H2)).
+exists V; split; auto; apply multi_step_Hyb with (M':=M'); auto.
 Qed.
 
 Hint Resolve WHT_step WHT_step_back.
@@ -69,119 +71,61 @@ Hint Resolve WHT_step WHT_step_back.
 (* CR 2 *)
 Theorem property_2:
 forall A M M' w
-  (HRed: Red M A)
+  (HRed: Red M A (fwo w))
   (H_lc_t: lc_t_Hyb M)
   (H_lc_w: lc_w_Hyb M)
-  (HStep:  (M, w) |-> (M', w)),
-  Red M' A.
+  (HStep:  (M, fwo w) |-> (M', fwo w)),
+  Red M' A (fwo w).
 induction A; intros; simpl in *; intros.
 (* base type *)
-apply step_WHT with w.
-assert (exists (x: var), x \notin \{}) by apply Fresh; destruct H;
-inversion HRed; subst;
-[specialize HStep with (fwo x);
-  apply value_no_step with (N:=M') (w:=fwo x) in H0; contradiction |
-apply H0; auto].
+eauto.
 (* arrow type *)
+destruct HRed;
+split; eauto; intros.
 apply IHA2 with (M:=appl_Hyb M N); auto; constructor; auto.
 (* box type *)
-apply IHA with (M:=unbox_fetch_Hyb (fwo w') M); auto; constructor; auto.
-Qed.
-
-(* CR 3 *)
-Theorem property_3:
-forall A M
-  (H_lc: lc_t_Hyb M),
-  neutral_Hyb M ->
-  (forall M' w, (M, fwo w) |-> (M', fwo w) ->
-    Red M' A) ->
-   Red M A.
-assert (exists (x:var), x \notin \{}) as nn by apply Fresh; destruct nn; auto;
-induction A; intros; simpl in *.
-(* base type *)
-intros; apply step_WHT with (w:=fwo x); auto; intros;
-apply H1 with x; auto.
-(* arrow type *)
-intros; apply IHA2; try constructor; auto; intros; simpl in *;
-inversion H2; subst; inversion H0; subst; eapply H1; eauto.
-(* box type *)
-intros; apply IHA; try constructor; auto; intros;
-inversion H2; subst; [inversion H0 | ];
-apply H1 with w'; auto.
+destruct HRed; split; auto; intros; eauto.
+apply IHA with (M:=unbox_fetch_Hyb (fwo w) M); auto; constructor; auto.
 Qed.
 
 (* CR 1 *)
 Theorem property_1:
-forall A M
-  (H_lc_t: lc_t_Hyb M)
-  (H_lc_w: lc_w_Hyb M),
-  Red M A -> WHT M.
-assert (exists (x:var), x \notin \{}) as nn by apply Fresh; destruct nn; auto;
+forall A M w
+  (H_lc_t: lc_t_Hyb M),
+  Red M A w -> WHT M w.
+induction A; intros; simpl in *; auto;
+destruct H; auto.
+Qed.
+
+(* CR 3 *)
+Theorem property_3:
+forall A M M' w
+  (H_lct: lc_t_Hyb M)
+  (H_lcw: lc_w_Hyb M),
+  (M, fwo w) |-> (M', fwo w) ->
+  Red M' A (fwo w) ->
+  Red M A (fwo w).
 induction A; intros; simpl in *.
 (* base type *)
-auto.
+eauto.
 (* arrow type *)
-(* Create variable of type A1 *)
-assert (forall x, neutral_Hyb (hyp_Hyb x)) by (intros; constructor).
-assert (forall x, WHT (hyp_Hyb x))
-  by (intros; apply step_WHT with (fwo x); intros; inversion H2).
-assert (forall x, Red (hyp_Hyb (fte x)) A1).
-  intros; apply property_3; auto.
-  constructor.
-  intros; inversion H3.
-assert (forall x, Red (appl_Hyb M (hyp_Hyb (fte x))) A2).
-intros; apply H0; auto; simpl; constructor.
-assert (forall x, WHT (appl_Hyb M (hyp_Hyb (fte x)))).
-intros; eapply IHA2; eauto;
-constructor; auto; constructor.
-(* From strong_norm (appl_L M (hyp_L x)) w deduce strong_norm M w *)
-eapply WHT_appl; auto; constructor; auto; constructor.
+destruct H0; split; eauto; intros;
+intros; apply IHA2 with (appl_Hyb M' N); try constructor; auto;
+intros; simpl in *.
 (* box type *)
-intros; apply WHT_box with (fwo x).
-constructor; auto.
-constructor; auto.
-apply IHA; [constructor | constructor | ]; auto.
-Grab Existential Variables.
-auto.
+destruct H0; split; eauto;
+intros; apply IHA with (unbox_fetch_Hyb (fwo w) M');
+try constructor; auto; intros.
 Qed.
 
-Lemma reducible_abstraction:
-forall A N B
-  (lc_N: lc_t_Hyb (lam_Hyb A N))
-  (HT: forall M,
-    lc_t_Hyb M ->
-    lc_w_Hyb M ->
-    Red M A ->
-    Red ([M// bte 0] N) B) ,
-  Red (lam_Hyb A N) (A ---> B).
-simpl; intros;
-apply property_3;
-repeat constructor; auto.
-inversion lc_N; auto.
-intros; inversion H; subst.
-apply HT; auto.
-inversion HT0.
-Qed.
+(* Idea: A separate list for each context from G *)
 
-Lemma reducible_box:
-forall A M
-  (lc_M: lc_t_Hyb M)
-  (HT: forall w, Red (M ^w^ (fwo w)) A),
-  Red (box_Hyb M) ([*]A).
-simpl; intros;
-apply property_3;
-repeat constructor; auto.
-intros; inversion H; subst.
-apply HT; auto.
-inversion HT0.
-Qed.
-
-Fixpoint find_var (L: list (var * ty * te_Hyb)) (x:var) :
-                     option (var * ty * te_Hyb) :=
+Fixpoint find_var (L: list (var * var * ty * te_Hyb)) (x:var) :
+                     option (var * var * ty * te_Hyb) :=
 match L with
 | nil => None
-| (v, A, M) :: L' =>
-  if (eq_var_dec x v) then Some (v, A, M) else find_var L' x
+| (w, v, A, M) :: L' =>
+  if (eq_var_dec x v) then Some (w, v, A, M) else find_var L' x
 end.
 
 Fixpoint find_world (L: list (var * var)) (w:vwo) : option (var * var) :=
@@ -191,7 +135,8 @@ match L with
   if (eq_vwo_dec w (fwo w1)) then Some (w0, w1) else find_world L' w
 end.
 
-Fixpoint SL (L: list (var * ty * te_Hyb)) (W: list (var * var)) (M: te_Hyb)
+Fixpoint SL (L: list (var * var * ty * te_Hyb))
+         (W: list (var * var)) (M: te_Hyb)
   : te_Hyb :=
 match M with
 | hyp_Hyb (bte v) => M
@@ -212,61 +157,63 @@ match M with
   end
 end.
 
-Fixpoint OkL (L: list (var * ty * te_Hyb)) U :=
+Fixpoint OkL (L: list (var * var * ty * te_Hyb)) U :=
 match L with
 | nil => True
-| (v, A, M) :: L' => ~ Mem v U /\ OkL L' (v::U)
+| (w, v, A, M) :: L' => ~ Mem v U /\ OkL L' (v::U)
 end.
 
 Lemma OkL_permut:
 forall L U1 U2,
   U1 *=* U2 ->
   OkL L U1 -> OkL L U2.
-induction L; intros; [constructor | destruct a; destruct p];
+induction L; intros; [constructor | destruct a; destruct p; destruct p];
 inversion H0; subst; constructor.
 intro; elim H1; apply Mem_permut with (l:=U2); [symmetry | ]; auto.
-apply IHL with (U1:=v::U1); auto.
+apply IHL with (U1:=v0::U1); auto.
 Qed.
 
 Lemma OkL_weaken:
 forall L U w,
   OkL L (w::U) -> OkL L U.
-induction L; intros; simpl in *; auto; destruct a; destruct p; destruct H;
-split.
+induction L; intros; simpl in *; auto; destruct a; destruct p; destruct p;
+destruct H; split.
 intro; elim H; rewrite Mem_cons_eq; right; auto.
-apply IHL with w. apply OkL_permut with (U1:=v::w::U); auto; permut_simpl.
+apply IHL with w. apply OkL_permut with (U1:=v0::w::U); auto; permut_simpl.
 Qed.
 
 Lemma OkL_used_notin:
-forall L U x A M,
+forall L U w x A M,
   OkL L U ->
   Mem x U ->
-  ~ Mem (x, A, M) L.
+  ~ Mem (w, x, A, M) L.
 induction L; intros.
 rewrite Mem_nil_eq; tauto.
-intro; destruct a; destruct p; rewrite Mem_cons_eq in *; inversion H; subst;
+intro; destruct a; destruct p; destruct p;
+rewrite Mem_cons_eq in *; inversion H; subst;
 destruct H1.
 inversion H1; subst; contradiction.
-specialize IHL with U x A M.
+specialize IHL with U w x A M.
 apply OkL_weaken in H3; apply IHL in H3; auto.
 Qed.
 
 Lemma Mem_Red_Hyp:
-forall L v A M W,
-  (forall (a : var) (b : ty) (c : te_Hyb), Mem (a, b, c) L → Red c b) ->
-  Mem (v, A, M) L ->
+forall L v A M W w,
+  (forall (w':var)  (a : var) (b : ty) (c : te_Hyb),
+     Mem (w', a, b, c) L → Red c b (fwo w')) ->
+  Mem (w, v, A, M) L ->
   OkL L nil ->
   SL L W (hyp_Hyb (fte v)) = M.
 induction L; intros; rew_map in *.
 rewrite Mem_nil_eq in H0; contradiction.
-destruct a; destruct p; simpl in *; case_if.
+destruct a; destruct p; destruct p; simpl in *; case_if.
 rewrite Mem_cons_eq in H0; destruct H0.
 inversion H0; subst; auto.
 destruct H1.
-apply OkL_used_notin with (U:=v0::nil) in H0;
+apply OkL_used_notin with (U:=v1::nil) in H0;
   [contradiction | auto | apply Mem_here ].
 destruct H1.
-apply IHL with A; auto.
+apply IHL with A w; auto.
 intros; apply H with a; rewrite Mem_cons_eq; right; auto.
 rewrite Mem_cons_eq in H0; destruct H0; auto; inversion H0; subst;
 elim H2; auto.
@@ -276,10 +223,12 @@ Qed.
 Lemma SL_hyp:
   forall L G Gamma w v A W,
   OkL L nil ->
+  (* 2. & 3. ~ map fst_ L,
+     forall w v A M in L, (v, A) in get w (w, Gamma) G *)
   concat (Gamma::(map snd_ G)) *=* map fst_ L ->
-  (forall a b c, Mem (a, b, c) L -> Red c b) ->
+  (forall w a b c, Mem (w, a, b, c) L -> Red c b (fwo w)) ->
   G |= (w, Gamma) |- hyp_Hyb (fte v) ::: A ->
-  Red (SL L W (hyp_Hyb (fte v))) A.
+  Red (SL L W (hyp_Hyb (fte v))) A (fwo w).
 intros.
 assert (Mem (v, A) (map fst_ L)).
   apply Mem_permut with (l:= concat (Gamma::map snd_ G)); auto;
