@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Require Export LFND_Shared.
 
 Inductive vctx_LF :=
@@ -13,6 +13,15 @@ Inductive te_LF :=
 | box_LF: te_LF -> te_LF
 | unbox_LF: te_LF -> te_LF
 .
+
+Lemma eq_te_LF_dec:
+forall (M1: te_LF) (M2: te_LF),
+  {M1 = M2} + {M1 <> M2}.
+decide equality.
+apply eq_vte_dec.
+apply eq_ty_dec.
+Qed.
+
 
 Inductive lc_t_n_LF : nat -> te_LF -> Prop :=
  | lc_t_hyp_bte_LF: forall v n, n > v -> lc_t_n_LF n (hyp_LF (bte v))
@@ -42,3 +51,21 @@ match M with
 | box_LF M => used_vars_te_LF M
 | unbox_LF M => used_vars_te_LF M
 end.
+
+Lemma closed_t_succ_LF:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
+Qed.
+
+Lemma closed_t_addition_LF:
+forall M n m,
+  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ_LF;
+assumption.
+Qed.

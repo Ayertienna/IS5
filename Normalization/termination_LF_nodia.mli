@@ -12,10 +12,6 @@ type 'a option =
 | Some of 'a
 | None
 
-type ('a, 'b) sum =
-| Inl of 'a
-| Inr of 'b
-
 type ('a, 'b) prod =
 | Pair of 'a * 'b
 
@@ -26,6 +22,9 @@ type 'a list =
 type 'a sig0 =
   'a
   (* singleton inductive, whose constructor was exist *)
+
+type ('a, 'p) sigT =
+| ExistT of 'a * 'p
 
 type sumbool =
 | Left
@@ -131,6 +130,8 @@ type te_LF =
 | Box_LF of te_LF
 | Unbox_LF of te_LF
 
+val eq_te_LF_dec : te_LF -> te_LF -> sumbool
+
 val used_vars_te_LF : te_LF -> Variables.var FsetImpl.fset
 
 val mem_dec : 'a1 list -> 'a1 -> ('a1 -> 'a1 -> sumbool) -> sumbool
@@ -179,29 +180,21 @@ type step_LF =
 | Red_appl_LF of te_LF * te_LF * te_LF * step_LF
 | Red_unbox_LF of te_LF * te_LF * step_LF
 
-type neutral_LF =
-| NHyp of vte
-| NAppl of te_LF * te_LF
-| NUnbox of te_LF
-
-val neutral_or_value : te_LF -> (neutral_LF, value_LF) sum
-
-val eq_te_LF_dec : te_LF -> te_LF -> sumbool
+type steps_LF =
+| Single_step_LF of te_LF * te_LF * step_LF
+| Multi_step_LF of te_LF * te_LF * te_LF * step_LF * steps_LF
 
 type wHT =
 | Val_WHT of te_LF * value_LF
-| Step_WHT of te_LF * (te_LF -> step_LF -> wHT)
-
-val wHT_appl : te_LF -> te_LF -> wHT -> wHT
-
-val wHT_box : te_LF -> wHT -> wHT
+| Step_WHT of te_LF * (te_LF, (value_LF, steps_LF) prod) sigT
 
 type red = __
 
-val property_3 :
-  ty -> te_LF -> neutral_LF -> (te_LF -> step_LF -> red) -> red
+val wHT_step_back : te_LF -> te_LF -> step_LF -> wHT -> wHT
 
 val property_1 : ty -> te_LF -> red -> wHT
+
+val property_3 : ty -> te_LF -> te_LF -> step_LF -> red -> red
 
 val find_var :
   ((Variables.var, ty) prod, te_LF) prod list -> Variables.var ->

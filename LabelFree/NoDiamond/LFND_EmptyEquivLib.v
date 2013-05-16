@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Require Export LFND_PPermutLib.
 
 Fixpoint emptyEquiv_LF (G: list (list (var * ty))) :=

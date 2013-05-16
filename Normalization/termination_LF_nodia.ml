@@ -13,10 +13,6 @@ type 'a option =
 | Some of 'a
 | None
 
-type ('a, 'b) sum =
-| Inl of 'a
-| Inr of 'b
-
 type ('a, 'b) prod =
 | Pair of 'a * 'b
 
@@ -27,6 +23,9 @@ type 'a list =
 type 'a sig0 =
   'a
   (* singleton inductive, whose constructor was exist *)
+
+type ('a, 'p) sigT =
+| ExistT of 'a * 'p
 
 type sumbool =
 | Left
@@ -297,6 +296,37 @@ type te_LF =
 | Box_LF of te_LF
 | Unbox_LF of te_LF
 
+(** val eq_te_LF_dec : te_LF -> te_LF -> sumbool **)
+
+let rec eq_te_LF_dec t m0 =
+  match t with
+  | Hyp_LF v ->
+    (match m0 with
+     | Hyp_LF v0 -> eq_vte_dec v v0
+     | _ -> Right)
+  | Lam_LF (t0, t1) ->
+    (match m0 with
+     | Lam_LF (t2, t3) ->
+       (match eq_ty_dec t0 t2 with
+        | Left -> eq_te_LF_dec t1 t3
+        | Right -> Right)
+     | _ -> Right)
+  | Appl_LF (t0, t1) ->
+    (match m0 with
+     | Appl_LF (t2, t3) ->
+       (match eq_te_LF_dec t0 t2 with
+        | Left -> eq_te_LF_dec t1 t3
+        | Right -> Right)
+     | _ -> Right)
+  | Box_LF t0 ->
+    (match m0 with
+     | Box_LF t1 -> eq_te_LF_dec t0 t1
+     | _ -> Right)
+  | Unbox_LF t0 ->
+    (match m0 with
+     | Unbox_LF t1 -> eq_te_LF_dec t0 t1
+     | _ -> Right)
+
 (** val used_vars_te_LF : te_LF -> Variables.var FsetImpl.fset **)
 
 let rec used_vars_te_LF = function
@@ -390,127 +420,50 @@ type step_LF =
 | Red_appl_LF of te_LF * te_LF * te_LF * step_LF
 | Red_unbox_LF of te_LF * te_LF * step_LF
 
-type neutral_LF =
-| NHyp of vte
-| NAppl of te_LF * te_LF
-| NUnbox of te_LF
-
-(** val neutral_or_value : te_LF -> (neutral_LF, value_LF) sum **)
-
-let neutral_or_value = function
-| Hyp_LF v -> Inl (NHyp v)
-| Lam_LF (t, t0) -> Inr (Val_lam_LF (t, t0))
-| Appl_LF (t, t0) -> Inl (NAppl (t, t0))
-| Box_LF t -> Inr (Val_box_LF t)
-| Unbox_LF t -> Inl (NUnbox t)
-
-(** val eq_te_LF_dec : te_LF -> te_LF -> sumbool **)
-
-let rec eq_te_LF_dec t m0 =
-  match t with
-  | Hyp_LF v ->
-    (match m0 with
-     | Hyp_LF v0 -> eq_vte_dec v v0
-     | _ -> Right)
-  | Lam_LF (t0, t1) ->
-    (match m0 with
-     | Lam_LF (t2, t3) ->
-       (match eq_ty_dec t0 t2 with
-        | Left -> eq_te_LF_dec t1 t3
-        | Right -> Right)
-     | _ -> Right)
-  | Appl_LF (t0, t1) ->
-    (match m0 with
-     | Appl_LF (t2, t3) ->
-       (match eq_te_LF_dec t0 t2 with
-        | Left -> eq_te_LF_dec t1 t3
-        | Right -> Right)
-     | _ -> Right)
-  | Box_LF t0 ->
-    (match m0 with
-     | Box_LF t1 -> eq_te_LF_dec t0 t1
-     | _ -> Right)
-  | Unbox_LF t0 ->
-    (match m0 with
-     | Unbox_LF t1 -> eq_te_LF_dec t0 t1
-     | _ -> Right)
+type steps_LF =
+| Single_step_LF of te_LF * te_LF * step_LF
+| Multi_step_LF of te_LF * te_LF * te_LF * step_LF * steps_LF
 
 type wHT =
 | Val_WHT of te_LF * value_LF
-| Step_WHT of te_LF * (te_LF -> step_LF -> wHT)
-
-(** val wHT_appl : te_LF -> te_LF -> wHT -> wHT **)
-
-let wHT_appl m n h0 =
-  let t = Appl_LF (m, n) in
-  let rec f t0 w n0 m0 =
-    match w with
-    | Val_WHT (m1, v) -> assert false (* absurd case *)
-    | Step_WHT (m1, w0) ->
-      let s = neutral_or_value m0 in
-      (match s with
-       | Inl n1 ->
-         Step_WHT (m0, (fun n2 h1 ->
-           let n3 = Appl_LF (n2, n0) in
-           let s0 = Red_appl_LF (m0, n2, n0, h1) in f n3 (w0 n3 s0) n0 n2))
-       | Inr v -> Val_WHT (m0, v))
-  in f t h0 n m
-
-(** val wHT_box : te_LF -> wHT -> wHT **)
-
-let wHT_box m h0 =
-  let t = Unbox_LF m in
-  let rec f t0 w m0 =
-    match w with
-    | Val_WHT (m1, v) -> assert false (* absurd case *)
-    | Step_WHT (m1, w0) ->
-      let s = neutral_or_value m0 in
-      (match s with
-       | Inl n ->
-         Step_WHT (m0, (fun n0 h1 ->
-           let n1 = Unbox_LF n0 in
-           let s0 = Red_unbox_LF (m0, n0, h1) in f n1 (w0 n1 s0) n0))
-       | Inr v -> Val_WHT (m0, v))
-  in f t h0 m
+| Step_WHT of te_LF * (te_LF, (value_LF, steps_LF) prod) sigT
 
 type red = __
 
-(** val property_3 :
-    ty -> te_LF -> neutral_LF -> (te_LF -> step_LF -> red) -> red **)
+(** val wHT_step_back : te_LF -> te_LF -> step_LF -> wHT -> wHT **)
 
-let rec property_3 t m h x =
-  match t with
-  | Tvar -> Obj.magic (Step_WHT (m, (Obj.magic x)))
-  | Tarrow (t0, t1) ->
-    Obj.magic (fun n _ hRed ->
-      property_3 t1 (Appl_LF (m, n)) (NAppl (m, n)) (fun m' h0 ->
-        match h0 with
-        | Red_appl_LF (m0, m'0, n0, h3) -> Obj.magic x m'0 h3 n __ hRed
-        | _ -> assert false (* absurd case *)))
-  | Tbox t0 ->
-    property_3 t0 (Unbox_LF m) (NUnbox m) (fun m' h0 ->
-      match h0 with
-      | Red_unbox_LF (m0, m'0, h2) -> x m'0 h2
-      | _ -> assert false (* absurd case *))
+let wHT_step_back m m' h h0 =
+  Step_WHT (m,
+    (match h0 with
+     | Val_WHT (m0, h1) ->
+       ExistT (m', (Pair (h1, (Single_step_LF (m, m', h)))))
+     | Step_WHT (m0, h1) ->
+       let ExistT (x, p) = h1 in
+       let Pair (v, s) = p in
+       ExistT (x, (Pair (v, (Multi_step_LF (m, m', x, h, s)))))))
 
 (** val property_1 : ty -> te_LF -> red -> wHT **)
 
 let property_1 a m x =
-  let nn = fresh FsetImpl.empty in
-  let rec f t m0 x0 =
-    match t with
-    | Tvar -> Obj.magic x0
-    | Tarrow (t0, t1) ->
-      let h = fun x1 -> NHyp x1 in
-      let x1 = fun x1 ->
-        property_3 t0 (Hyp_LF (Fte x1)) (h (Fte x1)) (fun m' h1 ->
-          assert false (* absurd case *))
-      in
-      let x2 = fun x2 -> Obj.magic x0 (Hyp_LF (Fte x2)) __ (x1 x2) in
-      let h1 = fun x3 -> f t1 (Appl_LF (m0, (Hyp_LF (Fte x3)))) (x2 x3) in
-      wHT_appl m0 (Hyp_LF (Fte nn)) (h1 nn)
-    | Tbox t0 -> wHT_box m0 (f t0 (Unbox_LF m0) x0)
-  in f a m x
+  match a with
+  | Tvar -> Obj.magic x
+  | Tarrow (t, t0) -> let Pair (w, r) = Obj.magic x in w
+  | Tbox t -> let Pair (w, r) = Obj.magic x in w
+
+(** val property_3 : ty -> te_LF -> te_LF -> step_LF -> red -> red **)
+
+let rec property_3 t m m' h x =
+  match t with
+  | Tvar -> Obj.magic (wHT_step_back m m' h (Obj.magic x))
+  | Tarrow (t0, t1) ->
+    let Pair (w, r) = Obj.magic x in
+    Obj.magic (Pair ((wHT_step_back m m' h w), (fun n _ x0 ->
+      property_3 t1 (Appl_LF (m, n)) (Appl_LF (m', n)) (Red_appl_LF (m, m',
+        n, h)) (r n __ x0))))
+  | Tbox t0 ->
+    let Pair (w, r) = Obj.magic x in
+    Obj.magic (Pair ((wHT_step_back m m' h w),
+      (property_3 t0 (Unbox_LF m) (Unbox_LF m') (Red_unbox_LF (m, m', h)) r)))
 
 (** val find_var :
     ((Variables.var, ty) prod, te_LF) prod list -> Variables.var ->
@@ -632,26 +585,34 @@ let rec main_theorem b c t t0 t1 l x =
          | Left -> x1
          | Right -> x a0 b1 c0 __))
     in
-    Obj.magic (fun n _ hRed ->
-      property_3 b0 (Appl_LF ((Lam_LF (a, (sL l m))), n)) (NAppl ((Lam_LF (a,
-        (sL l m))), n)) (fun m' h4 ->
-        match h4 with
-        | Red_appl_lam_LF (m0, n0, a0) -> x1 n hRed
-        | _ -> assert false (* absurd case *)))
+    Obj.magic (Pair ((Val_WHT ((Lam_LF (a, (sL l m))), (Val_lam_LF (a,
+      (sL l m))))), (fun n _ x2 ->
+      property_3 b0 (Appl_LF ((Lam_LF (a, (sL l m))), n))
+        (open_LF (sL l m) n) (Red_appl_lam_LF ((sL l m), n, a)) (x1 n x2))))
   | T_appl_LF (a, b0, g, gamma, m, n, h1, h2) ->
-    Obj.magic (fun _ l0 _ _ _ x0 ->
-      main_theorem g gamma m (Tarrow (a, b0)) h1 l0 x0) __ l __ __ __ x
-      (sL l n) __ (main_theorem g gamma n a h2 l x)
+    let Pair (x0, x1) =
+      Obj.magic (fun _ l0 _ _ _ x0 ->
+        main_theorem g gamma m (Tarrow (a, b0)) h1 l0 x0) __ l __ __ __ x
+    in
+    x1 (sL l n) __ (main_theorem g gamma n a h2 l x)
   | T_box_LF (g, gamma, m, a, h) ->
-    property_3 a (Unbox_LF (Box_LF (sL l m))) (NUnbox (Box_LF (sL l m)))
-      (fun m' h2 ->
-      match h2 with
-      | Red_unbox_box_LF m0 ->
-        main_theorem (append g (Cons (gamma, Nil))) Nil m a h l x
-      | _ -> assert false (* absurd case *))
-  | T_unbox_LF (g, gamma, m, a, h) -> main_theorem g gamma m (Tbox a) h l x
+    Obj.magic (Pair ((Val_WHT ((Box_LF (sL l m)), (Val_box_LF (sL l m)))),
+      (property_3 a (Unbox_LF (Box_LF (sL l m))) (sL l m) (Red_unbox_box_LF
+        (sL l m))
+        (main_theorem (append g (Cons (gamma, Nil))) Nil m a h l x))))
+  | T_unbox_LF (g, gamma, m, a, h) ->
+    let Pair (x0, x1) =
+      Obj.magic (fun _ l0 _ _ _ x0 ->
+        main_theorem g gamma m (Tbox a) h l0 x0) __ l __ __ __ x
+    in
+    x1
   | T_unbox_fetch_LF (g, gamma, gamma', m, a, h, g', p) ->
-    main_theorem (append g (Cons (gamma', Nil))) gamma m (Tbox a) h l x
+    let Pair (x0, x1) =
+      Obj.magic (fun _ l0 _ _ _ x0 ->
+        main_theorem (append g (Cons (gamma', Nil))) gamma m (Tbox a) h l0 x0)
+        __ l __ __ __ x
+    in
+    x1
 
 (** val wHT_Lang :
     (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> wHT **)

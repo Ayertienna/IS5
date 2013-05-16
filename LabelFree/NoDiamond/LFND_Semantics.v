@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Require Import LFND_OkLib.
 Require Import LFND_EmptyEquivLib.
 Require Import LFND_Substitution.
@@ -831,4 +831,37 @@ subst. replace (emptyEquiv_LF G0) with (G & nil).
 apply IHHT with (G0:=G0); auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
 apply emptyEquiv_LF_PPermut_equal; auto.
+Qed.
+
+Lemma value_no_step:
+forall M,
+  value_LF M ->
+  forall N , M |-> N ->
+             False.
+induction M; intros;
+try inversion H; subst;
+inversion H0; subst;
+rewrite IHM; eauto.
+Qed.
+
+Lemma lc_t_step_LF:
+forall M N,
+  lc_t_LF M ->
+  M |-> N ->
+  lc_t_LF N.
+induction M; intros; inversion H0; inversion H; subst; try constructor; eauto.
+apply lc_t_subst_t_LF_bound; auto.
+eapply IHM1; eauto.
+eapply IHM; eauto.
+Qed.
+
+Lemma types_LF_lc_t_LF:
+forall G Gamma M A,
+  G |= Gamma |- M ::: A -> lc_t_LF M.
+intros; induction X; constructor; try apply IHHT;
+unfold open_LF in *; auto.
+assert { x |  x \notin L} by apply Fresh; destruct H1;
+assert (x \notin L) by auto;
+specialize H0 with x; apply H0 in H1;
+apply lc_t_n_LF_subst_t in H0; auto; constructor.
 Qed.

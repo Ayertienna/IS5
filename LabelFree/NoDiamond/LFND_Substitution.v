@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Add LoadPath "..".
 Require Import PermutLib.
 Require Import LFND_Syntax.
@@ -72,4 +72,36 @@ induction M; intros; simpl in *;
 try (erewrite IHM || (erewrite IHM1; try erewrite IHM2); eauto);
 repeat (case_if; simpl); subst; auto;
 assert (v0 <> v0) as Neq by eauto; elim Neq; auto.
+Qed.
+
+Lemma lc_t_subst_t_LF_bound:
+forall M N n,
+  lc_t_n_LF n N ->
+  lc_t_n_LF (S n) M ->
+  lc_t_n_LF n ([N//bte n] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+assert (n <> v0) by (intro; subst; elim H1; auto); omega.
+eapply IHM; auto; apply closed_t_succ_LF; auto.
+Qed.
+
+Lemma lc_t_subst_t_LF_free:
+forall M N n v,
+  lc_t_n_LF n N ->
+  lc_t_n_LF n M ->
+  lc_t_n_LF n ([N//fte v] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+eapply IHM; eauto; apply closed_t_succ_LF; auto.
+Qed.
+
+Lemma lc_t_n_LF_subst_t:
+forall N M n,
+lc_t_n_LF n M ->
+lc_t_n_LF n ([M // (bte n)] N) ->
+lc_t_n_LF (S n) N.
+induction N; intros; simpl in *; try destruct v; constructor;
+repeat case_if; try inversion H1; subst; try omega;
+inversion H0; subst; eauto.
+apply IHN with (M:=M); eauto; apply closed_t_succ_LF; auto.
 Qed.

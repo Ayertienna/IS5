@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Require Import Setoid.
 Require Export LibTactics.
 Require Export PermutLib.

@@ -1,103 +1,9 @@
 Add LoadPath "..".
-Add LoadPath "../LabelFree/SingleUnbox/NoDiamond".
-Require Import Shared.
+Add LoadPath "../LabelFree/NoDiamond".
 Require Import LabelFreeNoDia.
 
 Open Scope is5_scope.
 Open Scope permut_scope.
-
-(* MOVE THIS TO LANG DEF! *)
-
-Lemma value_no_step:
-forall M,
-  value_LF M ->
-  forall N , M |-> N ->
-             False.
-induction M; intros;
-try inversion H; subst;
-inversion H0; subst;
-rewrite IHM; eauto.
-Qed.
-
-Lemma closed_t_succ_LF:
-forall M n,
-  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_LF.
-Qed.
-
-Lemma lc_t_subst_t_LF_bound:
-forall M N n,
-  lc_t_n_LF n N ->
-  lc_t_n_LF (S n) M ->
-  lc_t_n_LF n ([N//bte n] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-assert (n <> v0) by (intro; subst; elim H1; auto); omega.
-eapply IHM; auto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma lc_t_subst_t_LF_free:
-forall M N n v,
-  lc_t_n_LF n N ->
-  lc_t_n_LF n M ->
-  lc_t_n_LF n ([N//fte v] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-eapply IHM; eauto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma lc_t_step_LF:
-forall M N,
-  lc_t_LF M ->
-  M |-> N ->
-  lc_t_LF N.
-induction M; intros; inversion H0; inversion H; subst; try constructor; eauto.
-apply lc_t_subst_t_LF_bound; auto.
-eapply IHM1; eauto.
-eapply IHM; eauto.
-Qed.
-
-Lemma closed_t_succ:
-forall M n,
-  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_LF.
-Qed.
-
-Lemma closed_t_addition:
-forall M n m,
-  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
-intros; induction m;
-[ replace (n+0) with n by auto |
-  replace (n + S m) with (S (n+m)) by auto] ;
-try apply closed_t_succ;
-assumption.
-Qed.
-
-Lemma lc_t_n_LF_subst_t:
-forall N M n,
-lc_t_n_LF n M ->
-lc_t_n_LF n (subst_t_LF M (bte n) N) ->
-lc_t_n_LF (S n) N.
-induction N; intros; simpl in *; try destruct v; constructor;
-repeat case_if; try inversion H1; subst; try omega;
-inversion H0; subst; eauto.
-apply IHN with (M:=M); eauto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma types_LF_lc_t_LF:
-forall G Gamma M A,
-  G |= Gamma |- M ::: A -> lc_t_LF M.
-intros; induction X; constructor; try apply IHHT;
-unfold open_LF in *; auto.
-assert { x |  x \notin L} by apply Fresh; destruct H1;
-assert (x \notin L) by auto;
-specialize H0 with x; apply H0 in H1;
-apply lc_t_n_LF_subst_t in H0; auto; constructor.
-Qed.
 
 Inductive neutral_LF: te_LF -> Type :=
 | nHyp: forall n, neutral_LF (hyp_LF n)
@@ -127,87 +33,13 @@ destruct (IHG e); auto; destruct H0; exists x; split; auto.
 rewrite Mem_cons_eq; right; auto.
 Qed.
 
-Lemma ok_LF_Mem_Mem_eq':
-  forall (G : ctx_LF)(v : var) (A B : ty),
-    ok_LF G nil  ->
-    Mem (v, A) G -> Mem (v,B) G ->
-    A = B.
-induction G; intros.
-rewrite Mem_nil_eq in H0; contradiction.
-rewrite Mem_cons_eq in *; destruct H0; destruct H1; subst.
-inversion H1; subst; auto.
-inversion H; subst; apply Mem_split in H1; destruct H1 as (hd, (tl, H1));
-assert (hd & (v, B) ++ tl *=* (v, B) :: hd ++ tl) by permut_simpl;
-rewrite H1 in H6; apply ok_LF_permut with (G':= (v, B) :: hd ++ tl) in H6;
-auto; inversion H6; subst; elim H8; apply Mem_here.
-inversion H; subst; apply Mem_split in H0; destruct H0 as (hd, (tl, H0));
-assert (hd & (v, A) ++ tl *=* (v, A) :: hd ++ tl) by permut_simpl;
-rewrite H0 in H6; apply ok_LF_permut with (G':= (v, A) :: hd ++ tl) in H6;
-auto; inversion H6; subst; elim H8; apply Mem_here.
-eapply IHG; eauto.
-inversion H; subst; eapply ok_LF_used_weakening; eauto.
-Qed.
-
-Lemma eq_te_LF_dec:
-forall (M1: te_LF) (M2: te_LF),
-  {M1 = M2} + {M1 <> M2}.
-decide equality.
-apply eq_vte_dec.
-apply eq_ty_dec.
-Qed.
-
 (* Termination begins here *)
 
 Inductive WHT: te_LF -> Type :=
 | val_WHT: forall M, value_LF M -> WHT M
-| step_WHT: forall M, (* change this to transitive closure? *)
-             (*
-(forall N, M |-> N -> WHT N) ->
-             WHT M. *)
+| step_WHT: forall M,
               sigT (fun V => prod (value_LF V) (steps_LF M V)) -> WHT M.
-(*
-Lemma WHT_appl:
-forall M N,
-  lc_t_LF (appl_LF M N) ->
-  WHT (appl_LF M N) ->
-  WHT M.
-intros;
-remember (appl_LF M N) as T;
-generalize dependent M;
-generalize dependent N;
-induction H0; intros; subst.
-inversion v; auto.
-destruct (neutral_or_value M0);
-[ | constructor; auto];
-apply step_WHT; intros.
-apply H0 with (N0:=appl_LF N0 N) (N:=N); auto.
-constructor; eauto.
-inversion H; auto.
-inversion H; auto.
-apply lc_t_step_LF with (M:=appl_LF M0 N); auto. constructor; auto.
-inversion H; auto.
-inversion H; auto.
-Qed.
 
-Lemma WHT_box:
-forall M,
-  lc_t_LF (unbox_LF M) ->
-  WHT (unbox_LF M) ->
-  WHT M.
-intros; remember (unbox_LF M) as T;
-generalize dependent M;
-induction H0; intros; subst;
-[ inversion v |
-  destruct (neutral_or_value M0)];
-[  | constructor; auto];
-apply step_WHT; intros;
-apply H0 with (N := unbox_LF N).
-constructor; auto; inversion H; auto.
-apply lc_t_step_LF with (M:=unbox_LF M0); auto; constructor; auto;
-inversion H; auto.
-auto.
-Qed.
-*)
 Fixpoint Red (M: te_LF) (A: ty) : Type :=
 match A with
 | tvar => WHT M
@@ -222,7 +54,7 @@ end.
 
 Lemma step_LF_unique:
 forall M N N',
-M |-> N -> M |->N' -> N = N'.
+  M |-> N -> M |->N' -> N = N'.
 intros; generalize dependent N'; induction H; intros; inversion H0; subst;
 auto. inversion H5. inversion H2. inversion H.
 rewrite IHstep_LF with M'0; auto.
@@ -289,8 +121,7 @@ Qed.
 Theorem property_3:
 forall A M M'
   (H_lc: lc_t_LF M),
-  M |-> M' ->
-  Red M' A ->
+  M |-> M' ->   Red M' A ->
   Red M A.
 induction A; intros; simpl in *.
 (* base type *)
@@ -302,37 +133,6 @@ apply IHA2 with (appl_LF M' N); try constructor; auto; intros; simpl in *.
 destruct X; split; eauto; intros.
 intros; apply IHA with (unbox_LF M'); try constructor; auto.
 Qed.
-
-(*
-Lemma reducible_abstraction:
-forall A N B
-  (lc_N: lc_t_LF (lam_LF A N))
-  (HT: forall M,
-    lc_t_LF M ->
-    Red M A ->
-    Red ([M// bte 0] N) B),
-  Red (lam_LF A N) (A ---> B).
-simpl; intros;
-apply property_3;
-repeat constructor; auto.
-inversion lc_N; auto.
-intros; inversion H; subst.
-apply HT; auto.
-inversion H5.
-Qed.
-
-Lemma reducible_box:
-forall A M
-  (lc_M: lc_t_LF M)
-  (HT: Red M A),
-  Red (box_LF M) ([*]A).
-simpl; intros;
-apply property_3;
-repeat constructor; auto.
-intros; inversion H; subst; auto.
-inversion H2.
-Qed.
-*)
 
 Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
                      option (var * ty * te_LF) :=
@@ -487,7 +287,7 @@ constructor; auto.
 destruct (Mem_dec var (map fst_ (map fst_ L)) v). apply eq_var_dec.
 apply Mem_find_var in m; destruct m; destruct H1.
 rewrite H1. replace n with (0+n) by omega.
-apply closed_t_addition; apply H0 with v x. apply find_var_Mem; auto.
+apply closed_t_addition_LF; apply H0 with v x. apply find_var_Mem; auto.
 rewrite NotMem_find_var; auto.
 inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
 Qed.
@@ -566,18 +366,6 @@ apply find_var_Mem; eauto.
 Qed.
 
 Theorem main_theorem:
-forall G M A,
-  lc_t_LF M ->
-  emptyEquiv_LF G |= nil |- M ::: A -> Red M A.
-intros. remember nil as Gamma.
-remember (emptyEquiv_LF G) as G'; generalize dependent G.
-induction X; intros; subst.
-rewrite Mem_nil_eq in H0; contradiction.
-repeat constructor; intros.
-apply property_3 with (M':=M ^t^ N).
-Abort.
-
-Theorem main_theorem:
 forall G Gamma M A,
   lc_t_LF M ->
   G |= Gamma |- M ::: A ->
@@ -616,7 +404,7 @@ simpl in *; split; intros. repeat constructor.
 apply property_3 with (M':=(SL L0 M) ^t^ N).
 constructor; auto; constructor; apply lc_SL; auto; inversion LC; auto.
 constructor.
-constructor; auto. inversion LC; subst; apply lc_SL; auto.
+apply lc_SL; auto; inversion LC; auto. auto.
 unfold open_LF in *.
 rewrite subst_t_neutral_free_LF with (v:=x); auto.
 replace ([N // fte x]([hyp_LF (fte x) // bte 0](SL L0 M))) with
@@ -633,7 +421,7 @@ simpl in *; split. repeat constructor.
 apply property_3 with (SL L M).
 constructor; constructor; apply lc_SL; inversion LC; auto.
 constructor.
-constructor; auto; inversion LC; subst; apply lc_SL; auto.
+inversion LC; subst; apply lc_SL; auto.
 apply IHHT; auto; rew_concat in *. inversion LC; auto.
 rewrite <- H0; permut_simpl.
 (* unbox *)

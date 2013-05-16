@@ -1,4 +1,4 @@
-Add LoadPath "../../..".
+Add LoadPath "../..".
 Require Export LFND_PPermutLib.
 Require Export ListLib.
 Require Export LFND_EmptyEquivLib.
@@ -314,4 +314,25 @@ assert (ok_Bg_LF (emptyEquiv_LF G ++ G')).
 unfold ok_Bg_LF in *; rew_concat in *; auto.
 rew_concat; permut_simpl.
 rew_concat; permut_simpl.
+Qed.
+
+Lemma ok_LF_Mem_Mem_eq':
+  forall (G : ctx_LF)(v : var) (A B : ty),
+    ok_LF G nil  ->
+    Mem (v, A) G -> Mem (v,B) G ->
+    A = B.
+induction G; intros.
+rewrite Mem_nil_eq in H0; contradiction.
+rewrite Mem_cons_eq in *; destruct H0; destruct H1; subst.
+inversion H1; subst; auto.
+inversion H; subst; apply Mem_split in H1; destruct H1 as (hd, (tl, H1));
+assert (hd & (v, B) ++ tl *=* (v, B) :: hd ++ tl) by permut_simpl;
+rewrite H1 in H6; apply ok_LF_permut with (G':= (v, B) :: hd ++ tl) in H6;
+auto; inversion H6; subst; elim H8; apply Mem_here.
+inversion H; subst; apply Mem_split in H0; destruct H0 as (hd, (tl, H0));
+assert (hd & (v, A) ++ tl *=* (v, A) :: hd ++ tl) by permut_simpl;
+rewrite H0 in H6; apply ok_LF_permut with (G':= (v, A) :: hd ++ tl) in H6;
+auto; inversion H6; subst; elim H8; apply Mem_here.
+eapply IHG; eauto.
+inversion H; subst; eapply ok_LF_used_weakening; eauto.
 Qed.
