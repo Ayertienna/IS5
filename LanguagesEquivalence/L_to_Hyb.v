@@ -267,19 +267,19 @@ Qed.
 
 Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb :=
 match M0 with
-| hyp_L A v => hyp_Hyb A v
+| hyp_L v => hyp_Hyb v
 | lam_L A M => lam_Hyb A (L_to_Hyb_term w M)
 | appl_L M1 M2 => appl_Hyb (L_to_Hyb_term w M1) (L_to_Hyb_term w M2)
 | box_L M => box_Hyb (L_to_Hyb_term (bwo 0) M)
 | unbox_L M =>  unbox_fetch_Hyb w (L_to_Hyb_term w M)
 | here_L M => get_here_Hyb w (L_to_Hyb_term w M)
-| letd_L A M1 M2 => letdia_get_Hyb A w (L_to_Hyb_term w M1)
+| letd_L M1 M2 => letdia_get_Hyb w (L_to_Hyb_term w M1)
                           (L_to_Hyb_term (shift_vwo w) M2)
-| fetch_L w' M => letdia_get_Hyb tvar w' (get_here_Hyb w' (L_to_Hyb_term w' M))
+| fetch_L w' M => letdia_get_Hyb w' (get_here_Hyb w' (L_to_Hyb_term w' M))
                           (box_Hyb (unbox_fetch_Hyb (bwo 1)
-                                                    (hyp_Hyb tvar (bte 0))))
-| get_L w' M => letdia_get_Hyb tvar w' (L_to_Hyb_term w' M)
-                               (get_here_Hyb (bwo 0) (hyp_Hyb tvar (bte 0)))
+                                                    (hyp_Hyb (bte 0))))
+| get_L w' M => letdia_get_Hyb w' (L_to_Hyb_term w' M)
+                               (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))
 end.
 
 Lemma L_to_Hyb_term_subst_t:
@@ -330,7 +330,7 @@ auto; eapply Mem_L_to_Hyb_ctx; eauto.
 apply t_lam_Hyb with (L:=L);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | intros]; unfold open_t_Hyb in *;
 unfold open_t_L in *.
-rewrite <- L_to_Hyb_term_subst_t with (C1:=hyp_L A (fte v')); auto;
+rewrite <- L_to_Hyb_term_subst_t with (C1:=hyp_L (fte v')); auto;
 apply H with (x:=v'); auto;
 destruct Ok; apply split_at_Hyb_cons; auto.
 (* appl *)
@@ -359,7 +359,7 @@ eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto.
 (* fetch *)
 destruct (eq_var_dec w w'); subst.
 (* = *)
-apply t_letdia_Hyb with (L_w:=used_w_vars_Hyb (G_Hyb & (w', Gamma_Hyb)))
+apply  t_letdia_Hyb with (L_w:=used_w_vars_Hyb (G_Hyb & (w', Gamma_Hyb)))
                         (L_t:=used_t_vars_Hyb (G_Hyb & (w', Gamma_Hyb)))
                         (A:=[*]A);
 [eapply ok_L_to_Hyb_ctx_ok_Hyb; eauto | | intros];
@@ -590,7 +590,7 @@ destruct H; inversion H; subst; omega.
 Grab Existential Variables.
 auto. auto. auto. auto.
 auto. auto. auto. auto.
-auto. auto. auto. auto.
+auto. auto. auto. auto. auto.
 Qed.
 
 Lemma L_to_Hyb_term_lc_w_fwo:
@@ -894,6 +894,9 @@ repeat split; [constructor | constructor | ]; auto;
 exists (appl_Hyb x0 (L_to_Hyb_term (fwo w) M2));
 split; [constructor | ]; auto;
 apply steps_Hyb_appl; auto.
+repeat constructor; auto.
+repeat constructor; auto.
+eapply L_to_Hyb_term_R_lc_t in H3; eauto.
 (* unbox-box *)
 exists (L_to_Hyb_term (fwo w) (unbox_L (box_L M0))); repeat split;
 [| eapply L_to_Hyb_term_lc_w; eauto | simpl ]; auto;
@@ -912,7 +915,6 @@ repeat split; [constructor | constructor |]; auto;
 exists (unbox_fetch_Hyb (fwo w) x0);
 split; [constructor | ]; auto;
 apply steps_Hyb_unbox; eauto.
-eapply L_to_Hyb_term_R_lc_t; eauto.
 (* get *)
 simpl in H1; destruct H1; destruct H3; elim H3; auto.
 (* get-get *)
@@ -929,7 +931,12 @@ apply L_to_Hyb_term_lc_w with (k:=1) (w0:=w);
 inversion H; subst; auto.
 exists (letdia_get_Hyb (fwo w) x0 (L_to_Hyb_term (fwo w) M2));
 split; [constructor |]; auto.
-apply steps_Hyb_letdia; eauto.
+apply steps_Hyb_letdia; eauto;
+repeat constructor; auto.
+unfold open_t_L in *; unfold open_w_L in *.
+eapply L_to_Hyb_term_lc_w; eauto; inversion H; auto.
+eapply L_to_Hyb_term_lc_t; eauto; inversion H0; auto.
+apply L_to_Hyb_term_R_lc_t with (n:=0) in H3; auto.
 (* here *)
 simpl in *; destruct IHM with (M':=N') (w:=w); auto;
 destruct H3; destruct H4; destruct H5; destruct H5.
@@ -945,10 +952,12 @@ simpl in H1; destruct H1; elim H1; auto.
 (* fetch value *)
 simpl in H1; destruct H1; elim H1; auto.
 Grab Existential Variables.
-auto. exact 0. exact 0. exact 0. exact 0.
+auto. exact (bwo 0). exact (bwo 0).
+exact 0. exact (bwo 0). exact (bwo 0).
+auto.  exact 0. exact 0. exact 0. exact 0.
 Qed.
 
-(* Possible future development
+(* Possible future developments:
 
 Definition many0steps_Hyb := |->*
 Lemma L_to_Hyb_steps_with_get:
@@ -966,21 +975,6 @@ forall M M' w,
 Proof idea: for all of the non-get terms N''=N',
 for the get-related ones with value at the end we use
 N'' as this value
-This is the last get - the one without value
-(* get *)
-destruct v; inversion H; subst; try omega; simpl in *.
-destruct IHM with (M'0) v; auto.
-destruct H3 as (H3, (H4, (x0, (H9, H10)))).
-exists (letdia_get_Hyb (fwo v)
-        x (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
-repeat split; [constructor | constructor |]; auto;
-[constructor; constructor; try omega |].
-exists (letdia_get_Hyb (fwo v)
-        x0 (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0))));
-split; [constructor | ]; auto.
-eapply steps_Hyb_get; eauto.
-eapply L_to_Hyb_term_R_lc_t; eauto.
-constructor; auto. constructor; auto.
 
 Another one:
 Problem with fetch is that when term under fetch is a value,

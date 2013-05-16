@@ -214,8 +214,8 @@ Qed.
 (* Term conversion *)
 Fixpoint Hyb_to_L_term (M0: te_Hyb) :=
 match M0 with
-| hyp_Hyb t v =>
-  hyp_L t v
+| hyp_Hyb v =>
+  hyp_L v
 | lam_Hyb A M =>
   lam_L A (Hyb_to_L_term M)
 | appl_Hyb M N =>
@@ -226,8 +226,8 @@ match M0 with
   unbox_L (fetch_L w (Hyb_to_L_term M))
 | get_here_Hyb w M =>
   get_L w (here_L (Hyb_to_L_term M))
-| letdia_get_Hyb t w M N =>
-  letd_L t (get_L w (Hyb_to_L_term M)) (Hyb_to_L_term N)
+| letdia_get_Hyb w M N =>
+  letd_L (get_L w (Hyb_to_L_term M)) (Hyb_to_L_term N)
 end.
 
 Lemma Hyb_to_L_term_subst_t:
@@ -276,7 +276,7 @@ apply t_hyp_L.
 (* lam *)
 apply t_lam_L with (L:=L).
   eapply ok_Hyb_to_L_ctx_ok_L; eauto.
-  intros. replace (hyp_L A (fte x)) with (Hyb_to_L_term (hyp_Hyb A (fte x))).
+  intros. replace (hyp_L (fte x)) with (Hyb_to_L_term (hyp_Hyb (fte x))).
   unfold open_t_L; rewrite Hyb_to_L_term_subst_t. eapply H; eauto.
   simpl; permut_simpl; auto.
   simpl; auto.
@@ -379,7 +379,7 @@ apply t_letd_L with (A:=A) (Lt:=L_t) (Lw:=L_w).
   intros; unfold open_t_Hyb in *; unfold open_w_Hyb in *;
   unfold open_t_L in *; unfold open_w_L in *.
     rewrite Hyb_to_L_term_subst_w.
-    replace (hyp_L A (fte t)) with (Hyb_to_L_term (hyp_Hyb A (fte t))).
+    replace (hyp_L (fte t)) with (Hyb_to_L_term (hyp_Hyb (fte t))).
     rewrite Hyb_to_L_term_subst_t.
     eapply H; eauto.
     rewrite H_Delta; rew_map; simpl; permut_simpl.
@@ -416,7 +416,7 @@ apply t_letd_L with (A:=A) (Lt:=L_t) (Lw:=L_w).
     intros; unfold open_t_Hyb in *; unfold open_w_Hyb in *;
     unfold open_t_L in *; unfold open_w_L in *.
     rewrite Hyb_to_L_term_subst_w.
-    replace (hyp_L A (fte t)) with (Hyb_to_L_term (hyp_Hyb A (fte t))).
+    replace (hyp_L (fte t)) with (Hyb_to_L_term (hyp_Hyb (fte t))).
     rewrite Hyb_to_L_term_subst_t.
     eapply H; eauto.
     simpl; rewrite H_Delta; rew_flat_map; simpl; permut_simpl;
@@ -485,9 +485,9 @@ apply steps_L_get_L_here_L; unfold lc_w_L in *; unfold lc_t_L in *; auto;
 inversion H1; subst.
 (* letd_here*)
 clear IHM2;
-destruct v; destruct ctx''; inversion H; inversion H13; subst; try omega;
+destruct v; destruct ctx''; inversion H; inversion H12; subst; try omega;
 apply stepm_L with
-  (M':=letd_L t (get_L (fwo v0) (here_L (Hyb_to_L_term M)))
+  (M':=letd_L (get_L (fwo v0) (here_L (Hyb_to_L_term M)))
               (Hyb_to_L_term M2)).
 repeat constructor; auto; try (apply Hyb_to_L_value; auto);
 unfold open_t_L; unfold open_w_L;

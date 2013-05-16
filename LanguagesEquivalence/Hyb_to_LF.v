@@ -21,13 +21,13 @@ Definition Hyb_to_LF_ctx (G: bg_Hyb) (Ctx: ctx_Hyb) : (bg_LF * ctx_LF) :=
 
 Fixpoint Hyb_to_LF_term (M: te_Hyb) : te_LF :=
 match M with
-| hyp_Hyb A v => hyp_LF A v
+| hyp_Hyb v => hyp_LF v
 | lam_Hyb A M => lam_LF A (Hyb_to_LF_term M)
 | appl_Hyb M N => appl_LF (Hyb_to_LF_term M) (Hyb_to_LF_term N)
 | box_Hyb M => box_LF (Hyb_to_LF_term M)
 | unbox_fetch_Hyb w M => unbox_LF (Hyb_to_LF_term M)
 | get_here_Hyb w M => here_LF (Hyb_to_LF_term M)
-| letdia_get_Hyb A w M N => letdia_LF A (Hyb_to_LF_term M) (Hyb_to_LF_term N)
+| letdia_get_Hyb w M N => letdia_LF (Hyb_to_LF_term M) (Hyb_to_LF_term N)
 end.
 
 Lemma ok_Hyb_to_LF_ctx_ok_LF:
@@ -82,7 +82,7 @@ forall G_Hyb Gamma_Hyb G_LF Gamma_LF M_Hyb A,
 unfold Hyb_to_LF_ctx; intros; inversion H; subst; clear H; induction H0; simpl.
 constructor; simpl; eauto.
 econstructor; unfold open_LF in *; intros; eauto;
-replace (hyp_LF A (fte v)) with (Hyb_to_LF_term (hyp_Hyb A (fte v))) by
+replace (hyp_LF (fte v)) with (Hyb_to_LF_term (hyp_Hyb (fte v))) by
     (simpl; auto);
 rewrite Hyb_to_LF_term_subst_t; eauto.
 econstructor; eauto.
@@ -121,7 +121,7 @@ apply t_letdia_LF with (L:=L_t) (A:=A); eauto; intros; unfold open_LF in *.
 unfold open_w_Hyb in *; unfold open_t_Hyb in *.
 assert (exists w, w \notin L_w) by apply Fresh; destruct H3 as (w0).
 rewrite <- Hyb_to_LF_term_subst_w with (w1:=fwo w0) (w2:=bwo 0).
-replace (hyp_LF A (fte v)) with (Hyb_to_LF_term (hyp_Hyb A (fte v))) by
+replace (hyp_LF (fte v)) with (Hyb_to_LF_term (hyp_Hyb (fte v))) by
     (simpl; auto);
 rewrite Hyb_to_LF_term_subst_t; eauto;
 replace Gamma with (snd_ (w, Gamma)) by (simpl; auto);
@@ -138,14 +138,14 @@ intros.
 unfold open_LF in *; unfold open_w_Hyb in *; unfold open_t_Hyb in *.
 assert (exists w, w \notin L_w) by apply Fresh; destruct H3 as (w0).
 rewrite <- Hyb_to_LF_term_subst_w with (w1:=fwo w0) (w2:=bwo 0).
-replace (hyp_LF A (fte v)) with (Hyb_to_LF_term (hyp_Hyb A (fte v))) by
+replace (hyp_LF (fte v)) with (Hyb_to_LF_term (hyp_Hyb (fte v))) by
     (simpl; auto).
 rewrite Hyb_to_LF_term_subst_t; eauto.
 replace Gamma with (snd_ (w, Gamma)) by (simpl; auto).
 assert (types_LF
          (map snd_ ((w0, (v, A) :: nil) :: G & (w, Gamma)))
        (snd_ (w', Gamma'))
-     (Hyb_to_LF_term [hyp_Hyb A (fte v) // bte 0]({{fwo w0 // bwo 0}}N)) B).
+     (Hyb_to_LF_term [hyp_Hyb (fte v) // bte 0]({{fwo w0 // bwo 0}}N)) B).
 apply H; eauto.
 rew_map in *; simpl in *; auto.
 apply map_snd_PPermut_LF_Hyb in H1; rewrite <- H1; rew_map; simpl; auto.

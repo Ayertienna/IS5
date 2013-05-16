@@ -2415,6 +2415,72 @@ apply steps_reorder with (M':=(letdia_get_Hyb w (get_here_Hyb w0 N) M'));
 auto.
 Qed.
 
+Lemma steps_Hyb_appl:
+forall M N w M',
+  lc_w_Hyb (appl_Hyb M M') -> lc_t_Hyb (appl_Hyb M M') ->
+  steps_Hyb (M, fwo w) (N, fwo w) ->
+  steps_Hyb
+    (appl_Hyb M M', fwo w)
+    (appl_Hyb N M', fwo w).
+intros; remember (M, fwo w) as M0; remember (N, fwo w) as M1;
+generalize dependent M;
+generalize dependent N;
+generalize dependent w;
+generalize dependent M'.
+induction H1; intros; inversion HeqM1; inversion HeqM0; subst.
+inversion H0; inversion H1; subst.
+repeat constructor; auto.
+inversion H0; inversion H2; subst.
+apply multi_step_Hyb with (M':=appl_Hyb M' M'0);
+[ constructor | eapply IHsteps_Hyb ]; eauto; try constructor; auto.
+apply lc_w_step_Hyb_preserv in H; auto.
+eapply lc_t_step_Hyb_preserv in H; eauto.
+Qed.
+
+Lemma steps_Hyb_letdia:
+forall M w' w M' N,
+  lc_w_Hyb (letdia_get_Hyb (fwo w') M N) ->
+  lc_t_Hyb (letdia_get_Hyb (fwo w') M N) ->
+  steps_Hyb (M, fwo w') (M', fwo w') ->
+  steps_Hyb
+    (letdia_get_Hyb (fwo w') M N, fwo w)
+    (letdia_get_Hyb (fwo w') M' N, fwo w).
+intros; remember (M, fwo w') as M0; remember (M', fwo w') as M1;
+generalize dependent M;
+generalize dependent M'.
+generalize dependent w;
+generalize dependent N.
+generalize dependent w'.
+induction H1; intros; inversion HeqM1; inversion HeqM0; subst.
+inversion H0; inversion H1; subst.
+repeat constructor; auto.
+inversion H0; inversion H2; subst.
+apply multi_step_Hyb with (M':=letdia_get_Hyb (fwo w') M' N);
+[ constructor | eapply IHsteps_Hyb ]; eauto; try constructor; auto.
+apply lc_w_step_Hyb_preserv in H; auto.
+eapply lc_t_step_Hyb_preserv in H; eauto.
+Qed.
+
+Lemma steps_Hyb_here:
+forall M w' w M',
+ lc_w_Hyb M -> lc_t_Hyb M ->
+ steps_Hyb (M, fwo w') (M', fwo w') ->
+ steps_Hyb
+   (get_here_Hyb (fwo w') M, w)
+   (get_here_Hyb (fwo w') M', w).
+intros; remember (M, fwo w') as M0; remember (M', fwo w') as M1;
+generalize dependent M;
+generalize dependent M';
+generalize dependent w';
+generalize dependent w;
+induction H1; intros; inversion HeqM1; inversion HeqM0; subst;
+[constructor; constructor; auto | ];
+apply multi_step_Hyb with (M':=get_here_Hyb (fwo w') M');
+[ constructor | eapply IHsteps_Hyb ]; eauto;
+[eapply lc_w_step_Hyb_preserv | eapply lc_t_step_Hyb_preserv]; eauto.
+Qed.
+
+
 Close Scope hybrid_is5_scope.
 Close Scope is5_scope.
 Close Scope permut_scope.
