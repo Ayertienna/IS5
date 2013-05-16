@@ -1052,6 +1052,70 @@ eapply IHHT with (G0:=G & (w0, nil)); eauto;
 repeat rewrite emptyEquiv_Hyb_rewrite; simpl;
 apply emptyEquiv_Hyb_permut_split_last in H; rewrite H; reflexivity.
 Qed.
+
+Lemma lc_t_step_Hyb:
+forall M N w,
+  lc_t_Hyb M ->
+  (M, w) |-> (N, w) ->
+  lc_t_Hyb N.
+induction M; intros; inversion H0; subst.
+apply lc_t_subst_Hyb; auto.
+constructor; eauto. apply IHM1 with w; auto.
+apply lc_t_subst_w_Hyb; auto.
+constructor; apply IHM with v; auto.
+Qed.
+
+Lemma lc_w_step_Hyb:
+forall M M' w,
+  lc_w_Hyb M ->
+  step_Hyb (M, fwo w) (M', fwo w) ->
+  lc_w_Hyb M'.
+induction M; intros; inversion H0; subst.
+apply lc_w_subst_t_Hyb; auto.
+constructor; eauto. apply IHM1 with w; auto.
+apply lc_w_subst_Hyb; auto.
+inversion H; subst; try omega; constructor; apply IHM with w0; auto.
+Qed.
+
+Lemma value_no_step:
+forall M,
+  value_Hyb M ->
+  forall N w, (M,  w) |-> (N, w) ->
+             False.
+induction M; intros;
+try inversion H; subst;
+inversion H0; subst;
+rewrite IHM; eauto.
+Qed.
+
+
+Lemma types_Hyb_lc_w_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_t in H0; auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_w in H0; auto.
+Qed.
+
+Lemma types_Hyb_lc_t_Hyb:
+forall G Gamma M A w,
+  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
+intros; induction H; constructor; try apply IHHT;
+unfold open_w_Hyb in *; unfold open_t_Hyb in *;
+auto.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
+assert (exists x, x \notin L) by apply Fresh; destruct H0;
+specialize H with x; apply H in H0;
+apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
+Qed.
+
+
 Close Scope hybrid_is5_scope.
 Close Scope is5_scope.
 Close Scope permut_scope.

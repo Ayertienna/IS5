@@ -426,6 +426,14 @@ try rewrite IHM;
 try rewrite IHM1; try rewrite IHM2; eauto.
 Qed.
 
-
+Lemma lc_t_subst_t_Hyb_free:
+forall M N n v,
+  lc_t_n_Hyb n N ->
+  lc_t_n_Hyb n M ->
+  lc_t_n_Hyb n ([N//fte v] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+eapply IHM; eauto; apply closed_t_succ; auto.
+Qed.
 
 Close Scope hybrid_is5_scope.

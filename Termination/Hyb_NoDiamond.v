@@ -7,108 +7,76 @@ Open Scope is5_scope.
 Open Scope hybrid_is5_scope.
 Open Scope permut_scope.
 
-Inductive neutral_Hyb: te_Hyb -> Prop :=
-| nHyp: forall n, neutral_Hyb (hyp_Hyb n)
-| nAppl: forall M N, neutral_Hyb (appl_Hyb M N)
-| nUnbox: forall M w, neutral_Hyb (unbox_fetch_Hyb w M)
-.
-
-Lemma value_no_step:
-forall M,
-  value_Hyb M ->
-  forall N w , ~ (M, w) |-> (N, w).
-induction M; intros; intro;
-try inversion H0; inversion H1; subst;
-inversion H; subst; eapply IHM; eauto; try omega.
-Qed.
-
-Lemma neutral_or_value:
-forall M,
-  neutral_Hyb M \/ value_Hyb M.
-induction M; intros;
-try (destruct IHM; [left | right]; constructor; auto).
-left; constructor.
-right; constructor.
-left; constructor.
-right; constructor.
-left; constructor.
-Qed.
-
 Inductive WHT: te_Hyb -> Prop :=
 | val_WHT: forall M, value_Hyb M -> WHT M
 | step_WHT: forall M w,
-             (forall N, (M , w) |-> (N, w) -> WHT N) ->
-             WHT M.
-
-Lemma WHT_appl:
-forall M N,
-  lc_w_Hyb (appl_Hyb M N) ->
-  lc_t_Hyb (appl_Hyb M N) ->
-  WHT (appl_Hyb M N) ->
-  WHT M.
-intros;
-remember (appl_Hyb M N) as T;
-generalize dependent M;
-generalize dependent N;
-induction H1; intros; subst;
-[ inversion H1 |
-  assert (neutral_Hyb M0 \/ value_Hyb M0) by apply neutral_or_value];
-destruct H3;
-[ inversion H; subst; inversion H0; subst |
-  constructor; auto];
-apply step_WHT with w; intros;
-eapply H2 with (N0:=appl_Hyb N0 N) (N:=N);
-constructor; eauto.
-apply lc_w_step_Hyb in H4; auto.
-apply lc_t_step_Hyb in H4; auto.
-Qed.
-
-Lemma WHT_box:
-forall M w,
-  lc_w_Hyb (unbox_fetch_Hyb w M) ->
-  lc_t_Hyb (unbox_fetch_Hyb w M) ->
-  WHT (unbox_fetch_Hyb w M) ->
-  WHT M.
-intros; remember (unbox_fetch_Hyb w M) as T;
-generalize dependent M;
-generalize dependent w.
-induction H1; intros; subst;
-[ inversion H1 |
-  assert (neutral_Hyb M0 \/ value_Hyb M0) by apply neutral_or_value];
-destruct H3;
-[ inversion H0; inversion H; subst | constructor; auto].
-apply step_WHT with (w:=fwo w2); intros.
-inversion H; inversion H0; subst.
-apply H2 with (N := unbox_fetch_Hyb (fwo w2) N) (w:=fwo w2); auto.
-constructor; auto.
-constructor; apply lc_w_step_Hyb in H4; auto.
-constructor; apply lc_t_step_Hyb in H4; auto.
-omega.
-Qed.
+              (exists V, value_Hyb V /\ steps_Hyb (M, w) (V, w)) -> WHT M.
 
 Fixpoint Red (M: te_Hyb) (A: ty): Prop :=
 match A with
 | tvar => WHT M
 | tarrow A1 A2 =>
-    forall N
-           (H_lc_t: lc_t_Hyb N)
-           (H_lc_w: lc_w_Hyb N)
-           (HRed: Red N A1),
-      Red (appl_Hyb M N) A2
-| tbox A1 => forall w',
+  WHT M /\
+  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 ->
+            Red (appl_Hyb M N) A2)
+| tbox A1 => WHT M /\ forall w',
                Red (unbox_fetch_Hyb (fwo w') M) A1
 end.
 
+Lemma step_LF_unique:
+forall M N N' w,
+  (M, w) |-> (N, w) -> (M, w) |-> (N', w) -> N = N'.
+intros; remember (M, w) as M0; remember (N, w) as N0; remember (N', w) as N'0;
+generalize dependent M; generalize dependent N;
+generalize dependent N'; generalize dependent w;
+generalize dependent N'0; induction H; intros;
+inversion HeqM0; inversion HeqN0; inversion HeqN'0; subst.
+inversion H3; auto; inversion HT.
+inversion H1; auto; inversion HT.
+inversion H4; subst; [inversion H | ].
+assert (M' = M'0); [ | subst; auto]; eapply IHstep_Hyb; eauto.
+inversion H2; subst; [inversion H | ];
+assert (M' = M'0); [ | subst; auto]; eapply IHstep_Hyb; eauto.
+Qed.
+
+Lemma WHT_step:
+forall M M' w,
+  WHT M ->
+  (M, w) |-> (M', w) ->
+  WHT M'.
+intros; inversion H; subst.
+apply value_no_step with (N:=M')(w:=w) in H1; auto; contradiction.
+destruct H1 as (V, (H1, H2)).
+inversion H2; subst.
+apply step_LF_unique with (N':=V) in H0; subst; auto. constructor; auto.
+apply step_WHT; exists V; split; auto.
+apply step_LF_unique with (N':=M'0) in H0; subst; auto.
+Qed.
+
+Lemma WHT_step_back:
+forall M M',
+  M |-> M' ->
+WHT M' -> WHT M.
+intros; apply step_WHT.
+inversion H0; subst.
+exists M'; split; auto; constructor; auto.
+destruct H1; destruct p.
+exists x; split; auto; apply multi_step_LF with (M':=M'); auto.
+Qed.
+
+Hint Resolve WHT_step WHT_step_back.
+
 (* CR 2 *)
 Theorem property_2:
-forall A M M'
+forall A M M' w
   (HRed: Red M A)
   (H_lc_t: lc_t_Hyb M)
   (H_lc_w: lc_w_Hyb M)
-  (HStep: forall w, (M, w) |-> (M', w)),
+  (HStep:  (M, w) |-> (M', w)),
   Red M' A.
 induction A; intros; simpl in *; intros.
 (* base type *)
+apply step_WHT with w.
 assert (exists (x: var), x \notin \{}) by apply Fresh; destruct H;
 inversion HRed; subst;
 [specialize HStep with (fwo x);

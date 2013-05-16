@@ -98,8 +98,6 @@ Definition lc_w_Hyb M := lc_w_n_Hyb 0 M.
 
 
 (* For each pair of contexts, they are either equivalent or not. *)
-(* Note: this was originally {} + {} with permut_dec, but since
-   permut_dec is Admitted and permut_Dec has a proof... *)
 Theorem permut_context_Hyb_dec:
 forall (c1 c2: ctx_Hyb),
     permut (snd c1) (snd c2) /\ (fst c1) = (fst c2) \/
