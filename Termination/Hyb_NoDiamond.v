@@ -1,109 +1,11 @@
 Add LoadPath "..".
 Add LoadPath "../Hybrid/NoDiamond".
-Require Import HybND_Shared.
 Require Import HybridNoDia.
 Require Import ListLib.
 
 Open Scope is5_scope.
 Open Scope hybrid_is5_scope.
 Open Scope permut_scope.
-
-Lemma closed_t_succ_Hyb:
-forall M n,
-  lc_t_n_Hyb n M -> lc_t_n_Hyb (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_Hyb.
-Qed.
-
-Lemma lc_t_subst_t_Hyb_bound:
-forall M N n,
-  lc_t_n_Hyb n N ->
-  lc_t_n_Hyb (S n) M ->
-  lc_t_n_Hyb n ([N//bte n] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-assert (n <> v0) by (intro; subst; elim H1; auto); omega.
-eapply IHM; auto; apply closed_t_succ_Hyb; auto.
-Qed.
-
-Lemma lc_t_subst_t_Hyb_free:
-forall M N n v,
-  lc_t_n_Hyb n N ->
-  lc_t_n_Hyb n M ->
-  lc_t_n_Hyb n ([N//fte v] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-eapply IHM; eauto; apply closed_t_succ_Hyb; auto.
-Qed.
-
-Lemma lc_t_step_Hyb:
-forall M N w,
-  lc_t_Hyb M ->
-  (M, w) |-> (N, w) ->
-  lc_t_Hyb N.
-induction M; intros; inversion H0; subst.
-apply lc_t_subst_t_Hyb_bound; auto.
-constructor; eauto. apply IHM1 with w; auto.
-apply lc_t_subst_w_Hyb; auto.
-constructor; apply IHM with v; auto.
-Qed.
-
-Lemma lc_w_step_Hyb:
-forall M M' w,
-  lc_w_Hyb M ->
-  step_Hyb (M, w) (M', w) ->
-  lc_w_Hyb M'.
-induction M; intros; inversion H0; subst.
-apply lc_w_subst_t_Hyb; auto.
-constructor; eauto. apply IHM1 with w; auto.
-Admitted.
-
-Lemma closed_t_succ:
-forall M n,
-  lc_t_n_Hyb n M -> lc_t_n_Hyb (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_Hyb.
-Qed.
-
-Lemma closed_t_addition:
-forall M n m,
-  lc_t_n_Hyb n M -> lc_t_n_Hyb (n + m) M.
-intros; induction m;
-[ replace (n+0) with n by auto |
-  replace (n + S m) with (S (n+m)) by auto] ;
-try apply closed_t_succ;
-assumption.
-Qed.
-
-Lemma types_Hyb_lc_w_Hyb:
-forall G Gamma M A w,
-  G |= (w, Gamma) |- M ::: A -> lc_w_Hyb M.
-intros; induction H; constructor; try apply IHHT;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *;
-auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_t in H0; auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0; apply lc_w_n_Hyb_subst_w in H0; auto.
-Qed.
-
-Lemma types_Hyb_lc_t_Hyb:
-forall G Gamma M A w,
-  G |= (w, Gamma) |- M ::: A -> lc_t_Hyb M.
-intros; induction H; constructor; try apply IHHT;
-unfold open_w_Hyb in *; unfold open_t_Hyb in *;
-auto.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0;
-apply lc_t_n_Hyb_subst_t in H0; auto; constructor.
-assert (exists x, x \notin L) by apply Fresh; destruct H0;
-specialize H with x; apply H in H0;
-apply lc_t_n_Hyb_subst_w in H0; auto; constructor.
-Qed.
-
-Definition normal_form (M: te_Hyb) := value_Hyb M.
 
 Inductive neutral_Hyb: te_Hyb -> Prop :=
 | nHyp: forall n, neutral_Hyb (hyp_Hyb n)
@@ -732,7 +634,7 @@ destruct H5.
 assert (forall V, Red V A -> lc_t_Hyb V -> lc_w_Hyb V ->
            Red (SL ((x, A, V) :: L0) W [hyp_Hyb (fte x) // bte 0]M) B).
 intros; apply H with ((x,A)::Gamma0) w0; auto.
-apply lc_t_subst_t_Hyb_bound; [ constructor | inversion LC_t]; auto.
+apply lc_t_subst_Hyb; [ constructor | inversion LC_t]; auto.
 apply lc_w_subst_t_Hyb; [ constructor | inversion LC_w]; auto.
 constructor; [rewrite Mem_nil_eq; tauto | apply OkL_fresh]; auto;
 rewrite notin_union; rewrite from_list_nil; split; auto.
@@ -812,7 +714,7 @@ lc_t_n_Hyb (S n) N.
 induction N; intros; simpl in *; try destruct v; constructor;
 repeat case_if; try inversion H1; subst; try omega;
 inversion H0; subst; eauto.
-apply IHN with (M:=M); eauto; apply closed_t_succ_Hyb; auto.
+apply IHN with (M:=M); eauto; apply closed_t_succ; auto.
 Qed.
 
 Theorem termination_theorem:

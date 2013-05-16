@@ -5,36 +5,6 @@ Require Import LabelFreeNoDia.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
-Inductive neutral_LF: te_LF -> Type :=
-| nHyp: forall n, neutral_LF (hyp_LF n)
-| nAppl: forall M N, neutral_LF (appl_LF M N)
-| nUnbox: forall M, neutral_LF (unbox_LF M)
-.
-
-Lemma neutral_or_value:
-forall M,
-  neutral_LF M + value_LF M.
-induction M; intros;
-try (destruct IHM; [left | right]; constructor; auto);
-try (left; constructor);
-right;
-constructor.
-Qed.
-
-Lemma Mem_concat_mem_elem:
-forall G (e:var*ty),
-  Mem e (concat G) ->
-  exists (l: ctx_LF), Mem l G /\ Mem e l.
-induction G; intros; rew_concat in *.
-rewrite Mem_nil_eq in H; contradiction.
-rewrite Mem_app_or_eq in H; destruct H.
-exists a; split; auto; apply Mem_here.
-destruct (IHG e); auto; destruct H0; exists x; split; auto.
-rewrite Mem_cons_eq; right; auto.
-Qed.
-
-(* Termination begins here *)
-
 Inductive WHT: te_LF -> Type :=
 | val_WHT: forall M, value_LF M -> WHT M
 | step_WHT: forall M,
