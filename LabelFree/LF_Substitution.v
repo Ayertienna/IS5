@@ -88,3 +88,26 @@ rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
 rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
 rewrite IHM1; eauto; rewrite IHM2; eauto; omega.
 Qed.
+
+Lemma lc_t_subst_t_LF_free:
+forall M N n v,
+  lc_t_n_LF n N ->
+  lc_t_n_LF n M ->
+  lc_t_n_LF n ([N//fte v] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+eapply IHM; eauto; apply closed_t_succ_LF; auto.
+eapply IHM2; eauto; apply closed_t_succ_LF; auto.
+Qed.
+
+Lemma lc_t_subst_t_LF_bound:
+forall M N n,
+  lc_t_n_LF n N ->
+  lc_t_n_LF (S n) M ->
+  lc_t_n_LF n ([N//bte n] M).
+induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
+try constructor; eauto.
+assert (n <> v0) by (intro; subst; elim H1; auto); omega.
+eapply IHM; auto; apply closed_t_succ_LF; auto.
+eapply IHM2; auto; apply closed_t_succ_LF; auto.
+Qed.

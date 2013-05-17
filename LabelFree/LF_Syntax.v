@@ -52,3 +52,21 @@ match M with
 | here_LF M => used_vars_te_LF M
 | letdia_LF M N => used_vars_te_LF M \u used_vars_te_LF N
 end.
+
+Lemma closed_t_succ_LF:
+forall M n,
+  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
+intros; generalize dependent n;
+induction M; intros; inversion H; subst;
+eauto using lc_t_n_LF.
+Qed.
+
+Lemma closed_t_addition_LF:
+forall M n m,
+  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
+intros; induction m;
+[ replace (n+0) with n by auto |
+  replace (n + S m) with (S (n+m)) by auto] ;
+try apply closed_t_succ_LF;
+assumption.
+Qed.

@@ -6,105 +6,7 @@ Require Import LabelFree.
 Open Scope is5_scope.
 Open Scope permut_scope.
 
-Lemma closed_t_succ_LF:
-forall M n,
-  lc_t_n_LF n M -> lc_t_n_LF (S n) M.
-intros; generalize dependent n;
-induction M; intros; inversion H; subst;
-eauto using lc_t_n_LF.
-Qed.
-
-Lemma closed_t_addition_LF:
-forall M n m,
-  lc_t_n_LF n M -> lc_t_n_LF (n + m) M.
-intros; induction m;
-[ replace (n+0) with n by auto |
-  replace (n + S m) with (S (n+m)) by auto] ;
-try apply closed_t_succ_LF;
-assumption.
-Qed.
-
-Lemma lc_t_subst_t_LF_free:
-forall M N n v,
-  lc_t_n_LF n N ->
-  lc_t_n_LF n M ->
-  lc_t_n_LF n ([N//fte v] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-eapply IHM; eauto; apply closed_t_succ_LF; auto.
-eapply IHM2; eauto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma lc_t_subst_t_LF_bound:
-forall M N n,
-  lc_t_n_LF n N ->
-  lc_t_n_LF (S n) M ->
-  lc_t_n_LF n ([N//bte n] M).
-induction M; intros; simpl in *; inversion H0; subst; repeat case_if;
-try constructor; eauto.
-assert (n <> v0) by (intro; subst; elim H1; auto); omega.
-eapply IHM; auto; apply closed_t_succ_LF; auto.
-eapply IHM2; auto; apply closed_t_succ_LF; auto.
-Qed.
-
-Lemma lc_t_step_LF:
-forall M N,
-  lc_t_LF M ->
-  M |-> N ->
-  lc_t_LF N.
-induction M; intros; inversion H0; inversion H; subst; try constructor; eauto;
-unfold open_LF in *.
-apply lc_t_subst_t_LF_bound; auto.
-eapply IHM1; eauto.
-eapply IHM; eauto.
-eapply IHM; eauto.
-apply lc_t_subst_t_LF_bound; auto.
-eapply IHM1; eauto.
-Qed.
-
-Lemma lc_t_steps_LF:
-forall M N, lc_t_LF M -> steps_LF M N -> lc_t_LF N.
-intros; induction H0.
-apply lc_t_step_LF in H0; auto.
-apply IHsteps_LF; apply lc_t_step_LF in H0; auto.
-Qed.
-
-Definition normal_form (M: te_LF) := value_LF M.
-
-Inductive neutral_LF: te_LF -> Prop :=
-| nHyp: forall n, neutral_LF (hyp_LF n)
-| nAppl: forall M N, neutral_LF (appl_LF M N)
-| nUnbox: forall M, neutral_LF (unbox_LF M)
-| nHere: forall M, neutral_LF M -> neutral_LF (here_LF M)
-| nLetd: forall M N, neutral_LF (letdia_LF M N)
-.
-
-Lemma value_no_step_LF:
-forall M,
-  value_LF M ->
-  forall N , ~ M |-> N.
-induction M; intros; intro;
-try inversion H; inversion H0; subst; try inversion H2;
-eapply IHM; eauto.
-Qed.
-
-Lemma neutral_or_value_LF:
-forall M,
-  neutral_LF M \/ value_LF M.
-induction M; intros;
-try (destruct IHM; [left | right]; constructor; auto);
-try (left; constructor);
-right;
-constructor.
-Qed.
-
-Lemma neutral_not_value:
-forall M,
-  neutral_LF M -> ~ value_LF M.
-induction M; intros; intro; try inversion H0; subst; inversion H; subst;
-apply IHM in H3; contradiction.
-Qed.
-
+(* Find a variable in a list of potential substitutions *)
 Fixpoint find_var (L: list (var * ty * te_LF)) (x:var) :
                      option (var * ty * te_LF) :=
 match L with
@@ -145,6 +47,8 @@ destruct a; destruct p; simpl in *; case_if.
 inversion H; subst; apply Mem_here.
 rewrite Mem_cons_eq; right; apply IHL; auto.
 Qed.
+
+(* A list of potential substitutions contains no repetitions *)
 
 Fixpoint OkL (L: list (var * ty * te_LF)) U :=
 match L with
@@ -223,6 +127,8 @@ apply IHL; auto; apply OkL_weaken in H1; auto.
 intros; decide equality. apply eq_ty_dec. apply eq_var_dec.
 Qed.
 
+(* Simultaneous substitution *)
+
 Fixpoint SL (L: list (var * ty * te_LF)) M :=
 match M with
 | hyp_LF (bte v) => M
@@ -258,13 +164,6 @@ inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
 inversion H; subst; constructor; [eapply IHM2 | apply IHM1]; auto.
 Qed.
 
-Lemma eq_te_LF_dec:
-forall (M1: te_LF) (M2: te_LF),
-  {M1 = M2} + {M1 <> M2}.
-decide equality.
-apply eq_vte_dec.
-apply eq_ty_dec.
-Qed.
 
 Lemma SL_bte_subst:
 forall L0 M x k,
@@ -321,6 +220,8 @@ rewrite closed_subst_t_free_LF; auto.
 apply notin_FV_notin_elem with L0 v a; eauto.
 apply find_var_Mem; eauto.
 Qed.
+
+(* Termination *)
 
 Require Export Relations.
 

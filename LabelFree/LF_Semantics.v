@@ -1649,3 +1649,42 @@ subst.
 rewrite <- H2. rewrite <- H0.
 apply HT2; eauto.
 Qed.
+
+Lemma lc_t_step_LF:
+forall M N,
+  lc_t_LF M ->
+  M |-> N ->
+  lc_t_LF N.
+induction M; intros; inversion H0; inversion H; subst; try constructor; eauto;
+unfold open_LF in *.
+apply lc_t_subst_t_LF_bound; auto.
+eapply IHM1; eauto.
+eapply IHM; eauto.
+eapply IHM; eauto.
+apply lc_t_subst_t_LF_bound; auto.
+eapply IHM1; eauto.
+Qed.
+
+Lemma lc_t_steps_LF:
+forall M N, lc_t_LF M -> steps_LF M N -> lc_t_LF N.
+intros; induction H0.
+apply lc_t_step_LF in H0; auto.
+apply IHsteps_LF; apply lc_t_step_LF in H0; auto.
+Qed.
+
+Lemma value_no_step_LF:
+forall M,
+  value_LF M ->
+  forall N , ~ M |-> N.
+induction M; intros; intro;
+try inversion H; inversion H0; subst; try inversion H2;
+eapply IHM; eauto.
+Qed.
+
+Lemma eq_te_LF_dec:
+forall (M1: te_LF) (M2: te_LF),
+  {M1 = M2} + {M1 <> M2}.
+decide equality.
+apply eq_vte_dec.
+apply eq_ty_dec.
+Qed.
