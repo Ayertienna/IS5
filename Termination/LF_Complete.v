@@ -164,7 +164,6 @@ inversion H; subst; constructor; [apply IHM1 | apply IHM2]; auto.
 inversion H; subst; constructor; [eapply IHM2 | apply IHM1]; auto.
 Qed.
 
-
 Lemma SL_bte_subst:
 forall L0 M x k,
   ~ Mem x (map fst_ (map fst_ L0)) ->
@@ -223,42 +222,12 @@ Qed.
 
 (* Termination *)
 
-Require Export Relations.
-
-Definition multisteps := clos_refl_trans_1n _ step_LF.
-
-Notation " M |->* N " := (multisteps M N) (at level 70).
-
 Inductive WT: te_LF -> Prop :=
 | val_WT: forall V, value_LF V -> WT V
 | step_WT: forall M, (exists V, value_LF V /\ steps_LF M V) -> WT M
 .
 
-Lemma lc_t_starsteps_LF:
-forall M N,
- lc_t_LF M -> M |->* N -> lc_t_LF N.
-intros.
-induction H0; auto.
-apply IHclos_refl_trans_1n; apply lc_t_step_LF in H0; auto.
-Qed.
-
-Hint Resolve lc_t_step_LF lc_t_steps_LF lc_t_starsteps_LF.
-
-Lemma steps_star:
-forall M M',
-  steps_LF M M' -> M |->* M'.
-intros. induction H; unfold multisteps in *.
-apply clos_rt1n_step; auto.
-Admitted.
-
-Lemma WTWT':
-forall M,
-WT M <->  (exists V, value_LF V /\ M |->* V).
-split; intros.
-induction H.
-  exists V; split; eauto; apply rt1n_refl.
-  destruct H as (V, (H, H1)); exists V; split; auto.
-Admitted.
+Hint Resolve lc_t_step_LF lc_t_steps_LF.
 
 Lemma step_LF_unique:
 forall M N N',
@@ -364,6 +333,7 @@ Hint Resolve WT_step.
 
 Inductive Cont :=
 | IdK: ty -> Cont
+| ConsU: Cont -> ty -> Cont
 | ConsD: Cont -> te_LF -> ty -> ty -> Cont
 | ConsA: Cont -> te_LF -> ty -> ty -> Cont
 .
@@ -371,6 +341,7 @@ Inductive Cont :=
 Fixpoint ContAppl (K: Cont) (M: te_LF) : te_LF :=
 match K with
 | IdK A => M
+| ConsU K' A => ContAppl K' (unbox_LF M)
 | ConsD K' N A B => ContAppl K' (letdia_LF M N)
 | ConsA K' N A B => ContAppl K' (appl_LF M N)
 end.
@@ -378,27 +349,15 @@ end.
 Notation " K '@' M " := (ContAppl K M) (at level 65).
 
 Inductive ContLC: Cont -> Prop :=
-| ContId_nil: forall A, ContLC (IdK A)
-| ContD_stepL: forall K N A B,
+| ContId_lc: forall A, ContLC (IdK A)
+| ContU_lc: forall K A, ContLC K -> ContLC (ConsU K A)
+| ContD_lc: forall K N A B,
                  ContLC K -> lc_t_n_LF 1 N -> ContLC (ConsD K N A B)
-| ContA_stepR: forall K N A B,
+| ContA_lc: forall K N A B,
                  ContLC K -> lc_t_LF N -> ContLC (ConsA K N A B)
 .
 
-(*
-Lemma WT_KAppl_step:
-forall K M M',
-  lc_t_LF M ->
-  ContAppLC K ->
-  WT (ContAppAppl K M') -> M  |-> M' -> WT (ContAppAppl K M).
-induction K; intros; simpl in *.
-apply WT_step_back in H2; auto.
-inversion H0; subst; apply IHK with (M':=appl_LF M' t); auto;
-repeat constructor; auto.
-inversion H0; subst; apply IHK with (M':=appl_LF M' t); auto;
-repeat constructor; auto.
-Abort.
-*)
+Definition WTC K := forall M, WT (K@M).
 
 Lemma Step_KApplStep:
 forall K M M',
@@ -406,24 +365,20 @@ forall K M M',
   lc_t_LF M ->
   M |-> M' ->
   K @ M |-> K @ M'.
-Admitted.
-(*
-induction K; intros; simpl in *.
-auto.
-inversion H; subst.
-assert (here_LF (letdia_LF t0 M t) |->
-                here_LF ((letdia_LF t0 M' t))).
-   repeat constructor; auto.
-apply IHK in H2; auto.
-constructor; auto; constructor; auto.
-inversion H; subst.
-assert (here_LF (appl_LF M t) |->
-                here_LF (appl_LF M' t)).
-   repeat constructor; auto.
-apply IHK in H2; auto.
-constructor; auto; constructor; auto.
+induction K; intros; simpl in *; auto.
+inversion H; subst;
+assert (unbox_LF M |-> unbox_LF M')
+   by (repeat constructor; auto);
+apply IHK in H2; auto; constructor; auto.
+inversion H; subst;
+assert (letdia_LF M t |-> letdia_LF M' t)
+   by (repeat constructor; auto);
+apply IHK in H2; auto; constructor; auto.
+inversion H; subst;
+assert (appl_LF M t |-> appl_LF M' t)
+   by (repeat constructor; auto);
+apply IHK in H2; auto; constructor; auto.
 Qed.
-*)
 
 Lemma steps_KApplSteps:
 forall K M M',
@@ -438,215 +393,51 @@ apply Step_KApplStep; auto.
 apply IHsteps_LF; auto. apply lc_t_step_LF in H; auto.
 Qed.
 
-(*
-Lemma neutral_ContAppl:
-forall K M,
-  neutral_LF M ->
-  neutral_LF (ContAppl K M).
-induction K; intros; simpl in *.
-auto.
-apply IHK; constructor; constructor.
-apply IHK; constructor; constructor.
-Qed.
-
-Lemma neutral_not_value_LF:
-forall M,
-  neutral_LF M -> ~value_LF M.
-induction M; intros; intro; inversion H0; auto; subst; inversion H; subst.
-apply IHM in H3; contradiction.
-Qed.
-*)
-(*
-Lemma value_ContAppl:
-forall K M,
-  value_LF (ContAppl K M) ->
-  value_LF M /\ exists A, K = IdK A.
-induction K; intros; simpl in *.
-inversion H; subst; split; auto; eexists; auto.
-assert (neutral_LF (ContAppl K (here_LF (letdia_LF t0 M t)))).
-apply neutral_ContAppl; constructor; constructor.
-Admitted.
-
-apply neutral_not_value_LF in H0; contradiction.
-assert (neutral_LF (ContAppl K (here_LF (appl_LF M t)))).
-apply neutral_ContAppl; constructor; constructor.
-apply neutral_not_value_LF in H0; contradiction.
-Qed.
-*)
-
-Fixpoint R (M: te_LF) (A: ty) : Prop :=
-
-let RC K A :=
-    forall V,
-      lc_t_LF V -> R V A ->
-      WT (K @ V) in
-
-let Q N A :=
-    forall K, ContLC K -> RC K A -> WT (K @ N) in
-
+Fixpoint R M A {struct A} : Prop :=
+let Q M A := forall K, lc_t_LF M -> ContLC K -> RC K A -> WT (K @ M) in
 match A with
 | tvar => WT M
-
-| A1 ---> A2 =>
-  WT M /\
-  forall N, lc_t_LF N -> Q N A1 ->
-    forall K, ContLC K -> RC K A2 ->
-      WT (K @ (appl_LF M N))
-
-| [*] A1 => WT M /\
-             forall K, ContLC K -> RC K A1 ->
-               WT (K @ (unbox_LF M))
-
-| <*> A1 =>
-  forall K,
-    ContLC K -> RC K A1 -> WT (K @ M)
+| A1 ---> A2 => WT M /\
+                (forall N, lc_t_LF N -> Q N A1 -> Q (appl_LF M N) A2)
+| [*]A1 => WT M /\ forall K, RC K A1 -> WT (K @ (unbox_LF M))
+| <*>A1 => forall K, ContLC K ->
+                     (forall V, lc_t_LF V -> R V A1 -> WT (K @ (here_LF V))) ->
+                     WT (K @ M)
+end
+with RC K A {struct A} : Prop :=
+let Q M A := forall K, lc_t_LF M -> ContLC K -> RC K A -> WT (K @ M) in
+match A with
+| tvar => forall V, lc_t_LF V -> WT V -> WT (K @ V)
+| tbox A1 => forall V, lc_t_LF V ->
+                       (* R V ([*]A1) -> *)
+                       (WT V /\
+                        forall K0, ContLC K0 ->
+                                   RC K0 A1 ->
+                                   WT (K0 @ (unbox_LF V))) ->
+                       WT (K @ V)
+| A1 ---> A2 => forall V, lc_t_LF V ->
+                  (WT V /\
+                   (forall N, lc_t_LF N -> Q N A1 -> Q (appl_LF V N) A2)) ->
+                  (* A.k.a: forall V, lc_t_LF V -> R V A1 ---> A2 -> *)
+                  WT (K @ V)
+| <*> A1 => forall V, lc_t_LF V ->
+                       Q V A1 -> WT (K @ (here_LF V))
 end.
 
-Definition RC K A :=
-    forall V,
-      lc_t_LF V -> R V A ->
-      WT (K @ V).
-
 Definition Q N A :=
-    forall K, ContLC K -> RC K A -> WT (K @ N).
+    forall K, lc_t_LF N -> ContLC K -> RC K A -> WT (K @ N).
 
-Hint Unfold RC Q.
+Hint Unfold Q.
 
-(* CR 2 *)
-Theorem property_2:
-forall A M M'
-  (HR: R M A)
-  (H_lc_t: lc_t_LF M)
-  (HStep: M |-> M'),
-  R M' A.
-Admitted.
-(*
-induction A; intros; simpl in *; intros.
-(* base type *)
-eauto.
-(* arrow type *)
-destruct HR; split; eauto; intros.
-assert (exists (x: var), x \notin \{}) by apply Fresh; destruct H3.
-inversion H; subst.
-apply value_no_step_LF in HStep; eauto; contradiction.
-[specialize HStep with (fwo x);
-  apply value_no_step with (N:=M') (w:=fwo x) in H0; contradiction |
-apply H0; auto].
-(*
-apply WT_step with (M:=ContAppl K (here_LF (appl_LF M N))).
-apply H0; auto.
-apply Step_KApplStep; auto.
-constructor; constructor; auto.
-constructor; constructor; auto.
-*)
-(* box type *)
-destruct HR; split; eauto; intros.
-apply WT_step with (M:=ContAppl K (here_LF (unbox_LF M))).
-apply H0; auto.
-apply Step_KApplStep; auto.
-constructor; constructor; auto.
-constructor; constructor; auto.
-(* dia type *)
-specialize HR with K; assert (ContLC K) by auto;
-apply HR in H; auto; inversion H; subst.
-apply value_ContAppl in H2; destruct H2; destruct H3; subst; simpl in *;
-apply value_no_step_LF in HStep; auto; contradiction.
-assert (ContAppl K M |-> ContAppl K M') by (apply Step_KApplStep; auto);
-destruct H2 as (V, (H2, H5)); eauto.
+(* This is required for the main theorem *)
+Lemma RCIdK:
+forall t, RC (IdK t) t.
+induction t; simpl in *; intros; auto.
+destruct H0; auto.
+destruct H0; auto.
+assert (WT ((IdK t) @ V));
+[apply H0; auto; constructor | rewrite <- WT_here; auto].
 Qed.
-*)
-(*
-Lemma head_expansion_star:
-forall A M M'
-  (HR: R M A)
-  (H_lc_t: lc_t_LF M)
-  (HStep: M |->* M'),
-  R M' A.
-intros; induction HStep; [ assumption | ];
-apply IHHStep;
-[apply property_2 with x | apply lc_t_step_LF with x]; auto.
-Qed.
-*)
-
-Lemma property_2_steps:
-forall A M M'
-  (HR: R M A)
-  (H_lc_t: lc_t_LF M)
-  (HStep: steps_LF M M'),
-  R M' A.
-Admitted.
-
-Lemma property_3:
-forall A M M'
-  (H_lc: lc_t_LF M),
-  M |-> M' ->
-  R M' A ->
-  R M A.
-Admitted.
-(*
-assert (exists (x:var), x \notin \{}) as nn by apply Fresh; destruct nn; auto;
-induction A; intros; simpl in *; try split; eauto.
-apply WT_step_back in H0; auto.
-apply WT_step_back in H0; auto; destruct H1; auto.
-destruct H1.
-intros. apply IHA2 with (appl_LF M' N); try constructor; auto; intros; simpl in *.
-apply WT_step_back in H0; auto; destruct H1; auto.
-destruct H1. apply IHA with (unbox_LF M'); auto; constructor; auto.
-intros.
-apply WT_step_back with (N:=ContAppl K M').
-apply H1; auto. apply Step_KApplStep; auto.
-Qed.
-*)
-
-Lemma property3_steps:
-forall A M M'
-  (H_lc: lc_t_LF M),
-  steps_LF M M' ->
-  R M' A ->
-  R M A.
-Admitted.
-
-Lemma property_1:
-forall A M
-  (H_lc_t: lc_t_LF M),
-  R M A -> WT M.
-induction A; intros; auto.
-destruct H; auto.
-destruct H; auto. simpl in H.
-skip.
-Qed.
-
-Lemma lc_ContAppl:
-forall K M,
-  ContLC K-> lc_t_LF M -> lc_t_LF (ContAppl K M).
-induction K; intros; simpl in *.
-auto.
-inversion H; subst.
-apply IHK with (M:=letdia_LF M t) in H3; auto.
-constructor; auto.
-inversion H; subst.
-apply IHK with (M:=appl_LF M t) in H3; auto.
-constructor; auto.
-Qed.
-(*
-Lemma R_here:
-forall M A, lc_t_LF M -> R M A -> R (here_LF M) (<*>A).
-simpl; intros; apply H2; auto.
-Qed.
-*)
-(*
-Lemma steps_val_here:
-forall M V,
-  steps_LF (here_LF M) V ->
-  value_LF V ->
-  exists M0, V = here_LF M0.
-intros; remember (here_LF M) as M1;
-generalize dependent M; induction H; intros; subst.
-inversion H; subst; eexists; eauto.
-inversion H; subst.
-destruct IHsteps_LF with M'0; auto; subst; eexists; eauto.
-Qed.
-*)
 
 Lemma steps_letdia:
 forall M M', steps_LF M M' ->
@@ -667,103 +458,6 @@ repeat constructor; auto.
 apply IHsteps_LF; apply lc_t_step_LF in H; auto.
 Qed.
 
-Lemma steps_appl:
-forall M M' N,
-  steps_LF M M' -> lc_t_LF M -> lc_t_LF N ->
-  steps_LF (appl_LF M N) (appl_LF M' N).
-Admitted.
-
-Lemma steps_unbox:
-forall M M',
-  steps_LF M M' -> lc_t_LF M ->
-  steps_LF (unbox_LF M) (unbox_LF M').
-Admitted.
-
-(*
-Lemma Lemma_6:
-forall M,
-  lc_t_LF M -> WT M ->
-  forall N K A, lc_t_n_LF 1 N -> ContLC K ->
-  WT (ContAppl K (here_LF (N ^t^ M))) ->
-  WT (ContAppl K (here_LF (letdia_LF A (here_LF M) N))).
-intros M LC H; induction H; intros.
-apply WT_step_back with (N:=ContAppl K (here_LF (N ^t^ V))); auto.
-apply Step_KApplStep; auto.
-repeat constructor; auto.
-repeat constructor; auto.
-destruct H as (V, (H, H3)).
-apply WT_steps_back
-with (N:=(ContAppl K (here_LF (letdia_LF A (here_LF V) N)))).
-apply steps_KApplSteps; auto.
-repeat constructor; auto.
-apply steps_here; auto.
-apply steps_letdia; auto.
-apply steps_here; auto. constructor; auto.
-repeat constructor; auto.
-apply WT_step_back with (N:=ContAppl K (here_LF (N ^t^ V))).
-Focus 2.
-apply Step_KApplStep; auto.
-repeat constructor; auto; eapply lc_t_steps_LF in H3; eauto.
-repeat constructor; auto.
-apply lc_t_steps_LF with (n:=0) in H3; auto.
-apply lc_t_steps_LF with (n:=0) in H3; auto.
-Admitted.
-
-Lemma Lemma_7:
-forall K M A N B,
-  lc_t_n_LF 1 N -> lc_t_LF M ->
-  R M (<*>A) ->
-  (forall P, R P A -> R (N ^t^ P) B) ->
-  RC K B ->
-  ContLC K ->
-  WT (ContAppl K (here_LF (letdia_LF A M N))).
-intros; simpl in *; unfold RC in *.
-assert (RC (ConsK K N A B) A); unfold RC; intros.
-simpl.
-apply Lemma_6; auto.
-apply property_1 in H5; auto.
-apply H3. apply H2; auto. unfold open_LF; apply lc_t_subst_t_LF_bound; auto.
-unfold RC in *. simpl in *.
-Admitted.
-*)
-
-(*
-Lemma RC_cons:
-forall K N B A C,
-  ContLC K ->
-  lc_t_n_LF 1 N ->
-  RC K B ->
-  (forall P, lc_t_LF P -> R P C -> R ([P // bte 0]N) B) ->
-  RC (ConsD K N A B) C.
-unfold RC; intros. simpl.
-assert (WT V).
-  apply property_1 with C; auto.
-inversion H5; subst.
-apply H1.
-Focus 2. repeat constructor; auto.
-apply property_3 with (M':=[V//bte 0] N).
-repeat constructor; auto.
-constructor; auto.
-apply H2; auto.
-destruct H6 as (V', (H6, H7)).
-apply WT_steps_back
-  with (N:=ContDiaAppl K (here_LF (letdia_LF A (here_LF V') N))).
-apply steps_KApplSteps; auto.
-repeat constructor; auto.
-apply steps_here. apply steps_letdia.
-apply steps_here; auto.
-constructor; auto.  auto. repeat constructor; auto.
-apply H1.
-Focus 2. repeat constructor; auto. apply lc_t_steps_LF in H7; auto.
-apply property_3 with (M':=[V'//bte 0] N).
-repeat constructor; auto. apply lc_t_steps_LF in H7; auto.
-constructor; auto.
-apply lc_t_steps_LF in H7; auto.
-apply H2; auto. apply lc_t_steps_LF in H7; auto.
-apply property_2_steps with (M:=V); auto.
-Qed.
-*)
-
 Lemma Q_SL_hyp:
 forall L G Gamma v A,
   OkL L nil ->
@@ -782,93 +476,6 @@ apply H1 with v.
 apply find_var_Mem; auto.
 Qed.
 
-(*
-Lemma WT_letdia:
-forall M N A ,
-  WT (letdia_LF A M N) -> WT M.
-intros; remember (letdia_LF A M N) as M'.
-generalize dependent M; generalize dependent N; generalize dependent A.
-induction H; intros; subst; [ inversion H | ].
-destruct H as (V, (H, H0)).
-remember (letdia_LF A M0 N) as M'.
-generalize dependent M0; generalize dependent N; generalize dependent A.
-induction H0; intros; subst.
-inversion H0; subst. rewrite <- WT_here; auto. constructor; auto.
-inversion H.
-inversion H0; subst. rewrite <- WT_here; auto. constructor; auto.
-apply WT_step_back with (N:=M'0); auto.
-apply IHsteps_LF with A N; auto.
-Qed.
-
-Lemma WT_crazyletdia:
-forall A M, lc_t_LF M ->
-(WT (letdia_LF A (here_LF M) (here_LF (hyp_LF (bte 0)))) <-> WT M).
-split.
-intros. apply WT_here; auto. apply WT_letdia in H0; auto.
-intros.
-inversion H0; subst.
-apply WT_step_back with (N:=(here_LF (hyp_LF (bte 0)))^t^ M).
-unfold open_LF in *; simpl in *; case_if; rewrite <- WT_here; auto.
-constructor; auto; repeat constructor; auto.
-destruct H1 as (V, (H1, H2)).
-apply WT_steps_back with
-(N:=letdia_LF A (here_LF V) (here_LF (hyp_LF (bte 0)))).
-Focus 2.
-apply WT_step_back with (N:=(here_LF (hyp_LF (bte 0))) ^t^ V).
-unfold open_LF; simpl; case_if; rewrite <- WT_here.
-  constructor; auto.
-  apply lc_t_steps_LF with (n:=0) in H2; auto.
-  constructor; auto.
-  apply lc_t_steps_LF with (n:=0) in H2; auto.
-  repeat constructor; auto.
-apply steps_letdia. apply steps_here; auto.
-constructor; auto. repeat constructor; omega.
-Qed.
-*)
-
-(*
-Lemma WT_subst_val:
-forall M N v,
-lc_t_LF M -> lc_t_LF N ->
-value_LF N -> WT M -> WT [M // v]N.
-intros. generalize dependent M;
-generalize dependent v;
-induction H1; intros; simpl.
-constructor; constructor; auto.
-constructor; constructor; auto.
-inversion H0; subst;
-rewrite <- WT_here; auto.
-inversion H0; subst.
-destruct v. destruct n.
-apply lc_t_subst_t_LF_bound; auto;
-apply closed_t_succ_LF; auto.
-rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
-apply lc_t_subst_t_LF_free; auto.
-Qed.
-*)
-(*
-Lemma value_red:
-forall G Gamma V A,
-  value_LF V ->
-  G |= Gamma |- V ::: A ->
-                R V A.
-Abort.
-*)
-(*
-Lemma WT_K_step:
-forall K M M',
-  lc_t_LF M ->
-  ContLC K ->
-  WT (ContAppl K M') -> M |-> M' -> WT (ContDiaAppl K M).
-induction K; intros; simpl in *.
-apply WT_step_back in H2; auto.
-inversion H0; subst; apply IHK with (M':=letdia_LF t0 (here_LF M') t); auto;
-repeat constructor; auto.
-inversion H0; subst; apply IHK with (M':=appl_LF M' t); auto;
-repeat constructor; auto.
-Abort.
-*)
-
 Theorem main_theorem:
 forall G Gamma M A,
   lc_t_LF M ->
@@ -885,17 +492,79 @@ forall G Gamma M A,
 intros G Gamma M A LC HT;
 induction HT;
 intros; simpl in *.
-Focus 9.
+(* hyp *)
+assert (lc_t_LF (SL L (hyp_LF (fte v)))) by
+  (apply lc_SL; auto; constructor);
+simpl in *;
+assert (Q (SL L (hyp_LF (fte v))) A);
+[apply Q_SL_hyp with G Gamma; auto; constructor | apply H7]; auto.
+(* lam *)
+autounfold in *; inversion LC; subst; apply H6; simpl;
+[ constructor; apply lc_SL; auto |];
+split; intros; [repeat constructor | ];
+apply WT_step_back with (N:=ContAppl K0 (((SL L0 M) ^t^ N)));
+[ unfold open_LF in *;
+  assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
+       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil)
+  as HF by apply Fresh; destruct HF | ];
+[ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
+rewrite subst_t_neutral_free_LF with (v:=x); auto;
+rewrite SL_bte_subst; auto;
+[rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
+[|apply notin_Mem]; auto;
+apply H0; auto.
+  apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
+  constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.
+  rew_map in *; simpl; rewrite <-  H2; rew_concat; auto.
+  intros; rewrite Mem_cons_eq in *; destruct H14; eauto;
+  inversion H14; subst; auto.
+  intros; rewrite Mem_cons_eq in *; destruct H14; eauto;
+  inversion H14; subst; auto.
+(* appl *)
+inversion LC; subst;
+assert (WT ((ConsA K (SL L N) A B) @ (SL L M))); [ | simpl; auto];
+apply IHHT1; auto; [constructor; auto; apply lc_SL; auto | ];
+autounfold in *; simpl; intros; destruct H6; apply H7; auto;
+repeat constructor; auto; apply lc_SL; auto.
+(* box *)
+inversion LC; subst;
+apply H4; [constructor; apply lc_SL; auto | ];
+split; [repeat constructor | intros].
+apply WT_step_back with (K0 @ (SL L M)).
+  apply IHHT; auto; rewrite <- H0; rew_concat; permut_simpl.
+  apply Step_KApplStep; auto; repeat constructor; apply lc_SL; auto.
+(* unbox *)
+inversion LC; subst;
+assert (WT ((ConsU K A) @ (SL L M))); [ | simpl; auto];
+apply IHHT; auto; [ constructor; auto | intros ];
+destruct H6; simpl; apply H8; auto.
+(* unbox-fetch *)
+inversion LC; subst;
+assert (WT ((ConsU K A) @ (SL L M))); [ | simpl; auto];
+apply IHHT; auto; [ | constructor; auto | intros ];
+[ | destruct H7; simpl; apply H9; auto];
+rewrite <- H1; rew_concat; permut_simpl;
+replace (Gamma ++ concat G) with (concat (Gamma::G)) by (rew_concat; auto);
+apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
+(* here *)
+inversion LC; subst; apply H4; [apply lc_SL; auto | intros]; apply IHHT; auto.
+(* get-here *)
+inversion LC; subst.
+apply H5; [apply lc_SL; auto | ]; simpl; intros;
+apply IHHT; auto.
+rew_map in *; simpl; rewrite <-  H1; rew_concat; auto; permut_simpl;
+replace (Gamma ++ concat G) with (concat (Gamma::G)) by (rew_concat; auto);
+apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
+(* letdia *)
 inversion LC; subst;
 assert (WT ((ConsD K (SL L0 N) A B) @ (SL L0 M))); [ | simpl; auto];
-apply IHHT; auto; [constructor; auto; apply lc_SL; auto | ].
-autounfold in *.
-intros. simpl.
-assert (WT V) by (apply property_1 in H7; auto).
-inversion H8; subst.
+apply IHHT; auto; [constructor; auto; apply lc_SL; auto | ]; intros; simpl in *.
+assert (WT ((IdK A) @ V)).
+  apply H7; auto. constructor. apply RCIdK.
+simpl in H8; inversion H8; subst.
   (* value *)
   apply WT_step_back with (K @ ((SL L0 N) ^t^ V));
-  [ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
+  [ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto].
   unfold open_LF in *;
   assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
        \u  used_vars_te_LF (SL L0 N)
@@ -904,7 +573,7 @@ inversion H8; subst.
   rewrite subst_t_neutral_free_LF with (v:=x); auto;
   rewrite SL_bte_subst; auto;
   [rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
-  [|apply notin_Mem]; auto;
+  [|apply notin_Mem]; auto.
   apply H with (G':=((x,A)::nil) :: G); auto.
     apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
     constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.
@@ -915,7 +584,6 @@ inversion H8; subst.
     inversion H13; subst; eauto.
     intros; rewrite Mem_cons_eq in *; destruct H13; auto;
     inversion H13; subst; eauto.
-    autounfold in *. apply H15; auto.
   (* step *)
   destruct H11 as (V', (H11, H12)).
   apply WT_steps_back with (K @ letdia_LF (here_LF V') (SL L0 N)).
@@ -944,71 +612,48 @@ inversion H8; subst.
     intros; rewrite Mem_cons_eq in *; destruct H15; auto;
     inversion H15; subst; eauto.
     intros; rewrite Mem_cons_eq in *; destruct H15; auto;
-    inversion H15; subst; eauto. autounfold in *.
-    assert (exists V'', V' = here_LF V''). skip. (* from H7 + H12 + H11? *)
-    destruct H18 as (V'', H18); subst.
-    apply H17.
-      inversion H13; auto. apply R_here.
-(* hyp *)
-assert (lc_t_LF (SL L (hyp_LF A (fte v)))) by
-  (apply lc_SL; auto; constructor);
-simpl in *;
-assert (Q (SL L (hyp_LF A (fte v))) A).
-apply Q_SL_hyp with G Gamma; auto; constructor; auto.
-autounfold in *; simpl in *. apply WT_here
-apply H7; auto.
-(* lam *)
-autounfold in *; inversion LC; subst; apply H6;
-[constructor; apply lc_SL; auto | ]; simpl;
-split; intros; [repeat constructor | ];
-apply WT_step_back with (N:=ContAppl K0 (((SL L0 M) ^t^ N)));
-[ unfold open_LF in *;
-  assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
-       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil)
-  as HF by apply Fresh; destruct HF | ];
-[ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
-rewrite subst_t_neutral_free_LF with (v:=x) (A:=A); auto;
-rewrite SL_bte_subst; auto;
-[rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
-[|apply notin_Mem]; auto;
-apply H0; auto.
-  apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
-  constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.
-  rew_map in *; simpl; rewrite <-  H2; rew_concat; auto.
-  intros; rewrite Mem_cons_eq in *; destruct H13; eauto;
-  inversion H13; subst; auto.
-  intros; rewrite Mem_cons_eq in *; destruct H13; eauto;
-  inversion H13; subst; auto.
-(* appl *)
-inversion LC; subst;
-assert (WT ((ConsA K (SL L N) A B) @ (SL L M))); [ | simpl; auto];
-apply IHHT1; auto; [constructor; auto; apply lc_SL; auto | ];
-autounfold in *; simpl; intros; destruct H6; apply H7;
-[apply lc_SL | | | ]; auto.
-(* box *)
-inversion LC; subst;
-apply H4; [constructor; apply lc_SL; auto | ];
-split; [ repeat constructor | intros];
-apply WT_step_back with (N:= K0 @ (SL L M));
-[ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
-apply IHHT; auto; rew_map in *; simpl; rewrite <-  H0; rew_concat; auto.
-Focus 5.
-(* letdia *)
+    inversion H15; subst; eauto. autounfold. intros.
+    apply WT_steps with (M:=K0 @ V).
+      apply steps_KApplSteps; auto. apply H7; auto.
+(* letdia-get *)
 inversion LC; subst;
 assert (WT ((ConsD K (SL L0 N) A B) @ (SL L0 M))); [ | simpl; auto];
-apply IHHT; auto; [constructor; auto; apply lc_SL; auto | ];
-autounfold in *; intros; simpl.
-assert (WT V) by (apply property_1 in H7; auto).
-assert (WT V) by auto; apply WTWT' in H8; destruct H8 as (V', (H8, H12)).
-assert (WT (K @ letdia_LF A (here_LF V') (SL L0 N))).
-
-
-inversion H8; subst.
+apply IHHT; auto; [ |constructor; auto; apply lc_SL; auto | ];
+[rewrite <-  H2; apply PPermut_concat_permut; rewrite <- H0; PPermut_LF_simpl|
+ intros; simpl in *];
+assert (WT ((IdK A) @ V)).
+  apply H8; auto; [constructor | apply RCIdK].
+simpl in H9; inversion H9; subst.
   (* value *)
-  assert (exists V0, V = here_LF V0) (* !!! *) by skip;
-  destruct H12 as (V', H12); subst;
-  assert (lc_t_LF V') (* !!! *) by skip;
-  inversion H10; subst;
+  apply WT_step_back with (K @ ((SL L0 N) ^t^ V));
+  [ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto].
+  unfold open_LF in *;
+  assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
+       \u  used_vars_te_LF (SL L0 N)
+       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil)
+  as HF by apply Fresh; destruct HF.
+  rewrite subst_t_neutral_free_LF with (v:=x); auto;
+  rewrite SL_bte_subst; auto;
+  [rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
+  [|apply notin_Mem]; auto.
+  apply H; auto.
+    apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
+    constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.
+    rew_map in *; simpl; rewrite <-  H2; rew_concat; auto; permut_simpl;
+    replace (concat G ++ Gamma) with (concat (G & Gamma)) by (rew_concat; auto);
+    apply PPermut_concat_permut; auto.
+    intros; rewrite Mem_cons_eq in *; destruct H14; auto;
+    inversion H14; subst; eauto.
+    intros; rewrite Mem_cons_eq in *; destruct H14; auto;
+    inversion H14; subst; eauto.
+  (* step *)
+  destruct H12 as (V', (H12, H13)).
+  apply WT_steps_back with (K @ letdia_LF (here_LF V') (SL L0 N)).
+    apply steps_KApplSteps; auto.
+      repeat constructor; auto; apply lc_SL; auto.
+      apply steps_letdia; [apply steps_here | |]; auto; repeat constructor;
+      auto; apply lc_SL; auto.
+  assert (lc_t_LF V') by (apply lc_t_steps_LF in H13; auto);
   apply WT_step_back with (K @ ((SL L0 N) ^t^ V'));
   [ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
   unfold open_LF in *;
@@ -1016,224 +661,22 @@ inversion H8; subst.
        \u  used_vars_te_LF (SL L0 N)
        \u  from_list (map fst_ (map fst_ L0))  \u from_list nil)
   as HF by apply Fresh; destruct HF;
-  rewrite subst_t_neutral_free_LF with (v:=x) (A:=A); auto;
+  rewrite subst_t_neutral_free_LF with (v:=x); auto;
   rewrite SL_bte_subst; auto;
   [rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
-  [|apply notin_Mem]; auto;
-  apply H with (G':=((x,A)::nil) :: G); auto.
+  [|apply notin_Mem]; auto.
+  apply H; auto.
     apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
     constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.
-    rew_map in *; simpl; rewrite <-  H1; rew_concat; auto;
-    replace (Gamma ++ concat G) with (concat (Gamma::G)) by (rew_concat; auto);
-    permut_simpl.
-    intros; rewrite Mem_cons_eq in *; destruct H15; auto;
-    inversion H15; subst; eauto.
-    intros; rewrite Mem_cons_eq in *; destruct H15; auto.
-    inversion H15; subst; auto.
-    autounfold in *.
-
-
-
-simpl in * |-. apply H7. constructor; auto; apply lc_SL; auto.
-intros. simpl.
-(*
- H4 : ContLC K
-  H5 : ∀ V : te_LF, lc_t_LF V → R V B → WT (K @ V)
-  H9 : lc_t_n_LF 1 N
-  H11 : lc_t_n_LF 0 M
-  V : te_LF
-  H6 : lc_t_LF V
-  H7 : R V (<*> A)
-  ============================
-   WT (K @ letdia_LF A V (SL L0 N))
-*)
-
-
-(* unbox *)
-inversion LC; subst.
-assert (WT (SL L M)).
-assert (WT ((IdK ([*]A)) @ (SL L M))).
-  apply IHHT; auto; [constructor | autounfold];
-  intros; simpl; apply property_1 in H6; auto.
-  simpl in H5; auto.
-remember (unbox_LF (hyp_LF ([*]A) (bte 0))) as N;
-assert (WT ((ConsD K N ([*]A) A) @ (SL L M))).
-  apply IHHT; auto; [subst; repeat constructor; auto | ].
-  autounfold in *; intros; simpl in * |- ; destruct H8.
-Focus 2. simpl in H6.
-assert (exists V, SL L M |->* V) by skip.
-destruct H8 as (V, H8).
-assert (exists M0, V = box_LF (SL L M0)) by skip.
-destruct H9 as (M0, H9).
-apply WT_steps with (N:=K @ (letdia_LF ([*]A)
-  (box_LF (SL L M0))) N) in H6.
-subst.
-apply WT_step with (M':=K @
- (unbox_LF (hyp_LF ([*]A) (bte 0))) ^t^ (box_LF (SL L M0))) in H6.
-unfold open_LF in *; simpl in *; case_if.
-apply WT_steps_back with
-(N:=ContDiaAppl K (here_LF (unbox_LF (box_LF (SL L M0))))).
-apply steps_KApplSteps; auto. repeat constructor; apply lc_SL; auto.
-apply steps_here. apply steps_unbox. skip.
-apply lc_SL; auto. constructor; apply lc_SL; auto.
-auto.
-apply Step_KApplStep; auto.
-repeat constructor; auto. skip.
-constructor. skip. repeat constructor; auto. constructor.
-apply steps_KApplSteps; auto.
-subst; repeat constructor; auto. apply lc_SL; auto.
-constructor. skip. repeat constructor; auto. constructor.
-
-apply IHHT; auto. constructor; auto; subst; constructor; constructor; omega.
-skip. (* !!! *)
-(* unbox-fetch *)
-skip. (* !!! *)
-(* here *)
-inversion LC; subst;
-apply H4; [ | constructor; apply lc_SL; auto]; simpl; intros;
-apply IHHT; auto.
-(* get-here *)
-inversion LC; subst.
-apply H5; [ | constructor; apply lc_SL; auto]; simpl; intros;
-apply IHHT; auto.
-rew_map in *; simpl; rewrite <-  H1; rew_concat; auto. permut_simpl.
-replace (Gamma ++ concat G) with (concat (Gamma::G)) by (rew_concat; auto).
-apply PPermut_concat_permut; rewrite <- H; PPermut_LF_simpl.
-(* letdia *)
-inversion LC; subst.
-assert (WT (SL L0 M)).
-  assert (WT (ContDiaAppl (IdD (<*>A)) (here_LF (SL L0 M)))).
-  apply IHHT; auto. constructor.
-  unfold RC in *. intros. simpl. apply property_1 in H6.
-  skip. (* WT_here *) auto.
-  simpl in H6. skip. (* WT_here *)
-assert (WT (SL L0 M)) by auto.
-eapply WTWT' in H6. destruct H6 as (V, H6).
-assert (exists V', V = here_LF V') by skip.
-destruct H8 as (V', H8).
-apply WT_steps_back with
-(N:=ContDiaAppl K (here_LF (letdia_LF A (here_LF V') (SL L0 N)))).
-skip. (* stepskapplsteps etc *)
-apply WT_step_back with
-(N:=ContDiaAppl K (here_LF ((SL L0 N) ^t^ V'))).
-Focus 2. skip.
-assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
-       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil \u
-       used_vars_te_LF (SL L0 N)) by apply Fresh.
-destruct H10.
-unfold open_LF in *.
-(* We'd like to push V' into L0, but to do that we need to make sure that
-it meets the requirements *)
-rewrite subst_t_neutral_free_LF with (v:=x) (A:=A); auto.
-rewrite SL_bte_subst; [ | apply notin_Mem |]; eauto.
-rewrite <- SL_extend with (A:=A); auto.
-Focus 2. apply notin_Mem; auto.
-apply H with (G':=((x,A)::nil)::G); auto.
-apply lc_t_subst_t_LF_bound; auto; constructor.
-constructor; [rewrite Mem_nil_eq |  apply OkL_fresh]; auto.
-rew_map in *; simpl; rewrite <-  H1; rew_concat; auto; permut_simpl.
-intros; rewrite Mem_cons_eq in *; destruct H12; eauto;
-inversion H12; subst; auto. skip. (* from H6 *)
-intros; rewrite Mem_cons_eq in *; destruct H12; eauto;
-inversion H12; subst; auto.
-
-
-
-(* letdia-get *)
-assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
-       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil \u
-       used_vars_te_LF (SL L0 N)) by apply Fresh;
-destruct H7; inversion LC; subst.
-assert (WT (SL L0 M)).
-  assert (WT (ContAppl (IdK A) ((SL L0 M)))).
-  apply IHHT; auto.
-  rewrite <-  H2; apply PPermut_concat_permut. rewrite <- H0; PPermut_LF_simpl.
-  constructor. unfold RC; intros.
-  simpl. apply property_1 in H8; auto.
-  auto.
-  simpl in H8; auto.
-assert (exists V, SL L0 M |->* V /\ value_LF V). skip.
-destruct H9 as (V, (H9, H10)).
-assert (exists V', V = here_LF V') by skip. destruct H12 as (V', H12).
-subst.
-assert (WT (ContAppl K ( (letdia_LF A (here_LF V') (SL L0 N))))).
-Focus 2.
-apply WT_steps_back
-with (N:= (ContAppl K ( (letdia_LF A (here_LF V') (SL L0 N))))).
-apply steps_KApplSteps; auto.
-repeat constructor; apply lc_SL; auto.
-apply steps_letdia. skip. (* H9 *)
-apply lc_SL; auto. apply lc_SL; auto.
-auto.
-apply WT_step_back with (N:=(ContAppl K (((SL L0 N)^t^ V')))).
-Focus 2.
-apply Step_KApplStep; auto.
-repeat constructor; auto. apply lc_SL; auto.
-skip. (* lc_t_steps_LF in H8; auto *)
-constructor. skip. apply lc_SL; auto. inversion H10; auto.
-unfold open_LF in *.
-rewrite subst_t_neutral_free_LF with (v:=x); auto.
-rewrite SL_bte_subst; [ | apply notin_Mem |]; eauto.
-rewrite <- SL_extend with (A:=A); auto.
-Focus 2. apply notin_Mem; auto.
-
-apply H; auto.
-apply lc_t_subst_t_LF_bound; auto; constructor.
-constructor. rewrite Mem_nil_eq; auto. apply OkL_fresh; auto.
-rew_map in *; simpl; rewrite <-  H2; rew_concat; auto. permut_simpl.
-apply PPermut_concat_permut in H0; rewrite <- H0; rew_concat; permut_simpl.
-intros; rewrite Mem_cons_eq in *; destruct H12; eauto;
-inversion H12; subst; auto. skip.
-intros; rewrite Mem_cons_eq in *; destruct H12; eauto;
-inversion H12; subst; auto.
-inversion H10; constructor; auto.
-(* appl *)
-(* unbox *)
-
-inversion LC; subst.
-assert (WT (SL L M)).
-assert (WT (ContAppl (IdK ([*]A)) ((SL L M)))).
-  apply IHHT; auto. constructor.
-  unfold RC; intros; simpl in *;
-  destruct H5; auto.
-simpl in H5; auto.
-
-remember (unbox_LF (hyp_LF (bte 0))) as N.
-assert (WT (ContAppl (ConsK K N ([*]A) A) ((SL L M)))).
-apply IHHT; auto. constructor; auto; subst; constructor; constructor; omega.
-skip. (* RC *)
-
-assert (exists V, SL L M |->* V) by skip.
-destruct H8 as (V, H8).
-assert (exists M0, V = box_LF (SL L M0)) by skip.
-destruct H9 as (M0, H9).
-simpl in H6.
-
-apply WT_steps with (N:=ContAppl K (letdia_LF ([*]A)
-  (here_LF (box_LF (SL L M0))) N)) in H6.
-subst.
-apply WT_step with (M':=ContAppl K
- ((unbox_LF (hyp_LF (bte 0))) ^t^ (box_LF (SL L M0)))) in H6.
-unfold open_LF in *; simpl in *; case_if.
-
-apply WT_steps_back with
-(N:=ContAppl K ((unbox_LF (box_LF (SL L M0))))).
-apply steps_KApplSteps; auto. repeat constructor; apply lc_SL; auto.
-apply steps_unbox. skip.
-apply lc_SL; auto.
-auto.
-
-apply Step_KApplStep; auto.
-repeat constructor. skip.
-constructor. skip. repeat constructor; auto.
-constructor.
-apply steps_KApplSteps; auto.
-subst; repeat constructor; auto; apply lc_SL; auto.
-apply steps_letdia. apply steps_here. subst. skip.
-apply lc_SL; auto. constructor; apply lc_SL; auto.
-subst; repeat constructor; omega.
-(* unbox-fetch *)
-skip. (* once unbox is done, no need to copy-paste more than once *)
+    rew_map in *; simpl; rewrite <-  H2; rew_concat; auto; permut_simpl;
+    replace (concat G ++ Gamma) with (concat (G & Gamma)) by (rew_concat; auto);
+    apply PPermut_concat_permut; auto.
+    intros; rewrite Mem_cons_eq in *; destruct H16; auto;
+    inversion H16; subst; eauto.
+    intros; rewrite Mem_cons_eq in *; destruct H16; auto;
+    inversion H16; subst; eauto. autounfold. intros.
+    apply WT_steps with (M:=K0 @ V).
+      apply steps_KApplSteps; auto. apply H8; auto.
 Qed.
 
 Lemma lc_t_n_LF_subst_t:
@@ -1281,7 +724,7 @@ forall G M A,
 intros.
 assert (lc_t_LF M).
   apply types_LF_lc_t_LF in H; auto.
-assert (WT (ContAppl (IdK A) M)).
+assert (WT (ContAppl (IdK A) M)); [ | simpl in *; auto];
 apply main_theorem with (L:=nil) (K:=IdK A) in H; auto.
 rewrite SL_nil in H; auto.
 constructor.
@@ -1290,7 +733,5 @@ induction G; simpl; rew_concat; auto.
 intros; rewrite Mem_nil_eq in *; contradiction.
 intros; rewrite Mem_nil_eq in *; contradiction.
 constructor.
-unfold RC; intros; simpl.
-apply property_1 in H1; auto.
-simpl in H1; auto.
+apply RCIdK.
 Qed.
