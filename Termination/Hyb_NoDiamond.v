@@ -26,19 +26,20 @@ Qed.
 Inductive WHT: te_Hyb -> vwo -> Prop :=
 | val_WHT: forall M w, value_Hyb M -> WHT M w
 | step_WHT: forall M w,
-             (exists V, steps_Hyb (M, w) (V, w) /\ value_Hyb V) ->
-                        WHT M w.
+            (exists V,
+              steps_Hyb (M, w) (V, w) /\ value_Hyb V) ->
+            WHT M w.
 
 Lemma WHT_step:
 forall M M' w,
   WHT M w ->
   (M, w) |-> (M', w) ->
   WHT M' w.
-intros; inversion H; subst.
-apply value_no_step with (N:=M')(w:=w) in H1; auto; contradiction.
+intros; inversion H; subst;
+[apply value_no_step with (N:=M')(w:=w) in H1; auto; contradiction | ].
 destruct H1 as (V, (H1, H2)).
 inversion H1; subst.
-apply step_LF_unique with (N':=V) in H0; subst; auto. constructor; auto.
+apply step_LF_unique with (N':=V) in H0; subst; auto; constructor; eauto.
 apply step_WHT; exists V; split; auto.
 apply step_LF_unique with (N':=M'0) in H0; subst; auto.
 Qed.
@@ -56,27 +57,25 @@ Qed.
 
 Hint Resolve WHT_step WHT_step_back.
 
-Fixpoint Red (M: te_Hyb) (A: ty) (W: fset var): Prop :=
+Fixpoint Red (M: te_Hyb) (A: ty) (w: vwo): Prop :=
 match A with
-| tvar => forall w, w \in W  -> WHT M (fwo w)
+| tvar => WHT M w
 | tarrow A1 A2 =>
-  (forall w, WHT M (fwo w)) /\
-  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 W ->
-            Red (appl_Hyb M N) A2 W)
-| tbox A1 => (forall w, WHT M (fwo w)) /\
-             forall w, Red (unbox_fetch_Hyb (fwo w) M) A1 W
+  WHT M w /\
+  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 w ->
+            Red (appl_Hyb M N) A2 w)
+| tbox A1 => WHT M w /\
+             forall w', Red (unbox_fetch_Hyb w M) A1 (fwo w')
 end.
 
-(*
 (* CR 2 *)
 Theorem property_2:
-forall A M M' W w
-  (HRed: Red M A W)
-  (HIn: w \in W)
+forall A M M' w
+  (HRed: Red M A (fwo w))
   (H_lc_t: lc_t_Hyb M)
   (H_lc_w: lc_w_Hyb M)
   (HStep:  (M, fwo w) |-> (M', fwo w)),
-  Red M' A W.
+  Red M' A (fwo w).
 induction A; intros; simpl in *; intros.
 (* base type *)
 eauto.
@@ -88,26 +87,24 @@ apply IHA2 with (M:=appl_Hyb M N); auto; constructor; auto.
 destruct HRed; split; auto; intros; eauto.
 eapply IHA with (M:=unbox_fetch_Hyb (fwo w) M); auto; constructor; auto.
 Qed.
-*)
 
 (* CR 1 *)
 Theorem property_1:
-forall A M w W
+forall A M w
   (H_lc_t: lc_t_Hyb M),
-  Red M A W -> w \in W -> WHT M (fwo w).
+  Red M A w -> WHT M w.
 induction A; intros; simpl in *; auto;
 destruct H; auto.
 Qed.
 
 (* CR 3 *)
 Theorem property_3:
-forall A M M' w W
+forall A M M' w
   (H_lct: lc_t_Hyb M)
   (H_lcw: lc_w_Hyb M),
-  w \in W ->
   (M, fwo w) |-> (M', fwo w) ->
-  Red M' A W ->
-  Red M A W.
+  Red M' A (fwo w) ->
+  Red M A (fwo w).
 induction A; intros; simpl in *.
 (* base type *)
 intros; eauto.
@@ -120,7 +117,6 @@ destruct H0; split; eauto;
 intros; apply IHA with (unbox_fetch_Hyb (fwo w) M');
 try constructor; auto; intros.
 Qed.
-*)
 
 Fixpoint find_var (L: list (var * var * ty * te_Hyb)) (x:var) :
                      option (var * var * ty * te_Hyb) :=
@@ -564,15 +560,16 @@ forall G Gamma M A w,
   lc_t_Hyb M ->
   lc_w_Hyb M ->
   G |= (w, Gamma) |- M ::: A ->
-  forall L W G' W0,
+  forall L W G',
     OkL L nil ->
     GoodLBg L G' ->
+    (forall w0, (w0 \in (free_worlds_Hyb M) ->
+                       find_world W (fwo w0) = None)) ->
     G' ~=~ ((w,Gamma)::G) ->
     (forall w0 a b c, Mem (w0, a,b,c) L -> lc_t_Hyb c) ->
     (forall w0 a b c, Mem (w0, a,b,c) L -> lc_w_Hyb c) ->
-    (forall w0 a b c, Mem (w0, a,b,c) L -> Red c b W0) ->
-    Mem w W0 ->
-    Red (SL L W M) A W0.
+    (forall w0 a b c, Mem (w0, a,b,c) L -> Red c b (fwo w)) ->
+    Red (SL L W M) A (fwo w).
 intros G Gamma M A w LC_t LC_w HT.
 remember (w, Gamma) as Ctx; generalize dependent w;
 generalize dependent Gamma.
@@ -586,9 +583,9 @@ unfold open_t_Hyb in *;
 assert (exists x, x \notin L \u free_vars_Hyb (SL L0 W M) \u
        from_list (map snd_ (map fst_ (map fst_ L0))) \u FV_L L0) by apply Fresh;
 destruct H7.
-assert (forall V, Red V A W0 -> lc_t_Hyb V -> lc_w_Hyb V ->
+assert (forall V, Red V A (fwo w0) -> lc_t_Hyb V -> lc_w_Hyb V ->
            Red (SL ((w0, x, A, V) :: L0) W [hyp_Hyb (fte x) // bte 0]M)
-               B W0).
+               B (fwo w0)).
 intros; apply H with (Gamma:=((x,A)::Gamma0))
                      (G':=((w0, (x,A)::Gamma0)::G))
                      (w:=w0); eauto.
@@ -597,24 +594,22 @@ apply lc_w_subst_t_Hyb; [ constructor | inversion LC_w]; auto.
 constructor; [rewrite Mem_nil_eq; tauto | apply OkL_fresh]; auto;
 rewrite notin_union; rewrite from_list_nil; split; auto.
 apply GoodLBg_extend; eauto.
-intros; rewrite Mem_cons_eq in *; destruct H11.
-inversion H11; subst; auto.
-apply H3 with w1 a b; auto.
+skip. (* free_worlds term subst *)
 intros; rewrite Mem_cons_eq in *; destruct H11.
 inversion H11; subst; auto.
 apply H4 with w1 a b; auto.
 intros; rewrite Mem_cons_eq in *; destruct H11.
 inversion H11; subst; auto.
-eapply H5; eauto.
+apply H5 with w1 a b; auto.
+intros; rewrite Mem_cons_eq in *; destruct H11.
+inversion H11; subst; auto.
+eapply H6; eauto.
 simpl in *. intros; split; [repeat constructor | intros].
-(* apply property_3 with (M':=(SL L0 W M) ^t^ N). *)
-assert (Red ((SL L0 W M) ^t^ N) B W0).
-(*
+apply property_3 with (M':=(SL L0 W M) ^t^ N).
 constructor; auto; constructor; apply lc_SL; auto; inversion LC_t; auto.
 repeat constructor; auto. apply lc_w_SL; inversion LC_w; auto.
 inversion LC_w; inversion LC_t; subst; constructor; auto.
 apply lc_w_SL; auto. apply lc_SL; auto.
-*)
 unfold open_t_Hyb in *.
 rewrite subst_t_Hyb_neutral_free with (v:=x); auto.
 replace ([N // fte x]([hyp_Hyb (fte x) // bte 0](SL L0 W M))) with
@@ -623,19 +618,38 @@ apply H8; auto.
 rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
 rewrite SL_extend_L; auto.
 apply notin_Mem; auto.
-skip.
 (* appl *)
 simpl in *; inversion LC_t; inversion LC_w; subst.
 eapply IHHT1 with (Gamma:=Gamma0) (G':=G'); auto.
+skip. (* worlds *)
 apply lc_SL; auto.
 apply lc_w_SL; auto.
-eapply IHHT2 with Gamma0  w0 G'; auto.
+eapply IHHT2 with Gamma0 G'; auto.
+skip.
 Focus 2.
 (* unbox *)
-simpl in *; inversion LC_t; inversion LC_w; subst;
-destruct (find_world W (fwo w0)); try destruct p.
+simpl in *; inversion LC_t; inversion LC_w; subst.
+specialize H1 with w0; rewrite H1;
+[ | rewrite in_union; left; rewrite in_singleton; auto].
+eapply IHHT with (w:=w0); eauto.
+skip.
+Focus 2.
+(* unbox-fetch *)
+simpl in *; inversion LC_t; inversion LC_w; subst.
+specialize H2 with w; rewrite H2;
+[ | rewrite in_union; left; rewrite in_singleton; auto].
+eapply IHHT with (G':=(w, Gamma) :: G & (w0, Gamma0)); eauto.
 
-eapply IHHT. with Gamma0 v W0; auto.
+rewrite <- H1; rew_map; rew_concat; simpl; permut_simpl;
+repeat rewrite flat_map_concat; simpl;
+transitivity (flat_map snd_ ((w, Gamma)::G)).
+rew_flat_map; auto. apply flat_map_PPermut_Hyb; rewrite <- H.
+PPermut_Hyb_simpl.
+rewrite <- H1; rew_map; rew_concat; simpl; permut_simpl;
+repeat rewrite flat_map_concat; simpl;
+transitivity (flat_map snd_ ((w, Gamma)::G)).
+rew_flat_map; auto. apply flat_map_PPermut_Hyb; rewrite <- H.
+PPermut_Hyb_simpl.
 
 (* box *)
 inversion LC_t; inversion LC_w; subst;
