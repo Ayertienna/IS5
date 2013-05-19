@@ -7,24 +7,6 @@ Open Scope is5_scope.
 Open Scope hybrid_is5_scope.
 Open Scope permut_scope.
 
-(* FIXME: Finish this variant of the formalization *)
-
-Inductive WHT: te_Hyb -> vwo -> Prop :=
-| val_WHT: forall M w, value_Hyb M -> WHT M w
-| step_WHT: forall M w,
-              (exists V, value_Hyb V /\ steps_Hyb (M, w) (V, w)) -> WHT M w.
-
-Fixpoint Red (M: te_Hyb) (A: ty) (w: vwo): Prop :=
-match A with
-| tvar => WHT M w
-| tarrow A1 A2 =>
-  WHT M w /\
-  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 w ->
-            Red (appl_Hyb M N) A2 w)
-| tbox A1 => WHT M w /\
-             Red (unbox_fetch_Hyb w M) A1 w
-end.
-
 Lemma step_LF_unique:
 forall M N N' w,
   (M, w) |-> (N, w) -> (M, w) |-> (N', w) -> N = N'.
@@ -41,6 +23,12 @@ inversion H2; subst; [inversion H | ];
 assert (M' = M'0); [ | subst; auto]; eapply IHstep_Hyb; eauto.
 Qed.
 
+Inductive WHT: te_Hyb -> vwo -> Prop :=
+| val_WHT: forall M w, value_Hyb M -> WHT M w
+| step_WHT: forall M w,
+             (exists V, steps_Hyb (M, w) (V, w) /\ value_Hyb V) ->
+                        WHT M w.
+
 Lemma WHT_step:
 forall M M' w,
   WHT M w ->
@@ -49,7 +37,7 @@ forall M M' w,
 intros; inversion H; subst.
 apply value_no_step with (N:=M')(w:=w) in H1; auto; contradiction.
 destruct H1 as (V, (H1, H2)).
-inversion H2; subst.
+inversion H1; subst.
 apply step_LF_unique with (N':=V) in H0; subst; auto. constructor; auto.
 apply step_WHT; exists V; split; auto.
 apply step_LF_unique with (N':=M'0) in H0; subst; auto.
@@ -68,6 +56,18 @@ Qed.
 
 Hint Resolve WHT_step WHT_step_back.
 
+Fixpoint Red (M: te_Hyb) (A: ty) (w:vwo) : Prop :=
+match A with
+| tvar => WHT M w
+| tarrow A1 A2 =>
+  WHT M w /\
+  (forall N, lc_t_Hyb N -> lc_w_Hyb N -> Red N A1 w ->
+            Red (appl_Hyb M N) A2 w)
+| tbox A1 => WHT M w /\
+             forall w', Red (unbox_fetch_Hyb w M) A1 (fwo w')
+end.
+
+
 (* CR 2 *)
 Theorem property_2:
 forall A M M' w
@@ -85,7 +85,7 @@ split; eauto; intros.
 apply IHA2 with (M:=appl_Hyb M N); auto; constructor; auto.
 (* box type *)
 destruct HRed; split; auto; intros; eauto.
-apply IHA with (M:=unbox_fetch_Hyb (fwo w) M); auto; constructor; auto.
+eapply IHA with (M:=unbox_fetch_Hyb (fwo w) M); auto; constructor; auto.
 Qed.
 
 (* CR 1 *)
@@ -546,14 +546,24 @@ case_if.
     case_if; rewrite IHM; auto.
 Qed.
 
+Lemma GoodLBg_PPermut:
+forall G G' L,
+  GoodLBg L G ->
+  G ~=~ G' ->
+  GoodLBg L G'.
+Admitted.
+
+Hint Resolve GoodLBg_PPermut.
+
 Theorem red_theorem:
 forall G Gamma M A w,
   lc_t_Hyb M ->
   lc_w_Hyb M ->
   G |= (w, Gamma) |- M ::: A ->
-  forall L W,
+  forall L W G',
     OkL L nil ->
-    GoodLBg L ((w,Gamma)::G) ->
+    GoodLBg L G' ->
+    G' ~=~ ((w,Gamma)::G) ->
     (forall w0 a b c, Mem (w0, a,b,c) L -> lc_t_Hyb c) ->
     (forall w0 a b c, Mem (w0, a,b,c) L -> lc_w_Hyb c) ->
     (forall w0 a b c, Mem (w0, a,b,c) L -> Red c b (fwo w0)) ->
@@ -564,31 +574,31 @@ generalize dependent Gamma.
 induction HT; intros; inversion HeqCtx; subst.
 (* hyp *)
 inversion LC_t; subst; try omega;
-apply SL_hyp with G Gamma0; auto;
+apply SL_hyp with G Gamma0; eauto;
 constructor; auto.
 (* lam *)
 unfold open_t_Hyb in *;
 assert (exists x, x \notin L \u free_vars_Hyb (SL L0 W M) \u
        from_list (map snd_ (map fst_ (map fst_ L0))) \u FV_L L0) by apply Fresh;
-destruct H5.
+destruct H6.
 assert (forall V, Red V A (fwo w0) -> lc_t_Hyb V -> lc_w_Hyb V ->
            Red (SL ((w0, x, A, V) :: L0) W [hyp_Hyb (fte x) // bte 0]M)
                B (fwo w0)).
-intros; apply H with ((x,A)::Gamma0); auto.
+intros; apply H with ((x,A)::Gamma0) ((w0, (x,A)::Gamma0)::G); eauto.
 apply lc_t_subst_Hyb; [ inversion LC_t | constructor]; auto.
 apply lc_w_subst_t_Hyb; [ constructor | inversion LC_w]; auto.
 constructor; [rewrite Mem_nil_eq; tauto | apply OkL_fresh]; auto;
 rewrite notin_union; rewrite from_list_nil; split; auto.
-apply GoodLBg_extend; auto.
-intros; rewrite Mem_cons_eq in *; destruct H9.
-inversion H9; subst; auto.
-apply H2 with w1 a b; auto.
-intros; rewrite Mem_cons_eq in *; destruct H9.
-inversion H9; subst; auto.
+apply GoodLBg_extend; eauto.
+intros; rewrite Mem_cons_eq in *; destruct H10.
+inversion H10; subst; auto.
 apply H3 with w1 a b; auto.
-intros; rewrite Mem_cons_eq in *; destruct H9.
-inversion H9; subst; auto.
-eapply H4; eauto.
+intros; rewrite Mem_cons_eq in *; destruct H10.
+inversion H10; subst; auto.
+apply H4 with w1 a b; auto.
+intros; rewrite Mem_cons_eq in *; destruct H10.
+inversion H10; subst; auto.
+eapply H5; eauto.
 simpl in *. intros; split; [repeat constructor | intros].
 apply property_3 with (M':=(SL L0 W M) ^t^ N).
 constructor; auto; constructor; apply lc_SL; auto; inversion LC_t; auto.
@@ -599,34 +609,34 @@ unfold open_t_Hyb in *.
 rewrite subst_t_Hyb_neutral_free with (v:=x); auto.
 replace ([N // fte x]([hyp_Hyb (fte x) // bte 0](SL L0 W M))) with
   (SL ((w0, x, A, N)::L0) W [hyp_Hyb (fte x) // bte 0] M).
-apply H6; auto.
+apply H7; auto.
 rewrite SL_bte_subst; auto; [ | apply notin_Mem; auto].
 rewrite SL_extend_L; auto.
 apply notin_Mem; auto.
 (* appl *)
 simpl in *; inversion LC_t; inversion LC_w; subst;
-apply IHHT1 with Gamma0; auto.
+apply IHHT1 with Gamma0 G'; auto.
 apply lc_SL; auto.
 apply lc_w_SL; auto.
-apply IHHT2 with Gamma0; auto.
+apply IHHT2 with Gamma0 G'; auto.
 (* box *)
 inversion LC_t; inversion LC_w; subst;
-replace (SL L0 W (box_Hyb M)) with (box_Hyb (SL L0 W M)) by (simpl; auto);
-constructor; [repeat constructor | ].
-apply property_3 with (M':=(SL L0 W M) ^w^ (fwo w0)).
+replace (SL L0 W (box_Hyb M)) with (box_Hyb (SL L0 W M)) by (simpl; auto).
+constructor; [repeat constructor | ]. intros.
+apply property_3 with (M':=(SL L0 W M) ^w^ (fwo w')).
 repeat constructor; apply lc_SL; auto.
 repeat constructor; apply lc_w_SL; auto.
 constructor; apply lc_SL || apply lc_w_SL; auto.
 unfold open_w_Hyb in *.
 assert (exists w, w \notin L \u free_worlds_Hyb (SL L0 W M) \u FW_L L0
        \u from_list (map fst_ W) \u from_list (map snd_ W))
-  by apply Fresh. destruct H5.
+  by apply Fresh. destruct H6.
 rewrite <- subst_w_Hyb_neutral_free with (w0:=x); eauto;
 rewrite SL_subst_w; auto; [ |apply notin_Mem; auto].
-replace ({{fwo w0 // fwo x}}(SL L0 W {{fwo x // bwo 0}}M))
-        with (SL L0 ((w0,x)::W) {{fwo x // bwo 0}}M)
+replace ({{fwo w' // fwo x}}(SL L0 W {{fwo x // bwo 0}}M))
+        with (SL L0 ((w', x)::W) {{fwo x // bwo 0}}M)
   by (rewrite SL_extend_W; auto; apply notin_Mem; auto).
-apply H with nil; auto.
+apply H with nil ((x, nil)::G'); auto.
 inversion LC_t; subst; apply lc_t_subst_w_Hyb; auto.
 inversion LC_w; subst; apply lc_w_subst_Hyb; auto.
 rew_concat; rew_map; rewrite <- H1; rew_map; rew_concat; permut_simpl.
