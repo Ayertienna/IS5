@@ -394,22 +394,31 @@ apply IHsteps_LF; auto. apply lc_t_step_LF in H; auto.
 Qed.
 
 Fixpoint R M A {struct A} : Prop :=
-let Q M A := forall K, lc_t_LF M -> ContLC K -> RC K A -> WT (K @ M) in
+let Q M A := forall K,
+               lc_t_LF M -> ContLC K -> RC K A ->
+               WT (K @ M) in
 match A with
 | tvar => WT M
 | A1 ---> A2 => WT M /\
-                (forall N, lc_t_LF N -> Q N A1 -> Q (appl_LF M N) A2)
+                (forall N,
+                   lc_t_LF N ->
+                   Q N A1 ->
+                   Q (appl_LF M N) A2)
 | [*]A1 => WT M /\ forall K, RC K A1 -> WT (K @ (unbox_LF M))
 | <*>A1 => forall K, ContLC K ->
-                     (forall V, lc_t_LF V -> R V A1 -> WT (K @ (here_LF V))) ->
+                     (forall V,
+                        lc_t_LF V ->
+                        R V A1 ->
+                        WT (K @ (here_LF V))) ->
                      WT (K @ M)
 end
 with RC K A {struct A} : Prop :=
-let Q M A := forall K, lc_t_LF M -> ContLC K -> RC K A -> WT (K @ M) in
+let Q M A := forall K,
+               lc_t_LF M -> ContLC K -> RC K A ->
+               WT (K @ M) in
 match A with
 | tvar => forall V, lc_t_LF V -> WT V -> WT (K @ V)
 | tbox A1 => forall V, lc_t_LF V ->
-                       (* R V ([*]A1) -> *)
                        (WT V /\
                         forall K0, ContLC K0 ->
                                    RC K0 A1 ->
@@ -417,8 +426,10 @@ match A with
                        WT (K @ V)
 | A1 ---> A2 => forall V, lc_t_LF V ->
                   (WT V /\
-                   (forall N, lc_t_LF N -> Q N A1 -> Q (appl_LF V N) A2)) ->
-                  (* A.k.a: forall V, lc_t_LF V -> R V A1 ---> A2 -> *)
+                   (forall N,
+                      lc_t_LF N ->
+                      Q N A1 ->
+                      Q (appl_LF V N) A2)) ->
                   WT (K @ V)
 | <*> A1 => forall V, lc_t_LF V ->
                        Q V A1 -> WT (K @ (here_LF V))
