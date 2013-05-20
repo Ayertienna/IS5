@@ -404,7 +404,7 @@ rewrite <- H0; apply PPermut_concat_permut.
 transitivityP (Gamma' :: G & Gamma); PPermut_LF_simpl.
 Qed.
 
-Theorem WHT_Lang:
+Theorem termination_language:
 forall G M A,
   emptyEquiv_LF G |= nil |- M ::: A ->
   WHT M.
@@ -420,4 +420,20 @@ intros; rewrite Mem_nil_eq in *; contradiction.
 intros; rewrite Mem_nil_eq in *; contradiction.
 Qed.
 
-Extraction "termination_LF_nodia" WHT_Lang.
+
+(*
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+Extract Inductive prod => "(*)"  [ "(,)" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+
+Extract Inductive nat => "int"
+  [ "0" "(fun x → x + 1)" ]
+  "(fun zero succ n →
+      if n=0 then zero () else succ (n-1))".
+Extract Constant plus => "( + )".
+
+Extract Constant eq_var_dec => "( = )".
+
+Extraction "termination_LF_nodia" termination_language.
+*)

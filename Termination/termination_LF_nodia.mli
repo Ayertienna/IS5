@@ -1,23 +1,8 @@
 type __ = Obj.t
 
-type bool =
-| True
-| False
-
-type nat =
-| O
-| S of nat
-
 type 'a option =
 | Some of 'a
 | None
-
-type ('a, 'b) prod =
-| Pair of 'a * 'b
-
-type 'a list =
-| Nil
-| Cons of 'a * 'a list
 
 type 'a sig0 =
   'a
@@ -26,15 +11,11 @@ type 'a sig0 =
 type ('a, 'p) sigT =
 | ExistT of 'a * 'p
 
-type sumbool =
-| Left
-| Right
-
-val plus : nat -> nat -> nat
+val plus : int -> int -> int
 
 val indefinite_description : __ -> 'a1
 
-val classicT : sumbool
+val classicT : bool
 
 type decidable =
   bool
@@ -44,9 +25,9 @@ type 'a comparable =
   'a -> 'a -> decidable
   (* singleton inductive, whose constructor was make_comparable *)
 
-val nat_compare : nat -> nat -> bool
+val nat_compare : int -> int -> bool
 
-val nat_comparable : nat comparable
+val nat_comparable : int comparable
 
 val inhab_witness : __ -> 'a1
 
@@ -106,20 +87,20 @@ type ty =
 | Tbox of ty
 
 type vte =
-| Bte of nat
+| Bte of int
 | Fte of Variables.var
 
 val shift_vte : vte -> vte
 
-val eq_var_dec : Variables.var -> Variables.var -> sumbool
+val eq_var_dec : Variables.var -> Variables.var -> bool
 
-val eq_ty_dec : ty -> ty -> sumbool
+val eq_ty_dec : ty -> ty -> bool
 
-val eq_vte_dec : vte -> vte -> sumbool
+val eq_vte_dec : vte -> vte -> bool
 
 val fresh : Variables.var FsetImpl.fset -> Variables.var
 
-type ctx_LF = (Variables.var, ty) prod list
+type ctx_LF = (Variables.var*ty) list
 
 type bg_LF = ctx_LF list
 
@@ -130,14 +111,13 @@ type te_LF =
 | Box_LF of te_LF
 | Unbox_LF of te_LF
 
-val eq_te_LF_dec : te_LF -> te_LF -> sumbool
+val eq_te_LF_dec : te_LF -> te_LF -> bool
 
 val used_vars_te_LF : te_LF -> Variables.var FsetImpl.fset
 
-val mem_dec : 'a1 list -> 'a1 -> ('a1 -> 'a1 -> sumbool) -> sumbool
+val mem_dec : 'a1 list -> 'a1 -> ('a1 -> 'a1 -> bool) -> bool
 
-val mem_cons_spec :
-  'a1 list -> 'a1 -> 'a1 -> ('a1 -> 'a1 -> sumbool) -> sumbool
+val mem_cons_spec : 'a1 list -> 'a1 -> 'a1 -> ('a1 -> 'a1 -> bool) -> bool
 
 val subst_t_LF : te_LF -> vte -> te_LF -> te_LF
 
@@ -145,19 +125,18 @@ val open_LF : te_LF -> te_LF -> te_LF
 
 type pPermut_LF =
 | PPermut_LF_nil
-| PPermut_LF_skip of ctx_LF list * ctx_LF list
-   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
-   * pPermut_LF
-| PPermut_LF_swap of (Variables.var, ty) prod list list
-   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
-   * (Variables.var, ty) prod list * (Variables.var, ty) prod list
+| PPermut_LF_skip of ctx_LF list * ctx_LF list * (Variables.var*ty) list
+   * (Variables.var*ty) list * pPermut_LF
+| PPermut_LF_swap of (Variables.var*ty) list list * (Variables.var*ty) list
+   * (Variables.var*ty) list * (Variables.var*ty) list
+   * (Variables.var*ty) list
 | PPermut_LF_trans of ctx_LF list * ctx_LF list * ctx_LF list * pPermut_LF
    * pPermut_LF
 
 val emptyEquiv_LF :
-  (Variables.var, ty) prod list list -> (Variables.var, ty) prod list list
+  (Variables.var*ty) list list -> (Variables.var*ty) list list
 
-val fst_ : ('a1, 'a2) prod -> 'a1
+val fst_ : ('a1*'a2) -> 'a1
 
 type types_LF =
 | T_hyp_LF of ty * ctx_LF list * ctx_LF * Variables.var
@@ -186,7 +165,7 @@ type steps_LF =
 
 type wHT =
 | Val_WHT of te_LF * value_LF
-| Step_WHT of te_LF * (te_LF, (value_LF, steps_LF) prod) sigT
+| Step_WHT of te_LF * (te_LF, value_LF*steps_LF) sigT
 
 type red = __
 
@@ -197,26 +176,25 @@ val property_1 : ty -> te_LF -> red -> wHT
 val property_3 : ty -> te_LF -> te_LF -> step_LF -> red -> red
 
 val find_var :
-  ((Variables.var, ty) prod, te_LF) prod list -> Variables.var ->
-  ((Variables.var, ty) prod, te_LF) prod option
+  ((Variables.var*ty)*te_LF) list -> Variables.var ->
+  ((Variables.var*ty)*te_LF) option
 
 val mem_find_var_type :
-  ((Variables.var, ty) prod, te_LF) prod list -> Variables.var -> ty -> te_LF
+  ((Variables.var*ty)*te_LF) list -> Variables.var -> ty -> te_LF
 
-val sL : ((Variables.var, ty) prod, te_LF) prod list -> te_LF -> te_LF
+val sL : ((Variables.var*ty)*te_LF) list -> te_LF -> te_LF
 
-val fV_L :
-  ((Variables.var, ty) prod, te_LF) prod list -> Variables.var FsetImpl.fset
+val fV_L : ((Variables.var*ty)*te_LF) list -> Variables.var FsetImpl.fset
 
 val sL_hyp :
-  ((Variables.var, ty) prod, te_LF) prod list -> (Variables.var, ty) prod
-  list list -> (Variables.var, ty) prod list -> Variables.var -> ty ->
-  (Variables.var -> ty -> te_LF -> __ -> red) -> types_LF -> red
+  ((Variables.var*ty)*te_LF) list -> (Variables.var*ty) list list ->
+  (Variables.var*ty) list -> Variables.var -> ty -> (Variables.var -> ty ->
+  te_LF -> __ -> red) -> types_LF -> red
 
 val main_theorem :
-  bg_LF -> ctx_LF -> te_LF -> ty -> types_LF -> ((Variables.var, ty) prod,
-  te_LF) prod list -> (Variables.var -> ty -> te_LF -> __ -> red) -> red
+  bg_LF -> ctx_LF -> te_LF -> ty -> types_LF -> ((Variables.var*ty)*te_LF)
+  list -> (Variables.var -> ty -> te_LF -> __ -> red) -> red
 
-val wHT_Lang :
-  (Variables.var, ty) prod list list -> te_LF -> ty -> types_LF -> wHT
+val termination_language :
+  (Variables.var*ty) list list -> te_LF -> ty -> types_LF -> wHT
 
