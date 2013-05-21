@@ -14,7 +14,7 @@ Coq proof assistant is required for this code to be compiled and the proofs chec
 In addition, a non-standard library tlc is used throughtout the development. The last verfied to be working version is available under http://github.com/Ayertienna/IS5-libs, but there is a good chance that a more recent version will work as well. This library has to be installed under user-contrib directory (or in any other place where it will be visible for coqtop).
 
 Next, to compile the language definitions, we need some shared libraries compiled as well.
-A complete script checking proofs for languages is the following (starting from the main repository directory).
+A complete script checking proofs for languages is the following (starting from the main repository directory):
 make
 cd Labeled && make && cd ..
 cd LabelFree && make && cd NoDiamond && make && cd .. && cd ..
