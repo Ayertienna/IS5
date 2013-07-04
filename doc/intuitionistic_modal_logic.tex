@@ -1,0 +1,606 @@
+\chapter{Intuitionistic modal logic}\label{chapter:logic}
+
+\begin{quote}
+\small
+In this chapter we introduce modal logics and intuitionistic modal logics. Our focus is on particular \logic{}, for which we present an axiomatization and three variants  of a natural deduction system. Finally we provide motivation and means by which \logic{} can be used as a type system. This chapter concludes with a short introduction to Curry-Howard isomorphism.
+\end{quote}
+
+\section{Modal logic}
+We begin by giving a general overview of modal logics. Where do we place them in relation to standard logic, be it classical or intuitionistic? How can we motivate the construction? What can it express?\\
+
+Suppose we have such a simple logic \LL{}, non-modal, as of yet. It may be classical or intuitionistic, but we want to consider it a simple one -- typically it would be using a single context to store assumptions and it would have $--->$, possibly along with some other logical connectives like $\vee$ or $\wedge$, $\neg$ etc.\\
+We can think of logic \LL{} as describing a single world, associated with a singular context it uses. What if we have many worlds? In each of them we can use \LL{} -- but that is all. However, if these worlds are connected (like in a directed graph), we may want to be able to say something more, express some properties of edges, of moving between worlds.\\
+
+We can be interested in expressing, for example, that for the current world, wherever we move, we are in a place where $\phi$ holds. Such a property will be written as $[*]\phi$. This is very much like saying "for all worlds connected to this one, $\phi$". We can therefore think of $[*]$ type as a variant of $\forall$ talking about connected worlds.\\
+Where we have $\forall$, it is usually possible to find $\exists$ equivalent as well. To say that there is a world connected to the current one in which $\psi$ holds, we will write $<*>\psi$.\\
+
+These two operators, $[*]$ and $<*>$, are what we call \emph{modal operators}. We read $[*]$ as "it is necessary" and $<*>$ as "it is possible". There are more possibilities of modal operators -- for example in epistemic logics there are modal operators expressing knowledge (K) and belief (B). In our formalizations we will however limit ourselves to $[*]$ and $<*>$.\\
+
+Different modal logics are distinguished based on both the logic underneath modal operators (intuitionistic, classical, linear, etc.) and accessibility relation. Further in this section we will describe axioms of some standard modal logics. As we are more interested in intuitionistic logics rather than classical ones, we will not dwell into details, rather provide axioms which are used to extend standard Hilbert calculus into a system for modal logic (Hilbert-Lewis system). To give the intuitive meaning of connectives, we will use formal semantics usually referred to as Kripke semantics, described below.
+
+For simplicity, we chose logic that has only four operators: $--->$, $\neg$, $[*]$, $<*>$ and propositional variables $p$, $q$, $\dots$.
+
+\subsection{Kripke semantics}
+The notion of logical consequence for modal logics is defined using Kripke semantics.
+
+We begin by defining a \emph{frame}, that is a pair $\mathcal F = (W, R)$, where $W$ is a set of worlds and $R \subseteq W \times W$ is an accessibility relation: $(w, v) \in R$ when we can move from world $w$ to world $v$ directly. We may simply think of $\mathcal F$ as of a directed graph.\\
+Next we extend such frame $\mathcal F$ into a \emph{model} $\mathcal M = (W, R , V)$ where $V$ is a function relating worlds from $w$ with sets of propositions which are true in this world. Finally, $::-$, often referred to as \emph{evaluation relation}, is an extension of $V$ to formulas, defined inductively as:
+\begin{description}
+\item[] $w ::- p$ if and only if $p \in V (w)$
+\item[] $w ::- \neg A$ if and only if $w \not ::- A$
+\item[]$w ::- A ---> B$ if and only if $w \not ::- A$ or $w ::- B$
+\item[]$w ::- [*]A$ if and only if for all ${u\in W}$ such that  $(w, u) \in R$, $u ::- A$
+\item[]$w ::- <*>A$ if and only if there exists $u \in W$ such that $(w, u) \in R $ and $u ::- A$
+\item[]$w ::- \false{}$ should never be true
+\end{description}
+We read $w ::- A$ as "$A$ is satisfied in $w$".\\ 
+
+A given formula $\phi$ is considered \emph{valid}
+\begin{itemize}
+\item in a model ($\mathcal M ::- \phi$), if it is satisfied in every world of that model, $w ::- \phi$ for all $w \in W_\mathcal{M}$
+\item in a frame ($\mathcal F ::- \phi$), if it is valid for every possible model of that frame (that is for any choice of V), $\mathcal M ::- \phi$ for all $\mathcal M \text{ extending } \mathcal F$
+\end{itemize}
+
+Below are some variants of modal logics where relation $R$ has some general properties, usually referred to as \emph{frame conditions}.
+\begin{description}
+\item[\axiomK] enforces no conditions on $R$;
+\item[\axiomD] requires $R$ to be serial, meaning that we always have some world connected to the current one: $\forall_{w \in W} \exists_{v \in W} (w, v) \in R$;
+\item[\axiomT] requires $R$ to be reflexive;
+\item[\axiomSfour] requires $R$ to be reflexive and transitive;
+\item[\axiomSfive] requires $R$ to be reflexive, symmetric and transitive and Euclidean (meaning that $\forall_{w_1, w_2, w_3 \in W} (w_1, w_2) \in R \wedge (w_1, w_3) \in R ---> (w_2, w_3) \in R$ and $\forall_{w_1, w_2, w_3 \in W} (w_1, w_3) \in R \wedge (w_2, w_3) \in R ---> (w_1, w_2) \in R$; transitive and symmetric relation is always Euclidean, Euclidean and reflexive relation is always symmetric and transitive).
+\end{description}
+
+\subsection{Axiomatization}
+
+For the previously mentioned logics we also want to have a syntax. We will provide it using Hilbert-style axiomatization, by adding necessitation rule (\ruleN{}) and a number of axioms to the original propositional calculus.
+
+Note that in classical modal logics we can define $<*>$ in terms of $[*]$:\\
+ ${<*>p := \neg [*] \neg p}$.
+
+\begin{center}
+\begin{tabular} { c c c }
+\inference[\ruleMP{}]{A ---> B & A}{B} & ~ &
+\inference[\ruleN{}]{A}{[*]A}
+\end{tabular}
+\end{center}
+
+\begin{description}
+\item[Subst:]All substitution instances of theorems of propositional calculus
+\item[Distribution Axiom \axiomK{}:] $[*](p --->q) ---> ([*]p ---> [*]q)$
+\item[Reflexivity Axiom \axiomT{}:] $[*]p ---> p$
+\item[Axiom \axiomSfour{}:] $[*]p ---> [*][*]p$
+\item[Axiom \axiomB{}:] $p --> [*]<*>p$
+\item[Axiom \axiomD{}:] $[*]p -> <*>p$
+\item[Axiom \axiomSfive{}:] $<*>p -> [*]<*>p$
+\end{description}
+
+From these axioms we can construct a number of \emph{normal modal logics}, starting with \logicK{} = \axiomK{} + \ruleN{} + \ruleMP{} + \textbf{Subst}, which is the smallest normal modal logic. Adding \axiomT{} to \logicK{} gives us \logicT{} logic, which is more in line with intuition of "if something is necessarily true, than it is true" -- this is the logic used as base for Fitch system~\cite{fitch52}. An alternative to \logicT{} is adding \axiomD{} to \logicK{}, resulting in \logicD{} system, which eliminates "loose ends" - in \logicD{}, if something is necessary then it is possible, as there always exists at least one world connected to current one.\\
+More complicated logic arises when \logicT{} is further enhanced with \axiomSfour{}, resulting in \logicSfour{} system. Finally, enriching \logicSfour{} with \axiomSfive{} results in \logicSfive{} logic.\\
+
+The intuitionistic counterparts of the last two systems have interesting applications in programming languages. \logiciSfour{} (intuitionistic \logicSfour{}) can be used for staged computations, as described in~\cite{stagedcomp}. \logiciSfive{} on the other hand is a good model for distributed systems. We will describe this last example in more detail in the final section of this chapter. Before that, however, we need to add intuitionism to modality.
+
+
+\section{Intuitionistic modality}
+As we have already discussed modality in general, we now need to understand how intuitionistic logics differ from classical ones. What changes is the definition of true statements. In classical logics we know that every statement is either true or false. In intuitionistic logics however, a statement is true only if there is a constructive proof that it is true and -- dually -- it is false only if there is a constructive proof that it is false.\\
+For example in axiomatic calculi for intuitionistic logic we remove from classical axiomatization the law of excluded middle ($p \vee \neg p$) and double negation elimination ($\neg \neg p -> p$) along with any other axioms that would allow us to prove any of these two (e.g. Peirce's law $((p-> q) -> p) -> p$). \\
+
+Knowing this, we should ask ourselves a question: how to create an intuitionistic analogue of a given standard logic?\\
+What is definite and beyond question is that, just as classical modal logic requires its propositional fragment to be classical logic, intuitionistic modal logic \IML{} requires such fragment to be intuitionistic logic (\IL{}).\\ 
+In addition, every instance of a theorem in \IL{} should be a theorem in \IML{}.\\
+ We also expect that adding the law of excluded middle (or double negation elimination etc.) to any variant of \IML{} results in the appropriate classical counterpart.\\
+
+This is all very natural, but we have hardly touched on the topic of modal operators. We require them to be independent -- meaning that no theorems such as $[*]A <-> \neg <*> \neg A$ can hold, just as they do not hold for $\vee$ and $\wedge$ in intuitionistic propositional logic.\\
+
+\subsection{Kripke semantics}
+
+Similarly to classical modal logics, we can define Kripke models for intuitionistic ones. The definitions are combination of Kripke semantics for intuitionistic logic (without modality) and for modal logic.  We have already given Kripke semantics for modal logic in the previous section -- now we will give them for intuitionistic logic (\IL{}).
+
+\subsubsection{Kripke semantics for \IL{}}
+An intuitionistic Kripke model is a tuple $\mathcal M = (W, \leq, V)$, where $W$ is a set of Kripke worlds and $\leq$ is a pre-order on $W$. $V$ is then a function from worlds to sets of propositions such that for $w \leq w'$,  $V_w (p)\subseteq V_{w'}(p)$. Based on $V$ we create a satisfaction relation $::-$ parametrized by Kripke world $w$:
+\begin{description}
+\item[] $w ::- p$ if and only if $p \in V(w)$
+\item[] $w ::- A ---> B$ if and only if for all $u \geq w$, $u ::- A$ implies $u ::- B$
+\item[] $w ::- \false{}$ should never be true
+\end{description}
+Note that typically $\neg A$ is defined in terms of $--->$ and $\false$ as: $\neg A := A ---> \false{}$\\
+
+Such semantics use worlds as states of knowledge -- the $w \leq w'$ relation between them intuitively expresses that $w'$ is an extension of $w$. In particular, it should be the case that all the knowledge from $w$ is preserved in $w'$. This is captured in the following lemma:
+
+\begin{lemma}[Monotonicity]\em
+If $w \leq$ w' and $w ::- \phi$ then $w' ::- \phi$.
+\begin{proof}
+Proof is by induction on the structure of $\phi$.
+\end{proof}
+\end{lemma}
+
+\subsubsection{Kripke semantics for \IML{}}
+
+As we have mentioned, semantics for \IML{} combines definitions for modal and intuitionistic logic. We have two types of worlds - modal and Kripke. Kripke worlds (states\footnote{It may be confusing to use ``worlds`` both for members of $W$ -- Kripke worlds, and for modal worlds known at a given Kripke world. We will therefore call Kripke worlds ``states`` to avoid confusion.}) are exactly the same as in \IL{}; for a given state $w$ we will have a set of modal worlds known in this state, a relation between these modal worlds and a function evaluating propositions.
+
+\begin{description}
+\item[$W$] as previously is a set of states. Same as in \IL{}, we require it to be partially ordered using $\leq$ relation
+\item[$\{ D_w\}_{w \in W}$] gives worlds known in the given state; for $w \in W$, $D_w$ is a non-empty set of modal worlds such that $ w \leq w'$ implies $D_w \subseteq D_{w'}$
+\item [$\{ R_w\}_{w \in W}$] is a family of relations on $D_w \times D_w$, defining modal world accessibility and such that $ w \leq w'$ implies $R_w \subseteq R_{w'}$
+\item[$\{V_w\}_{w\in W}$] for each $w \in W$, $V_w$ is a function accepting modal worlds from $D_w$ and returning a set of propositions which are true in this modal world; if $w \leq w'$ then $V_w(p) \subseteq V_{w'}(p)$
+\end {description}
+
+These form a \emph{birelation model} $\mathcal B = (W_\leq, \{R_w\}_{w \in W}, \{D_w\}_{w \in W}, \{V_w\}_{w \in W})$ We then define $::-$ as follows:
+\begin{description}
+\item[] $w, d ::- p$ if and only if $ p\in V_w(d)$
+\item[] $w, d ::- A ---> B$ if and only if for all $w' \in W$ such that $w' \geq w$, $w' , d ::- A$ implies $w' , d ::- B$
+\item[] $w, d ::- [*]A$ if and only if for all $w' \geq w$, for all $d' \in D_{w'}$,  if $R_{w'}(d, d')$ then $w', d' ::- A$
+\item[] $w, d ::- <*>A$ if and only if there exists $d' \in D_{w}$ such that $R_w(d, d')$ and $w, d' ::- A$
+\end{description}
+
+Again, there may be frame conditions on $R_w$ that lead to semantics of certain logics like \logiciK{}, \logiciT{}, \logiciSfour{} or \logiciSfive{}. 
+
+\begin{lemma}[Monotonicity]\em
+If $w \leq$ w' and $w, d ::- \phi$ then $w', d ::- \phi$.
+\begin{proof}
+Induction on the structure of $\phi$.
+\end{proof}
+\end{lemma}
+
+\subsection{Axiomatization of \logiciK{}}
+We will finish description of intuitionistic modal logics by presenting an axiomatization of \logiciK{} as per Plotkin's 1986 article~\cite{plotkin1986}. In the next section we will extend this axiomatization into one for \logic{}.\\
+
+An axiomatization of \logiciK{} is the following:
+
+\begin{itemize}
+\item[] All substitution instances of theorems of intuitionistic logic
+\item[] $[*](A --> B) ---> ([*]A ---> [*]B)$ -- distribution axiom \axiomK{}
+\item[] $[*](A ---> B) ---> (<*>A ---> <*>B)$ -- another variant of distribution
+\item[] $(<*>A ---> [*]B) ---> [*] (A ---> B)$
+\end{itemize} 
+
+Along with two standard rules of inference:
+\begin{center}
+\begin{tabular} { c c c }
+\inference[\ruleMP{}]{A ---> B & A}{B} & ~ &
+\inference[\ruleN{}]{A}{[*]A}
+\end{tabular}
+\end{center}
+
+\section{Formalizations of \logic{}}
+
+The accessibility relation in \logic{} is, same as in \clogic{}, an equivalence. We will look at only one connected component at a time, as it makes no change in expressive power -- the only operators that use worlds at all are $[*]$ and $<*>$ and they are limited to connected worlds.
+With such assumption we do not need to mention accessibility relation at all -- as all the worlds in $W$ are connected to each other. \\
+
+For \logic{} we would like to look at several different formalizations. We are also interested in limits of expressive power in this logic -- i.e. what cannot we prove in \logic{}? What can we prove, that we couldn't in weaker logics like \logiciSfour{}?
+
+\subsection{Expressive power and limitations}
+When thinking about limitations of \logic{}, we observe that they either come from the fact that \logic{} is intuitionistic or from the expectations that we set for modal logics in general. 
+
+An example of the first category can be $\not |- [*]A <-> \neg <*> \neg A$, lack of explicit connection between $<*>$ an $[*]$ mentioned in one of the previous sections. Note that this formula requires a classical axiom to prove and that it holds in \clogic{}.
+
+Second type of limitations are for example $\not |- A ---> [*]A$ and $\not |- <*> A ---> A$. These express different strength of three statements: $[*]A$ is stronger than $A$ (but we do not want it to be so strong as to never be true), $A$ is stronger than $<*>A$ (but again, $<*> A$ should not be always true).\\
+These two statements, along with $ |- A ---> <*> A$ and $ |- [*]A ---> A$ capture exactly what Łukasiewicz expected modal operators to behave -- however he also expected them to be interdefinable. Prior~\cite{prior55} makes this definition more liberal, excluding the interdefinability, thus defining the intuitionistic variant.\\
+
+As to expressive power, the following formulas are true in \logic{}, but not in \logiciSfour:
+\begin{itemize}
+\item[] $ |- <*> A ---> [*]<*> A$
+\item[]$ |- <*>[*]A ---> [*]A$
+\end{itemize}
+They are both variants of axiom \axiomSfive{}. The first one reads "if $A$ is possible, then it is necessarily possible", the second "if $A$ is possibly necessary, then it is necessary".
+
+\subsection {Axiomatization}
+An axiomatization of \logic{} extends \logiciK{} with the following axioms:
+\begin{itemize}
+\item[] $[*]A ---> A$ -- reflexivity axiom \axiomT{}
+\item[] $A ---> <*>A$ -- an instance of reflexivity axiom; ``if something is true, then it is possible``
+\item[] $[*]A ---> [*][*]A$-- \axiomSfour{}, guaranteeing transitivity
+\item[] $<*><*>A ---> <*>A$ -- a variant of \axiomSfour{} for $<*>$
+\item[] $<*>A ---> [*]<*>A$ -- axiom \axiomSfive{}, stating that the relation is Euclidean
+\item[] $<*>[*]A ---> [*]A$ -- a variant of \axiomSfive{}
+\end{itemize}
+
+We can observe that, from the point of view of the axioms, \logiciSfive{} is to \logicSfive{} just as \logiciK{} is to \logicK{}. Next we want to ensure that this axiomatization matches the intuitive meaning of \logic{}.
+
+\subsubsection{Soundness and Completeness}
+We want to ensure that the system we have just given is sound and complete. Soundness of a system means that its inference rules provide only valid formulas, where validity of a formula is determined by Kripke semantics\footnote{From this moment on, when talking about Kripke semantics we will specifically mean semantics for \logic{} -- where $R$ has to be an equivalence relation.}.
+
+\begin{theorem}[Soundness]\em
+For every theorem $\phi$ of \logic , $ ::- \phi$.
+\begin{proof}
+We will validate only new axioms added to \logiciK{} in the previous section. For proof of \logiciK{} soundness please refer to~\cite{simpson}.
+\begin{itemize}
+\item $[*]A ---> A$: We want to justify $w, d ::- [*]A ---> A$ for any given $w$, $d$. By definition this requires that for any $w' \geq w$, $w', d ::- [*]A$ implies $w', d::- A$. By definition of $w', d ::- [*]A$, for all $w'' \geq w'$ and for all $d' \in D_{w'}$, if $R_{w'}(d, d')$ then $w', d' ::- A$. From that we want to conclude $w', d ::- A$. Note that as our relation is an equivalence, we can take $d' = d$. Therefore by definition of $w', d::- [*]A$ we can conclude that $w', d ::- A$.
+\item $A ---> <*>A$: A similar argument is used; this time we want to exists such $d' \in D_w$ $R_w(d, d')$ and $w, d' ::- A$. $d'=d$ (in which $w, d ::- A$) satisfies both of these conditions.
+\item $[*]A ---> [*][*]A$: Having $w, d ::- [*]A$ we want to show that $w, d ::- [*][*]A$. The latter requires that for all $w' \geq w$, for all $d \in D_{w'}$, if $R_{w'}(d, d')$  then $w', d' ::- [*]A$. Let us take any such $w'$ and $d'$. We want to argue that $w', d' ::- [*]A$. This requires that for all $w'' \geq w'$, for all $d'' \in D{w''}$, if $R_{w'}(d', d'')$ then $w'', d'' ::- A$.  From definition of $w, d ::- [*]A$, the fact that $\geq$ is a preorder and that $D_{w'} \subseteq D_{w''}$ we have that $w'', d'' ::- A$.
+\item $<*><*>A ---> <*>A$: Dually to the previous proof.
+\item $<*>A ---> [*]<*>A$: We want to argue that if for all $w' \geq w$, if $w', d ::- <*>A$ then $w', d ::- [*]<*>A$. The former means that there exists $d \in D_{w'}$ such that $R_{w'}(d, d')$ and $w', d' ::- A$. Let us denote such existing $d'$ as $e$. We have to conclude from that $w', d ::- [*]<*>A$, meaning that for $w'' \geq w'$, $d' \in D_{w''}$, if $R_{w''}(d, d')$ then $w'', d' ::- <*>A$. Now we can use $e$ as the modal world that the definition demands. indeed in $w''$, $d'$ and $e$ are connected (from $R_{w'}(d,e)$ and properties of the relation $R_w$) and $w'', e ::- A$ follows from monotonicity lemma.
+\item $<*>[*]A ---> [*]A$: Analogously as before.
+\end{itemize}
+\end{proof}
+\end{theorem}
+
+Completeness provides the opposite -- everything that is considered valid under certain conditions, should also be syntactically derivable.
+\begin{theorem}[Completeness]\em
+If $::- \phi$ then $\phi$ is derivable.
+\end{theorem}
+The proof can be found e.g. in Simpson's PhD thesis~\cite{simpson}.
+
+
+\subsection{Natural deduction}
+
+Having axiomatization we can now move to natural deduction, a formalism in which it is easy to use proof-theoretic techniques when showing properties of the logic. We present here three natural deduction systems for \logic{}. The first one is \logicL{}, labeled logic, as described in ~\cite{labeled} and ~\cite{labeledphd}. It makes explicit use of worlds, but avoids mentioning relation $R$ between them completely. This is possible as all the worlds are connected to each other, so $R(w, w')$ holds for any pair of worlds $w$, $w'$.
+
+One significant difference between \logicL{} and any generic formalizations of intuitionistic modal logics, such as by Simpson~\cite{simpson} is that most of the rules -- with just three exceptions -- act locally: both premises and the conclusion use the same world. This is motivated by the aimed application of this particular logic -- we will talk more about it in the next section and the subsequent chapter.  Two of the exceptions we have just mentioned are operations referred to as fetch and get. They act on modal connectives, $[*]$ and $<*>$ respectively, and do not change the propositions, but rather the world in which the proof is. The last exception is $[*]$-introduction rule, which requires something to be true in a fresh world in order for it to be universally true.\\
+
+The complete \ND{} system for \logic{} in labeled variant is presented below. The following notations are used:
+\begin{description}
+\item[$\Omega$] denotes the set of known worlds; it has the same role as $W$ in Kripke models
+\item[$\Gamma$] is a context, containing all assumptions. As the assumptions are being made in a specific world, this world's name is also part of the assumption
+\item[$A @ w$] points to the world, in which $A$ holds -- in this case, $w$
+\end{description}
+
+\subsubsection{\logicL{}}
+
+\begin{center}
+\footnotesize
+\begin{spacing}{2.5}
+\begin{tabular}{@{} c }
+
+\inference[\hypr{}~]{w \in \Omega & (A @ w) \in \Gamma}
+			    {\Omega; \Gamma |-  A @ w}\\
+
+\inference[($---> I$)~]{\Omega; (A @ w) :: \Gamma |- B @ w}
+			    {\Omega; \Gamma |- (A --->B) @ w} ~~~
+\inference[($---> E$)~]{\Omega; \Gamma |- (A ---> B) @ w & \Omega; \Gamma |- A @ w}
+			     {\Omega; \Gamma |- B @ w}\\
+
+\inference[($\Box I$)~]{w \in \Omega & \fresh{w_0} & w_0 :: \Omega; \Gamma |- A @ w_0}
+			     {\Omega; \Gamma |- [*]A @ w} ~~~
+\inference[($\Box E$)~]{\Omega; \Gamma |- [*]A @ w}
+				 {\Omega; \Gamma |- A @ w}\\
+
+\end{tabular}\\
+
+\begin{tabular}{@{} c }
+
+\inference[($\Diamond I$)~]{\Omega ; \Gamma |- A @ w}
+			     {\Omega; \Gamma |- <*> A @ w} ~~~
+\inference[($\Diamond E$)~]
+	{\Omega; \Gamma |- <*>A @ w ~~ \fresh w_0 ~~
+	w_0 :: \Omega; (A @ w_0) :: \Gamma |- B @ w}
+	{\Omega; \Gamma |- B @ w} \\
+
+\inference[\fetchr{}~]{w \in \Omega & \Omega; \Gamma |- [*]A @ w'}
+			      {\Omega; \Gamma |- [*]A @ w} ~~~
+\inference[\getr{}~] {w \in \Omega & \Omega; \Gamma |- <*> A @ w'}
+ 			    {\Omega; \Gamma |- <*>A @ w}
+
+\end{tabular}
+\end{spacing}
+\normalsize
+\end{center}
+
+
+Most of the rules here look rather natural. In particular \hype{}, $--->I$ and\\ $--->E$ are standard and used also in \ND{} systems for \IL{}. The new logical connectives rules $[*]E$ and $<*>I$ follow from the reflexivity axioms, $[*]I$ is motivated by the necessitation rule. Finally, $<*>E$ is a standard rule in any natural deduction system for intuitionistic modal logic.\\
+
+Proofs of a number of axioms of \logic{} are given below. We begin with a proof for distribution axiom $[*](A ---> B) ---> ([*]A ---> [*]B)$. Let $w$ be any world from $\Omega$ and let $\Gamma =  [[*]A @ w,  [*] (A ---> B) @ w]$.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\AxiomC{$ [*](A ---> B) @ w \in \Gamma$}
+\UnaryInfC{$w_0::\Omega; \Gamma |- [*](A ---> B) @ w$}
+	\RightLabel{$w_0 \in w_0::\Omega$}
+\UnaryInfC{$w_0::\Omega; \Gamma |- (A ---> B) @ w_0$}
+\AxiomC{$ [*]A@ w \in \Gamma$}
+\UnaryInfC{$w_0::\Omega; \Gamma |- [*]A@ w$}
+	\RightLabel{$w_0 \in w_0::\Omega$}
+\UnaryInfC{$w_0::\Omega; \Gamma |- A @ w_0$}
+\BinaryInfC{$w_0::\Omega; \Gamma|- B @ w_0$}
+	\RightLabel{$ w \in \Omega, \fresh{w_0}$}
+\UnaryInfC{$\Omega;  \Gamma|- [*]B @ w$}
+\UnaryInfC{$\Omega; [[*](A ---> B)@w]|- ([*]A ---> [*]B) @ w$}
+\UnaryInfC{$\Omega; \nnil |- [*](A ---> B) ---> ([*]A ---> [*]B) @ w$}
+\DisplayProof
+\end{tabular}
+\normalsize
+\end{center}
+
+Next example is $(<*>A ---> [*]B) ---> [*] (A ---> B)$. Again, $w$ can be any world from $\Omega$ and by $\Gamma$ we mean $[A @ w_0, <*>A ---> [*]B@w]$.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\AxiomC{$<*> A ---> [*]B @ w \in \Gamma$}
+\UnaryInfC{$w_0::\Omega; \Gamma|- <*> A ---> [*]B @ w$}
+\AxiomC{$A@ w_0 \in \Gamma$}
+\UnaryInfC{$w_0::\Omega; \Gamma|- A  @ w_0$}
+\UnaryInfC{$w_0::\Omega; \Gamma|- <*>A  @ w_0$}
+	\RightLabel{$w_0 \in w_0::\Omega$}
+\UnaryInfC{$w_0::\Omega; \Gamma|- <*>A  @ w$}
+\BinaryInfC{$w_0::\Omega; \Gamma|- [*]B @ w$}
+	\RightLabel{$w_0 \in w_0::\Omega$}
+\UnaryInfC{$w_0::\Omega; \Gamma|- B @ w_0$}
+\UnaryInfC{$w_0::\Omega; [<*>A ---> [*]B@w]|- (A ---> B) @ w_0$}
+	\RightLabel{$ w \in \Omega, \fresh{w_0}$}
+\UnaryInfC{$\Omega; [<*>A ---> [*]B@w]|- [*](A ---> B) @ w$}
+\UnaryInfC{$\Omega; \nnil |- (<*>A ---> [*]B) ---> [*] (A ---> B) @ w$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+\end{center}
+
+Reflexivity axioms for both $[*]$ and $<*>$ is actually captured in the rules, so we will skip those.\\
+
+Next, transitivity in the $<*>$ case: $<*><*> A ---> <*>A$ in $w \in \Omega$. 
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\AxiomC{$ <*><*> A @ w \in [<*><*> A @ w]$}
+\UnaryInfC{$\Omega; [<*><*> A @ w] |- <*><*> A @ w$}
+\AxiomC{$<*>A @ w_0 \in [<*>A @ w_0, <*><*> A @ w]$}
+\UnaryInfC{$w_0::\Omega; [<*>A @ w_0, <*><*> A @ w] |- <*>A @ w_0$}
+	\RightLabel{$w \in \Omega$}
+\UnaryInfC{$w_0::\Omega; [<*>A @ w_0, <*><*> A @ w] |- <*>A @ w$}
+\BinaryInfC{$\Omega; [<*><*> A @ w] |-  <*>A @ w$}
+\UnaryInfC{$\Omega; \nnil |- (<*><*> A ---> <*>A) @ w$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+\end{center}
+
+We will conclude with the proof of axiom \axiomSfive: $<*>A ---> [*]<*>A$ in any $w\in \Omega$.
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\AxiomC{$<*>A@w \in [<*>A@w]$}
+\UnaryInfC{$w_0 :: \Omega; [<*>A @ w] |- <*>A @ w$}
+	\RightLabel{$w_0 \in w_0 :: \Omega$}
+\UnaryInfC{$w_0 :: \Omega; [<*>A @ w] |- <*>A @ w_0$}
+	\RightLabel{$\fresh{w_0}, w \in \Omega$}
+\UnaryInfC{$\Omega; [<*>A @ w] |- [*]<*>A @ w$}
+\UnaryInfC{$\Omega; \nnil |- (<*>A ---> [*]<*>A) @ w$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+\end{center}
+
+\subsubsection{Soundness and completeness}
+Again, we want to be sure that the system is sound and complete. Proofs for the two theorems below can be found in Simpson's PhD thesis~\cite{simpson}.
+
+\begin{theorem}[Soundness]\em
+Let $\Omega$ be a set of known worlds. For every theorem $\phi$ of \logicL{}: $\Omega; \nnil |- \phi$, it follows that $ ::- \phi$.
+\begin{proof}
+Induction on structure of derivation $\Omega; \nnil |- \phi$.
+\end{proof}
+\end{theorem}
+
+\begin{theorem}[Completeness]\em
+Let $\Omega$ be a set of known worlds. If $::- \phi$ then $\Omega; \nnil |- \phi$.
+\end{theorem}
+
+\subsubsection{Alternative ND systems - \logicLF{} and \logicHyb{}}
+Before we move towards applications, we would like to introduce two alternative natural deduction-style formalizations of \logic{}.\\
+The first is due to a paper by Galmiche and Salhi ~\cite{labelfree}. It does not use world names at all, instead using a separate context for each world. We will refer to it as \logicLF{}.\\
+
+The syntax used in \logicLF{}'s \ND{} system uses the following:
+\begin{description}
+\item[$\Gamma$] is the current context, about which we reason
+\item[$G$] is what we call a background -- it is simply an environment containing all the other, non-current contexts
+\end{description}
+\newpage
+\textbf{\logicLF{}}
+\begin{center}
+\footnotesize
+\begin{spacing}{2.5}
+\begin{tabular}{@{} c }
+\inference[\hypr{}~]{A \in \Gamma}
+			{G |= \Gamma |- A}\\
+
+\inference[($---> I$)~]{G |= A :: \Gamma |- B}
+			    {G |= \Gamma |- A --->B} ~~~ 
+\inference[($--->E$)~]{G|= \Gamma |- A ---> B & G|= \Gamma |- A}
+			     {G|= \Gamma |- B}\\
+
+\inference[($\Box I$)~]{\Gamma :: G |= \nnil |- A}
+			     {G |= \Gamma |- [*]A} ~~~
+\inference[($\Box E_1$)~]{G |=\Gamma |- [*]A}
+				 {G|= \Gamma |- A} ~~~
+\inference[($\Box E_2$)~]{\Gamma' :: G |= \Gamma |- [*]A}
+			      {\Gamma :: G |= \Gamma' |- A}\\
+
+\inference[($\Diamond  I_1$)~]{G|=\Gamma |- A}
+			     {G|=\Gamma |- <*> A}~~~
+\inference[($\Diamond I_2$)~]{\Gamma' :: G |= \Gamma |- A}
+			     {\Gamma :: G |= \Gamma' |- <*> A} \\
+
+\inference[($\Diamond E_1$)~]
+	{G |= \Gamma |- <*>A  &
+	(A::\nnil) :: G  |= \Gamma |- B}
+	{G |=\Gamma |- B}\\
+
+\inference[($\Diamond E_2$)~]
+	{\Gamma :: G |= \Gamma' |- <*>A  &
+	(A :: \nnil) :: \Gamma' :: G  |= \Gamma |- B}
+	{\Gamma' :: G |=\Gamma |- B}
+\end{tabular}\\
+\end{spacing}
+\normalsize
+\end{center}
+
+Note that for modal operators' introduction and elimination rules, we usually have two variants: one changing the current context to something from the background and the other leaving it untouched -- this allows skipping get and fetch rules. Other than that, the rules correspond to ones from \langL{}.\\
+
+The second logic is our contribution - a variant of \logicLF{}, but with explicit world names as in \logicL{}. We will call it \logicHyb{} as it is a hybrid between the other two and it makes a stepping stone in connecting (formally) the two. The syntax is the same as in \ND{} for \logicLF{}, except we name the contexts.\\
+
+\textbf{\logicHyb{}}
+\begin{center}
+\footnotesize
+\begin{spacing}{2.5}
+\begin{tabular}{@{} c }
+\inference[\hypr{}~]{A \in \Gamma}
+			{G |= (w, \Gamma) |- A} \\
+
+\inference[($---> I$)~]{G |= (w, A :: \Gamma) |- B}
+			    {G |= (w, \Gamma) |- A --->B} ~~~
+\inference[($---> E$)~]{G|= (w, \Gamma) |- A ---> B & G|= (w, \Gamma) |- A}
+			     {G|= (w, \Gamma) |- B}\\
+
+\inference[($\Box I$)~]{\fresh w_0 & (w, \Gamma) :: G |=( w_0, \nnil) |- A}
+			     {G |= (w, \Gamma) |- [*]A} \\
+
+\inference[($\Box E_1$)~]{G |=(w, \Gamma) |- [*]A}
+				 {G|= (w, \Gamma) |- A} ~~~
+\inference[($\Box E_2$)~]{(w', \Gamma') :: G |= (w, \Gamma) |- [*]A}
+			      {(w, \Gamma) :: G |= (w', \Gamma') |- A}\\
+\end{tabular}\\
+\begin{tabular}{@{} c }
+
+\inference[($\Diamond I_1$)~]{G|=(w, \Gamma) |- A}
+			     {G|=(w, \Gamma) |- <*> A} ~~~
+\inference[($\Diamond I_2$)~]{(w', \Gamma') ::: G |= (w, \Gamma) |- A}
+			     {(w, \Gamma) :: G |= (w', \Gamma') |- <*> A}\\
+
+\inference[($\Diamond E_1$)~]
+	{G |= (w, \Gamma) |- <*>A  &
+	\fresh w_0 & ((w_0, A) :: \nnil) :: G  |= (w, \Gamma) |- B}
+	{G |=(w, \Gamma) |- B}\\
+
+\inference[($\Diamond E_2$)~]
+	{(w', \Gamma') :: G |= (w, \Gamma) |- <*>A  & \fresh {w_0} &
+	(w_0, A :: \nnil) :: (w, \Gamma) :: G  |= (w', \Gamma') |- B}
+	{(w, \Gamma) :: G |=(w', \Gamma') |- B}
+\end{tabular}\\
+\end{spacing}
+\normalsize
+\end{center}
+
+\section{Applications}
+
+What are possible applications of intuitionistic modal logics? They vary from programming languages to describing behavior of hardware circuits, from applications in bisimularity to staged computations. We would now like to focus on applications for \logic{}, namely distributed programming, as it is our main motivation for investigating \logic{}.\\
+
+How do we define a problem for which, as we claim, \logic{} is the solution?\\
+Imagine we have a number of hosts in the network. The connectivity relation $R$ will determine how these hosts are connected. In a standard networking environment it is most natural to assume that all hosts are connected to one another, so $R$ is an equivalence. This is exactly the case in \logic{}.\\
+Next, some resources are available only locally. It means that each host in the network has direct access to its own resources, but not to the resources of its neighbors. This characterizes type $<*>$: it is a type for local address. We can have such address, but unless we are at the host, at which this address was made, we cannot unpack it and use its value.\\
+Finally, for some programs to be run in a distributed environment, they need to be executable from any host within the network -- we will call them \emph{mobile}. We want to be able to express that for some computations it does not matter where they are being run. This matches our understanding of necessity (``true everywhere``) -- making $[*]$ type a good choice for such mobile programs.\\
+
+With such interpretation, what do we make of some of the the characteristic propositions from \logic{}?
+\begin{itemize}
+\item[] $[*]A ---> A$ is simple to interpret: mobile programs are executable
+\item[] $A ---> <*>A$ is just as straightforward, stating that we can create an address of anything
+\item[] $<*>[*]A ---> [*]A$ states that if we have an address of a mobile value, then we can obtain such value
+\end{itemize}
+
+Having said all that, it suggests that \logic{} seems like a good type system for distributed programming languages. What is missing are actual terms. We will add them in the next chapter, but first let us talk a little bit about how we can actually put the logic into a good use as type system via Curry-Howard correspondence.
+
+\subsection{Curry-Howard isomorphism}
+Originally discovered by Haskell Curry and William Alvin Howard, by Curry-Howard isomophism we now understand a relationship between proofs in a logical system and programs. To put things simply: \emph{a proof is a program, the formula it proves is a type for this program}. Furthermore, what this means is that reduction (when looking at terms) can be viewed as proof transformation for logic.\\
+
+The simplest but perhaps most vivid example is the original observation of Howard, correlation between the intuitionistic natural deduction system and the simply typed $\lambda$-calculus. We will now give a brief overview of the two. For the sake of simplicity we will limit ourselves to a system with only $--->$ operator.
+
+\subsubsection{Natural deduction}
+Natural deduction system for implication has the following rules of inference, where $\alpha$ and $\beta$ are judgments "$\alpha$ is true" and "$\beta$ is true" respectively.\\
+
+\footnotesize
+\begin{tabular} { l l l }
+\inference[(Ax)~]{\alpha \in \Gamma} {\Gamma |- \alpha} &
+\inference[($--->I$)~]{\alpha :: \Gamma |- \beta} {\Gamma |- \alpha ---> \beta} &
+\inference[($--->E$)~]{\Gamma |- \alpha ---> \beta & \Gamma |- \alpha}{\Gamma |- \beta}
+\end{tabular}\\
+\normalsize
+
+For example, a proof of the judgment $(\alpha ---> \beta) ---> \alpha ---> \beta$ being true can be constructed as follows:
+\footnotesize
+\begin{prooftree}
+\AxiomC{$(\alpha ---> \beta) \in [\alpha, \alpha ---> \beta]$}
+\UnaryInfC{$[\alpha, \alpha ---> \beta] |- \alpha ---> \beta$}
+\AxiomC{$\alpha \in [\alpha, \alpha ---> \beta]$}
+\UnaryInfC{$[\alpha, \alpha ---> \beta] |- \alpha$}
+\BinaryInfC{$[\alpha, \alpha ---> \beta] |- \beta$}
+\UnaryInfC{$[\alpha ---> \beta] |- \alpha ---> \beta$}
+\UnaryInfC{$ [~] |- (\alpha ---> \beta) ---> \alpha ---> \beta$}
+\end{prooftree}
+\normalsize
+
+Note that there may be more than one proof tree for a given statement. Take, for example, $\alpha ---> \alpha$. A proof for that can simply be
+\footnotesize
+\begin{prooftree}
+\AxiomC{$\alpha \in [\alpha]$}
+\UnaryInfC{$[\alpha] |- \alpha$}
+\UnaryInfC{$[~] |- \alpha ---> \alpha$}
+\end{prooftree}
+\normalsize
+But nothing stops us from producing the following proof:
+\footnotesize
+\begin{prooftree}
+\AxiomC{$(\alpha ---> \alpha) \in [\alpha ---> \alpha]$}
+\UnaryInfC{$[~] |- (\alpha ---> \alpha) ---> (\alpha ---> \alpha)$}
+\AxiomC{$\alpha \in [\alpha]$}
+\UnaryInfC{$[\alpha] |- \alpha$}
+\UnaryInfC{$[~] |- \alpha ---> \alpha$}
+\BinaryInfC{$[~] |- \alpha ---> \alpha$}
+\end{prooftree}
+\normalsize
+
+\subsubsection{$\lambda$-calculus with simple types}
+Typing rules for simple $\lambda$-calculus are the following:\\
+
+\footnotesize
+\begin{tabular} { c }
+\inference[(Var)~]{x ::: \alpha \in \Gamma}{\Gamma |- x ::: \alpha}\\[0.4cm]
+\inference[(Lam)~]{(x:::\alpha) :: \Gamma |- M ::: \beta}{\Gamma |- \lambda x^{\alpha}. M ::: \alpha ---> \beta} ~~~
+\inference[(Appl)~]{\Gamma |- M ::: \alpha ---> \beta & \Gamma |- N ::: \alpha}{\Gamma |- \appl{M}{N} ::: \beta}
+\end{tabular}\\
+\normalsize
+
+Note that $\alpha$ and $\beta$ are now types for terms in $\lambda$-calculus.\\
+
+Looking at the rules, the similarity is striking. Let us then take a look at two different terms: first is an identity function $\lambda x^{\alpha} . x$, the second is more complex: $\appl{(\lambda f^{(\alpha ---> \alpha)} . f )}{(\lambda x^{\alpha} . x)}$. We want to assign them types using typing rules we have just provided.\\
+
+First the identity function:
+\footnotesize
+\begin{prooftree}
+\AxiomC{$x::\alpha \in [x::\alpha]$}
+\UnaryInfC{$[ x:::\alpha] |- x ::: \alpha$}
+\UnaryInfC{$[~] |- \lambda x^{\alpha} . x ::: \alpha ---> \alpha$}
+\end{prooftree}
+\normalsize
+
+And then the more complex term:
+\footnotesize
+\begin{prooftree}
+\AxiomC{$( f:: \alpha ---> \alpha) \in [f::\alpha ---> \alpha]$}
+\UnaryInfC{$[~] |- \lambda f^{(\alpha--->\alpha)} . f  (\alpha ---> \alpha) ---> (\alpha ---> \alpha)$}
+\AxiomC{$x::\alpha \in [x::\alpha]$}
+\UnaryInfC{$[x::\alpha] |- x:: \alpha$}
+\UnaryInfC{$[~] |- \lambda x^{\alpha} . x:: \alpha ---> \alpha$}
+\BinaryInfC{$[~] |- \appl{(\lambda f^{(\alpha ---> \alpha)} . f)}{(\lambda x^{\alpha} . x)} :::  \alpha ---> \alpha$}
+\end{prooftree}
+\normalsize
+
+Not only they are of the same type, their typing trees look exactly like two proofs for $\alpha ---> \alpha$ in natural deduction system. When checking the type of term $\lambda x^{\alpha} .x$ we did not have any choice -- we had to build the simpler proof tree. This is true in general and this is what we mean by ``programs encode proofs``.
+
+\subsubsection{Computations}
+For $\lambda$-calculus the computation consists of applying $\beta$-reduction until a value is obtained: $\appl{(\lambda x^{\alpha} . M)}{N} |->_\beta \substt{N}{x}{M}$. 
+Without changing the final result of the computation, we can also expand the term via $\eta$-expansion: ${M |->_\eta \lambda x^{\alpha} . (\appl{M}{x})}$ when $x\notin \operatorname{FV}{M}$. What is the meaning of these operations in logic?\\
+
+$\beta$-reduction corresponds to local soundness of $--->$ in natural deduction, a form of optimizing the proof. Looking at the proof tree:
+\footnotesize
+\begin{prooftree}
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$(x::\alpha)::\Gamma |- M ::: \beta$}
+\UnaryInfC{$\Gamma|- \lambda x^{\alpha} . M ::: \alpha ---> \beta$} 
+\AxiomC{$\mathcal{E}$}
+\noLine
+\UnaryInfC{$\Gamma |- N ::: \alpha$}
+\BinaryInfC{$\Gamma |- \appl{(\lambda x^{\alpha} . M)}{N} ::: \beta$}
+\end{prooftree}
+\normalsize
+
+we can see that it uses $--->$ introduction one step before elimination. In pure logic without terms, we can rewrite this proof as
+\footnotesize
+\begin{prooftree}
+\AxiomC{$\substt{\mathcal{E}}{\alpha}{\mathcal{D}}$}
+\UnaryInfC{$\Gamma |- N ::: \beta$}
+\end{prooftree}
+\normalsize
+
+Similarly, $\eta$-expansion is justified by local completeness of $--->$ operator.
+\\
+
+We have advocated the importance of finding an interpretation for some logic -- it is not because we can formally describe e.g. distributed computations using \logic{}, but because we can obtain a programming language that realizes this interpretation. In the next chapter we will present three such languages, one for each variant of \logic{} natural deduction system.

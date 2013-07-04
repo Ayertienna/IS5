@@ -1,0 +1,265 @@
+\chapter{Termination of evaluation} \label{chapter:termin}
+
+\begin{quote}
+\small
+In this chapter we show termination of call-by-name evaluation for \langLF{}. First we provide proof for sublanguage without the $<*>$ type. Next we discuss termination of full \langLF{} language. All proofs of termination in this chapter use Tait's method of logical relations as their base.
+\end{quote}
+
+Operational semantics for languages described in Chapter \ref{chapter:lang} provide us with strategies of evaluation. In the previous chapter we have (partially) shown that reductions and values are compatible across three described languages, therefore there is a shared strategy of evaluation for all variants of \lang{}. The question we want to answer in this chapter is whether the chosen strategy is terminating. If that is the case, then by careful proof construction we can automatically extract the evaluator in OCaml from the proof in Coq.\\
+
+Reason for choosing call by name evaluation strategy was the intended interpretation of the language, as described in Section 1 of Chapter \ref{chapter:lang}.  In this chapter we want to show that by evaluating a term that is typing in an empty environment we can eventually reach a term in the normal form (i.e. a value).\\
+
+ We define termination of term $M$ as $\termin{M} := \exists V, M *|->* V \wedge \val{V}$. Proof of this property will -- in both presented variants -- use logical relations (Tait's) method~\cite{girard}. The first case described here, \langLF{} without $<*>$, the proof will follow closely termination of simply-typed $\lambda$-calculus. The second one, termination of full \langLF{} language, uses slightly different logical relations, inspired by~\cite{modalnormalization} and~\cite{contextmabi}.\\
+
+\section{\langLF{} without $<*>$}
+Termination of evaluation for \langLF{} without $<*>$ (\nodiaLangLF{}) can be proven similarly to the same property for simply-typed $\lambda$-calculus. The only significant change is adding definition of reducibility for the $[*]$ type constructor.
+
+Main goal of this section is to justify the following theorem:
+
+\begin{introtheorem}[Termination of \nodiaLangLF{}]\em
+For every $M$, if $\emptyEq G |- \nnil |- M ::: A$\footnote{As a reminder -- $\emptyEq{G}$ replaces each context from $G$ with an empty context}, then $\termin{M}$. 
+\end{introtheorem}
+
+When trying to prove such property directly, by induction on type derivation, we cannot get past the application case. We are unable to  show $\termin{(\appl{M}{N})}$ having only assumptions: $\termin{M}$ and $\termin{N}$.\\
+
+We therefore follow Tait's method and define a family of relations, one for each type, containing reducibility candidates.
+This definition is the following (where $\iota$ denotes base type):
+\begin{description}
+\item $\Red{M}{\iota} := \termin{M}$
+\item $\Red{M}{A ---> B} := \termin{M} \wedge \forall N, \Red{N}{A} ---> \Red{\appl{M}{N}}{B}$
+\item $\Red{M}{[*]A} := \termin{M} \wedge \Red{\unboxe{}\ {M}}{A}$
+\end{description}
+
+Note that we are allowed to require termination for reducible terms of complex types ($A--->B$ and $[*]A$) as we do not evaluate neither under $\lambda$ expressions not under \bboxe{} -- these are unconditional values in \langLF{}\footnote{In contrast, in full \langLF{} the term $\here{M}$ is a value conditionally --  namely only when $M$ itself is a value.} and therefore also in \nodiaLangLF{}.\\
+ 
+Let us first remark two observations for \nodiaLangLF{}, that will make our reasoning simpler:
+\begin{observation}[Redex uniqueness]\em
+If $M |->N$ and $M |-> N'$ in \nodiaLangLF{} then $N = N'$.
+\end{observation}
+
+\begin{observation}\em
+If $M |-> N$ then \termin{M} if and only if \termin{N}.
+\begin{proof}
+It follows from the uniqueness of redex.
+\end{proof}
+\end{observation}
+\newpage
+We require all variants of the $\Red{M}{A}$ relation to have the following properties:
+
+\begin{lemma}[CR1]\em
+\label{cr1}
+If $\Red{M}{A}$ then $\termin{M}$.
+\begin{proof}
+By induction on $A$; it follows directly from the definition of \Red{M}{A} in each case.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}[CR2]\em
+If $\Red{M}{A}$ and $ M |-> N$ then $\Red{N}{A}$.
+\begin{proof}
+By induction on $A$.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}[CR3]\em
+\label{cr3}
+If $\Red{N}{A}$ and $ M |-> N$ then $\Red{M}{A}$.
+\begin{proof}
+By induction on $A$.
+\end{proof}
+\end{lemma}
+
+Having \ref{cr1}, in order to show the termination property it suffices to argue that $\emptyEq G |- \nnil |- M ::: A$ implies $\Red{M}{A}$.  This time we cannot work only on empty contexts, as in $\lambda$ case we will need to use the induction hypothesis, and for typing of $\lambda$ this has non-empty context. Therefore, we would like to prove the following:
+\begin{introtheorem}[Reducibility Theorem]\em
+For any given $M$, if $G |- \Gamma |- M ::: A$ then $\Red{M}{A}$.
+\end{introtheorem}
+
+Unfortunately, the proof by induction on type derivation for $M$ is again impossible.  Consider the case $\lam{v}{A}{M}$. By the definition of $\Red{}{A--->B}$ we need to show  $\Red{\substt{N}{v}{M}}{B}$. But from assumptions we  only have $\Red{M}{B}$ and $\Red{N}{A}$ -- and we know nothing about reducibility under substitution.\\
+
+To remedy that we introduce a variant of term substitution: $\substt{L}{X}{M}$. This substitution is simultaneous, with $L$ being a list of terms to be substituted and $X$ being a list of variables. The final version of reducibility theorem is as follows:
+
+\begin{theorem}[Reducibility Theorem]\em
+\label{redtheorem}
+If $G |- \Gamma |- M ::: A$, $X$ contains all free variables used in $M$ and $L$ contains reducible terms to be substituted for these variables, then
+$\Red{\substt{L}{X}{M}}{A}$.
+\begin{proof}
+By induction on type derivation of $M$. In $\lam{v}{A}{M}$ and $\bbox{w_0}{M}$ cases we use the property \ref{cr3}. The previously problematic part of $\lambda$ case proof, showing reducibility of $\substt{N}{v}{(\substt{L}{X}{M})}$ in type $B$, is now solved simply by extending $L$ and $X$ by $N$ and $v$, respectively.
+\end{proof}
+\end{theorem}
+\newpage
+Now it remains to prove the following:
+\begin{theorem}[Termination Theorem]\em
+For any given $M$, if this term has a type in empty context: $\emptyEq G |- \nnil |- M ::: A$, then $\termin{M}$.
+\begin{proof}
+It is enough to notice that as there are no assumptions in the environment, there can be no free variables. Therefore $X = \nnil$, $L=\nnil$ and from \ref{cr1} and \ref{redtheorem} we can conclude that indeed $\termin{M}$.
+\end{proof}
+\end{theorem}
+
+\section{Complete \langLF{}}
+
+In a sublanguage without $<*>$ everything was simple and straightforward. Do we expect the same from the full \langLF{}?  Judging from the rules for reducibility we have so far, any attempts to extend $\Red{}{}$ to capture $<*>A$ type as well would require using destructor of this type -- \letdiae. Whether this is going to be problematic or not depends on the typing and reduction rules for the two operators that we add along with the $<*>$ type constructor. Let us remind them:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{} l }
+\inference[\herer{}~]{G|=\Gamma |- M ::: A}
+			     {G|=\Gamma |- \here M ::: <*> A} ~~~
+\inference[\getherer{}~]{\Gamma' :: G |= \Gamma |- M ::: A}
+			     {\Gamma :: G |= \Gamma' |- \here M ::: <*> A}\\[0.8cm]
+
+\inference[\letdiar{}~]
+	{G |= \Gamma |- M ::: <*>A  & \fresh {v_0} &
+	[v_0:::A] :: G  |= \Gamma |- N ::: B}
+	{G |=\Gamma |- \letdia {v_0} {} M N ::: B}\\[0.8cm]
+
+\inference[\letdiagetr{}~]
+	{\Gamma :: G |= \Gamma' |- M ::: <*>A  &  \fresh {v_0} &
+	[v_0 ::: A] :: \Gamma' :: G  |= \Gamma |- N ::: B}
+	{\Gamma' :: G |=\Gamma |- \letdia {v_0} {} M N ::: B}
+\end{tabular}
+\end{center}
+\begin{tabular}{ l }
+$\ifthen {\val M} {\val{\here{M}}}$\\[0.5cm]
+
+$\ifthen{\val M}{\letdia v {} {\here M} N |-> \substt{M}{v}{N}}$\\[0.1cm]
+$\ifthen{M|-> M'} {\here M |-> \here M'}$\\[0.1cm]
+$\ifthen{M|-> M'} {\letdia v {} M  N |->\letdia v {} {M'} N}$\\[0.1cm]
+\end{tabular}
+
+We do not expect \heree{} to give us much trouble -- its typing is as simple as the one for \unboxe{}. \letdiae{} on the other hand uses arbitrary result type $B$. We do not know whether $B$ is a smaller type than $<*>A$, so our usual inductive definition, along the lines of:\\
+ $\Red{M}{<*>A} := \forall{N} \ \forall{B}\ \forall{v},\ \fresh{v} -> \Red{N}{B} -> \Red{\letdia{v}{}{M}{N}}{B}$
+will not be proper!\\
+
+The solution we propose uses the ideas described in~\cite{modalnormalization} and~\cite{contextmabi}. First of these articles describes reducibility for strong normalization of a language with operator \letTe{}, similar to \letdiae{}, except with more concrete type of resulting expression $N$\footnote{In the original article the type of computation is denoted as $T A$, but for the sake of consistency we will continue to use $<*>A$.}:
+\begin{center}
+\footnotesize
+\begin{tabular}{@{} l }
+\inference[(\letTe{})~]{M ::: <*>A & N :: <*>B}{\letT{v}{M}{N} ::: <*>B}\\
+\end{tabular}
+\end{center}
+
+The authors propose the following definition of reduciblility for $<*>A$ type:
+\begin{description}
+\item $\Red{M}{<*>A}$: Term M of type $<*>A$ is reducible if for all reducible continuations $K$, the application $K @ M$ is strongly normalizing;
+\item $\RedK{K}{<*>A}$: Continuation $K$ accepting terms of type $<*>A$ is reducible if for all reducible $V$ of type $A$, the application $K $ $(\here{V})$ is strongly normalizing.
+\end{description}
+
+The continuations are defined there as $ K ::= \IdK{\tau} ~|~ K \circ (\letT{v}{[~]}{N})$ and application of continuation is the following:
+\begin{description}
+\item $\IdK{A} @ M = M$
+\item $ (K \circ (\letT{v}{[~]}{N})) @ M = K @ (\letT{v}{M}{N})$
+\end{description}
+
+We cannot use the proof method described there directly, as we have completely arbitrary result type of \letdiae{} while $\letTe{}$ always returns a computational ($<*>$) result . Nevertheless, we can change the above definitions into termination-expressing variant. They become:
+\begin{description}
+\item $\Red{M}{<*>A} := \forall\ K,\ \RedK{K}{<*>A}-> \termin{K@M}$
+\item $\RedK{K}{<*>A}:= \forall\ V,\ \Red{V}{A} -> \termin{K@(\here{M})}$
+\end{description}
+
+Continuations and $K@M$ operation are defined similarly as before:
+\begin{description}
+\item $ K ::= \IdK{A} ~|~ K \circ (\letdia{v}{}{[~]}{N})$
+\item $\IdK{A} @ M = M$
+\item $ (K \circ (\letdia{v}{}{[~]}{N})) @ M = K @ (\letdia{v}{}{M}{N})$
+\end{description}
+
+With that, the proposed definitions of $\Red{}{}$ relation are complete. However, they turn out not to be enough to prove the following:
+
+\begin{introtheorem}[Reducibility Theorem]\em
+If $G |- \Gamma |- M ::: A$, $X$ contains all free variables used in $M$ and $L$ contains reducible terms to be substituted for these variables, then
+$\Red{\substt{L}{X}{M}}{A}$.
+\end{introtheorem}
+
+The problem arises when showing the required property for \letdiae{}. This operator is not used directly in the definition of $\Red{M}{<*>A}$, and the type of \letdiae{} is completely arbitrary.\\
+
+What we can do in this case is use the approach described in~\cite{contextmabi} and, instead of showing reducibility, prove that $\forall\ K,\ \RedK{K}{A} -> \termin{K@(\substt{L}{X}{M})}$ (with the assumptions same as before). We will denote such property of a term as $\Q{}{A}$. The final variant of the reducibility theorem is the following:
+
+\begin{introtheorem}[Reducibility Theorem]\em
+If $G |- \Gamma |- M ::: A$, $X$ contains all free variables used in $M$ and $L$ contains terms satysfying relation $\Q{}{}$ to be substituted for these variables, then
+$\Q{(\substt{L}{X}{M})}{A}$.
+\end{introtheorem}
+
+We cannot leave the definitions of reducibility for types other than $<*>$ unchanged, rather we have to adapt them to the new goal similarly to $\Red{M}{<*>A}$. First however, let us create continuations for the destructors of all the types:
+\begin{description}
+\item $ K ::= \IdK{A} ~|~ K \circ (\letdia{v}{}{[~]}{N}) ~|~ K \circ (\appl{[~]}{N}) ~|~ K \circ (\unbox{[~]})$
+\item $\IdK{A} @ M = M$
+\item $ (K \circ (\letdia{v}{}{[~]}{N})) @ M = K @ (\letdia{v}{}{M}{N})$
+\item $ (K \circ (\appl{[~]}{N})) @ M = K @ (\appl{M}{N})$
+\item $ (K \circ (\unbox{[~]})) @ M = K @ (\unbox{M})$
+\end{description}
+
+This will allow us to prove e.g. $\termin{K@(\unbox{\substt{L}{X}{M}})}$ by extending the continuation $K$ into $K \circ (\unbox{[~]})$ and using induction hypothesis on the remaining term, $\substt{L}{X}{M}$.
+
+The reason for creating exactly these continuations is the order in which reductions are made. In particular for the continuations defined as above the following is true:
+\begin{propertyb}\em
+For any $M$, $N$ and $K$, if $M |-> N$ then $K@M |-> K@N$.
+\end{propertyb}
+
+Next we have to define mutually recursive logical relations $\Red{M}{A}$ and $\RedK{K}{A}$. Given that in the end, from reducibility theorem we want to prove ``$\emptyEq G |- \nnil |- M :: A ---> \termin{M}$``, we need to ensure that $\forall\ A,\ \RedK{(\IdK{A})}{A}$ holds, as this property will be required to make that final step.\\
+
+\newpage
+We will begin with definitions for a basic type $\iota$.
+\begin{description}
+\item $\Red{M}{\iota} := \termin{M}$
+\item $\RedK{K}{\iota} := \forall\ V,\ \termin{V} -> \termin{K @ V}$
+\end{description}
+The reducibility of terms is standard; for continuation the definition follows from the fact that, as mentioned above, we want identity continuation to be reducible.\\
+
+Now let us move to definitions for $A ---> B$ type. These relations are consistent with those from~\cite{contextmabi}:
+\begin{description}
+\item $\Red{M}{A ---> B} := \termin{M} \wedge (\forall \ N,\ \Q{N}{A}) --> \Q{(\appl{M}{N})}{B}$
+\item $\RedK{K}{A ---> B} := \forall\ M,\ \Red{M}{A--->B} -> \termin{K @ M}$
+\end{description}
+Note that despite $\RedK{K}{A--->B}$ calling $\Red{M}{A--->B}$, this definition stays correct as in $\Red{M}{A--->B}$ we use only recursive calls for smaller types.\\
+
+For $[*]A$ the pattern is similar:
+\begin{description}
+\item $\Red{M}{[*]A} := \termin{M} \wedge \Q{(\unboxe{}\ {M})}{A}$
+\item $\RedK{K}{[*]A} := \forall\ M,\ \Red{M}{[*]A} -> \termin{K @ M}$
+\end{description}
+
+Finally, it turns out that the previous definition of $\RedK{K}{<*>A}$ has stronger assumptions than we desire for $\here{M}$ case (as now we aim at proving $\Q{M}{A}$ rather than $\Red{M}{A}$), we will therefore weaken them in the final version of the definition:
+\begin{description}
+\item $\Red{M}{<*>A} := \forall\ K,\ \RedK{K}{<*>A}-> \termin{K@M} = \Q{M}{<*>A}$
+\item $\RedK{K}{<*>A}:= \forall\ V,\ \Q{V}{A} -> \termin{K@(\here{M})}$
+\end{description}
+
+
+Now that the all reductions are all defined, let us first check the property of identity continuations we have mentioned previously:
+\begin{lemma}\label{redidk}
+$\forall\ A,\ \RedK{(\IdK{A})}{A}$.
+\begin{proof}
+By induction on type $A$. The only non-trivial case is $<*>A$, the rest follow directly from the definitions of $\Red{M}{A}$.\\
+$\RedK{\IdK{}}{<*>A} = \forall\ V,\ \Q{V}{A} -> \termin{\IdK{}@(\here{M})}$. We want to show that $\termin{\here{V}}$ knowing that $\termin{V}$ (from $\Q{V}{A}$). But in \langLF{} $(\termin{M} -> \termin{(\here{M})})$, because we have defined value on \heree{} as ``$\ifthen {\val M} {\val{\here{M}}}$``.
+\end{proof}
+\end{lemma}
+
+\newpage 
+
+We are now ready to prove the reducibility theorem,
+
+\begin{theorem}[Reducibility Theorem]\label{fullredtheorem}\em
+If $G |- \Gamma |- M ::: A$, $X$ contains all free variables used in $M$ and $L$ contains terms satisfying relation $\Q{}{}$ to be substituted for these variables, then
+$\Q{(\substt{L}{X}{M})}{A}$.
+\begin{proof}
+Proof is by induction on type derivation of $M$. We will describe only selected cases.
+\begin{itemize}
+\item $\appl{M}{N}$: $\termin{K @ (\appl{(\substt{L}{X}{M})}{(\substt{L}{X}{N})})}$ \\
+Observe that by the definition of $@$ we have $K @ (\appl{(\substt{L}{X}{M})}{(\substt{L}{X}{N})})$ $= (K \circ (\appl{[~]}{(\substt{L}{X}{N})}) @ (\substt{L}{X}{M}))$. By induction hypothesis on $\substt{L}{X}{M}$, such application terminates provided that $\RedK{K \circ (\appl{[~]}{(\substt{L}{X}{N})})}{A ---> B}$. But this follows directly from unfolding the definition.
+
+\item $\unbox{M}$: $\termin{K @ (\unbox{{\substt{L}{X}{M}}})}$\\
+Again, $K @ (\unbox{{\substt{L}{X}{M}}}) = (K \circ (\unbox{[~]}) @ (\substt{L}{X}{M})$. Termination of the latter follows directly from the induction hypothesis.
+
+\item $\here{M}$: $\termin{K @ (\here{(\substt{L}{X}{M})})}$\\
+From $\RedK{K}{<*>A}$ we get $\forall\ V,\ \Q{V}{A} -> \termin{K@(\here{M})}$. It remains to show that $\Q{(\substt{L}{X}{M})}{A}$. This is exactly the conclusion from the induction hypothesis.
+\end{itemize}
+\end{proof}
+\end{theorem}
+
+Finally, the termination theorem is given below.
+\begin{theorem}[Termination Theorem]\em
+For any given $M$, if this term has a type in empty context: $\emptyEq G |- \nnil |- M ::: A$, then $\termin{M}$.
+\begin{proof}
+Same as in the sublanguage variant, $X = \nnil$, $L=\nnil$ -- therefore $\substt{L}{X}{M} = M$. Next, by \ref{redidk} we know that $\RedK{(\IdK{A})}{A}$, therefore from \ref{fullredtheorem} we conclude that $\termin{M}$.
+\end{proof}
+\end{theorem}

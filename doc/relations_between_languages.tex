@@ -1,0 +1,688 @@
+\chapter{Relations between languages} \label{chapter:relations}
+
+\begin{quote}
+\small
+In this chapter we establish relationship between \langL{}, \langLF{} and \langHyb{}. We do so by providing type-preserving transformations between these languages.
+\end{quote}
+
+Just by looking at type systems for three languages presented in the previous chapter, we can notice a lot of similarities. Our goal in this chapter is to formally describe these, either in terms of functional transformations or using relations between terms in different languages. We focus on both type and reduction preservation -- as we will see it is not always possible to achieve both, though usually for technical reasons.\\
+As much as we would like to provide a functional translation on terms for each pair of languages that interests us, it has proven to be infeasible. Note for example that moving from \langLF{} to \langHyb{} requires adding context names to both terms and context, in a controlled manner. It is much more natural to express this translation by using a proof tree to reconstruct term from \langHyb{}. Some of the difficulties come from our choice of implementation -- these we will describe in full detail in Appendix \ref{appendix:coq}.\\
+
+First however, let us explain the motivation for creating such transformations in the first place. As some of the proofs of language properties become technical, it is worth it to be able to prove a given property in one language and -- through language transformations -- extend its truthfulness to others. For example, proofs of normalization and termination properties seem to be less technically challenging in \langLF{} than in any other language. \\
+In addition, as all the languages use the same logic as their type system, we want to know exactly how close they are to one another.  Perhaps at first \langL{} and \langLF{} do not seem identical, but through transformations between each of them and the in-between hybrid language, we can be more precise in where these differences lie.\\
+
+We have created hybrid language \langHyb{} with a single goal in mind: we wanted for it to be immersed in both \langL{} and \langLF{}. In this we have been successful, as both translations are done using easy to understand functions. We will begin by describing them, then move to other, more complex translations.
+
+\section{From \langHyb{} to \langL{}}
+As the relation between \langHyb{} and \langLF{} is trivial, we will begin with a more interesting case. We aim at creating a pair of translation functions \funHybtoLe{} -- one for contexts translation, one for terms. We want the following conditions to be satisfied:
+
+\begin{introtheoremB}[Typing Preservation] \em
+Let $\funHybtoL{(w, \Gamma) :: G} = (\Omega, \Delta, w)$  and let $M'$ be the result of $\funHybtoL{M}$. 
+Then from $G |- (w, \Gamma) |-_\tHyb{} M ::: A$, it follows that $\Omega; \Delta |-_\tL M' ::: A @ w$
+\end{introtheoremB}
+
+\begin{introtheoremB}[Value Preservation]\em
+For any term $M \in \teHyb{}$, if $\val[\tHyb]{M}$ then $\val[\tL]{\funHybtoL{M}}$.
+\end{introtheoremB}
+
+For the next condition we require multi-step reductions ($|->*$). We define them inductively as:\\
+
+\begin{tabular} { l }
+If $M |-> M'$ then $M |->* M'$ \\
+If $M |-> M'$ and $M' |->* M''$ then also $M |->* M''$
+\end{tabular}\\
+
+\begin{introtheoremB}[Reduction Preservation]\em
+Assume that $M |->_w M'$ in \langHyb{} and let $\funHybtoL{M} = N$, $\funHybtoL{M'} = N'$. Then $N |->*_w N'$ in \langL{}.
+\end{introtheoremB}
+
+The first condition states that typing is preserved through \funHybtoLe{} translation, the second requires us to transform values to values, and the last talks about preservation of multi-step reduction. Of course, we would rather use a single-step reduction,  but it is impossible, as for example in \langL{} we have separate unbox and fetch operators, whereas in \langHyb{} we only have a combination of them, called \unboxfetch{}. It may therefore be the case that one-step reduction from \langHyb{} is simulated by two reduction steps in \langL{} -- in our example, one for \unboxe{} and one for \fetche{}.\\
+
+Function \funHybtoLe{} for contexts rewriting is easy to create. We want to gather all context names (worlds) from the environment $(w, \Gamma) :: G$ into $\Omega$ and annotate every assumption from this environment with the appropriate world. We define such annotation for any $(w_0, \Gamma_0) \in (w, \Gamma)::G$ as follows:\\
+
+\begin{tabular} { l }
+$\annotateworlds{w_0}{\nnil}= \nnil$ \\
+$\annotateworlds{w_0}{(v:::A)::\Gamma'_0}= (v:::A @ w_0) :: \annotateworlds{w_0}{\Gamma'_0}$
+\end{tabular}\\
+
+Next we simply concatenate all annotated contexts to create $\Delta$\footnote{flatmap is concat over map for any function that returns a list type}.\\
+
+\begin{tabular} { l }
+$\Omega = \map{\fst{}} {((w, \Gamma)::G)}$\\
+$\Delta = \flatmap{\text{annotateWorlds}} {((w, \Gamma)::G)}$
+\end{tabular}\\
+
+Note that we did not change any names in the environment, just reordered the assumptions -- that way our requirement of non-duplicating world names and variable names is maintained through this transformation.\\
+
+Next let us create a translation for terms. It is fairly straightforward. The syntax we use here is Coq-like\footnote{To be exact this is the syntax for fixpoint in Coq}, with pattern matching on constructors.
+\begin{align*}
+&\funHybtoL{M_0}:=\match{M_0}\\
+&~~~|~ \hyp[\tHyb{}]{v} => \hyp[\tL{}]{v}\\
+&~~~|~ \lam[\tHyb{}]{v}{A}{M} =>  \lam[\tL]{v}{A}(\funHybtoLe{M}) \\
+&~~~|~ \appl[\tHyb] M N => \appl[\tL] {(\funHybtoLe{M})} {(\funHybtoLe{N})}\\
+&~~~|~ \bbox[\tHyb] w M => \bbox[\tL] w (\funHybtoLe{M}) \\
+&~~~|~ \unboxfetch [\tHyb] w M => \unbox[\tL] (\fetch [\tL]w (\funHybtoLe{M})) \\
+&~~~|~ \gethere [\tHyb] w M =>  \get [\tL] w (\here [\tL] (\funHybtoLe{M}))\\
+&~~~|~ \letdiaget [\tHyb] w v {w_0} M N =>\\
+&~~~~~~~~~~~~\letdia [\tL] {v}{w_0} {\get [\tL] w (\funHybtoLe{M})} {(\funHybtoLe{N})} \\
+\end{align*}
+
+We can immediately notice that $\funHybtoL{\unboxfetch w M}$ along with $\funHybtoL{\gethere w M}$ and $\funHybtoL{\letdiaget w v  {w_0} M N}$ could all be  optimized into using \gete{} (or \fetche{}) only when the world is really changing. Indeed, we could have kept current world as a parameter and rewrite e.g. $\funHybtoL {\unboxfetch w M , w}$ to $\unbox(\funHybtoL{M, w})$. This additional world parameter would, however, complicate reasoning about such function -- in particular for recursive call within the \bboxe{} case, where current world should be fresh.\\
+Our solution requires a possibly redundant use of get (or fetch) operator, but avoids such problems. Additionally, note that the following proof tree (and similar ones for \getheree{} and \letdiagete{}) justifies such step, at least typing-wise:
+
+\footnotesize
+\begin{prooftree}
+\AxiomC{$\mathcal D$}
+\noLine
+\UnaryInfC{$\Omega; \Gamma |-_\tL M ::: [*]A @ w$}
+\AxiomC{$w \in \Omega$ (as $M$ types in $w$)}
+\BinaryInfC{$\Omega; \Gamma |-_\tL \fetch w M ::: [*]A @ w$}
+\end{prooftree}
+\normalsize
+
+In order to show reduction preservation property we have mentioned at the beginning of this section, we will require these two lemmas regarding substitution and world renaming with relation to \funHybtoLe{}:
+
+\begin{lemma}
+$\substt{\funHybtoL{M}}{v}{(\funHybtoL{N})} = \funHybtoL{(\substt{M}{v}{N})}$.
+\begin{proof}
+Simple induction over $N$.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}
+$\substw{w}{w'}{(\funHybtoL{N})} = \funHybtoL{(\substw{w}{w'}{N})}$.
+\begin{proof}
+Simple induction over $N$.
+\end{proof}
+\end{lemma}
+
+We are now ready to show the preservation properties. We begin with typing preservation: 
+
+\begin{theorem}[Typing Preservation] \em
+Let $\funHybtoL{(w, \Gamma) :: G} = (\Omega, \Delta, w)$  and let $M'$ be the result of $\funHybtoL{M}$. 
+Then from $G |- (w, \Gamma) |-_\tHyb M ::: A$, it follows that $\Omega; \Delta|-_\tL M' ::: A @ w$.
+\begin{proof}
+Induction on type derivation for $M$. We will cover only selected cases:
+\begin{itemize}
+\item $G |- (w, \Gamma) |-_\tHyb \hyp v ::: A$\\
+$M' = \hyp v$ and from correctness of contexts rewriting, since $v:::A \in \Gamma$ then also $v ::: A @ w \in \Delta$. From the definition of set of known worlds $\Omega$:  $\Omega = \map{\fst{}}{((w, \Gamma) :: G)} = w :: (\map{\fst{}} {G})$, we conclude $w \in \Omega$.
+
+\item $G |- (w, \Gamma) |-_\tHyb \lam{v}{A}{M_0} ::: A ---> B$\\
+In this case $M' = \lam{v}{A}(\funHybtoL{M_0})$. For $M'$ to have the type $A ---> B$ we require that $\Omega; (v:::A@w) :: \Delta |-_\tL \funHybtoL{M_0} ::: B$. First, from the typing derivation of $\lam{v}{A}{M_0}$ we obtain that in the case of $M_0$, $G |- (w, (v, A) :: \Gamma) |-_\tHyb M_0 ::: B$. To use the induction hypothesis it remains to check: $\funHybtoL{(w, (v::A)::\Gamma) :: G} = (\Omega, (v:::A@w) :: \Delta, w)$.
+
+\item $G |- (w, \Gamma) |-_\tHyb \bbox {w_0} {M_0} ::: [*]A$\\
+$M' = \bbox{w_0}{(\funHybtoL{M_0})}$; for it to type we require that both $w \in \Omega$ and ${w_0 :: \Omega; \Delta|-_\tL \funHybtoL{M_0} ::: A}$ hold. The first condition was covered in $\hyp v$ case, the second is just as simple -- we have $(w, \Gamma) :: G |- (w_0, \nnil) |-_\tHyb M_0 ::: A$, so we only have to check that indeed $\funHybtoL{(w_0, \nnil) :: (w, \Gamma) :: G} = (w_0::\Omega, \Delta, w)$. Then by induction hypothesis $\funHybtoL{M_0}$ is typing.
+
+\item $(w', \Gamma') :: G |- (w, \Gamma) |-_\tHyb \gethere{w'}{M_0} ::: <*>A$\\
+In this case $M' = \get{w'}{(\here (\funHybtoL{M_0}))}$. We also know that ${(w, \Gamma):: G |- (w', \Gamma') |-_\tHyb M_0 ::: A}$. Next, by induction hypothesis we have: $\Omega; \Delta |-_\tL \funHybtoL{M_0} ::: A @ w'$ -- this in turn allows to conclude that $\Omega; \Delta |-_\tL \here (\funHybtoL{M_0}) ::: <*>A @ w'$. Finally, we can show that $w \in \Omega$, and therefore $\Omega; \Delta |-_\tL M' ::: <*>A @w$.
+\end{itemize}
+\end{proof}
+\end{theorem}
+
+\begin{theorem}[Value Preservation] \em
+For all $M \in \teHyb{}$, if $\val[\tHyb]{M}$ then $\val[\tL]{\funHybtoL{M}}$.
+\begin{proof}
+Case analysis on values from \langHyb{}. Compare the values from \langHyb{} with the ones from \langL{}:\\
+
+\begin{tabular}{ l l }
+$\val[\tHyb]{\lam A v M}$ &
+$\val[\tL]{\lam A v M}$\\
+$\val[\tHyb]{\bbox {w_0} M}$ &
+$\val[\tL]{\bbox {w_0} M}$\\
+if ${\val [\tHyb] M}$ &
+if ${\val [\tL] M}$ \\
+~~~then ${\val [\tHyb] {\gethere w M}}$ &
+~~~then ${\val [\tL] {\get w (\here M)}}$
+\end{tabular}\\
+
+It is straightforward to notice that $\funHybtoLe{}$ preserves values.
+\end{proof}
+\end{theorem}
+
+
+\begin{theorem}[Reduction Preservation]\em
+Assume that $M |->_w M'$ in \langHyb{} and let $\funHybtoL{M} = N$, $\funHybtoL{M'} = N'$. Then $N |->*_w N'$ in \langL{}.
+\begin{proof}
+Simple induction on reduction $M|->_w M'$. Note that in most cases, $|->*$ relation is being interpreted as one-step reduction -- with the exceptions of \unboxfetche{}, \getheree{} and \letdiagete{}, where two steps may be required.
+\end{proof}
+\end{theorem}
+
+This concludes the translation from \langHyb{} to \langL{}.
+
+
+
+\section{From \langHyb{} to \langLF{}}
+
+Translation from \langHyb{} to \langLF{} is by far the simplest of all -- we just remove world names from both the environment and terms. Again, we want to preserve types, values, and reductions. The complete transformation is given below:
+
+\begin{align*}
+&\funHybtoLF{(w, \Gamma) :: G} = ((\map{\snd{}}{G}), \Gamma) \\
+&\funHybtoLF{M_0} := \match{M_0} \\
+&~~~|~ \hyp[\tHyb] v => \hyp [\tLF] v\\
+&~~~|~ \lam [\tHyb] v A M => \lam [\tLF] v A (\funHybtoLFe{M}) \\
+&~~~|~ \appl [\tHyb] M N => \appl [\tLF] {(\funHybtoLFe{M})} {(\funHybtoLFe{N})}\\
+&~~~|~ \bbox [\tHyb] {w_0} {M} => \bboxe_{\tLF} \ (\funHybtoLFe M) \\
+&~~~|~ \unboxfetch [\tHyb] w M => \unbox [\tLF] (\funHybtoLFe M) \\
+&~~~|~ \gethere [\tHyb] w M => \here [\tLF] (\funHybtoLFe M) \\
+&~~~|~ \letdiaget [\tHyb] w v {w_0} M N => \\
+&~~~~~~~~\letdia [\tLF] {v} {} {\funHybtoLFe M} {(\funHybtoLFe N)}
+\end{align*}
+
+Again, the context transformation preserves variable uniqueness.\\
+
+The term substitution lemma and a variant of world substitution lemma are both given below.
+
+\begin{lemma}
+$\substt{\funHybtoLF{M}}{v}{(\funHybtoLF{N})} = \funHybtoLF{\substt{M}{v}{N}}$.
+\begin{proof}
+Simple induction over $N$.
+\end{proof}
+\end{lemma}
+
+Note that there are no world names in \langLF{}, therefore world substitution does not change the end result of \funHybtoLFe{}:
+\begin{lemma}
+$\funHybtoLF{N} = \funHybtoLF{\substw{w}{w'}{N}}$.
+\begin{proof}
+Simple induction over $N$.
+\end{proof}
+\end{lemma}
+
+Similarly to previous case, we are interested in preservation of types, values and reductions -- this time, single-step ones.
+
+\begin{theorem}[Typing Preservation] \em
+Let $M' = \funHybtoLF{M}$; then from $G |- (w, \Gamma) |-_\tHyb M ::: A$, we can conclude that $(\map{\snd{}}{G}) |- \Gamma |-_\tLF M' ::: A$.
+\begin{proof}
+Induction on type derivation for $M$. 
+\end{proof}
+\end{theorem}
+
+\begin{theorem}[Value Preservation] \em
+For all $M \in \teHyb{}$, if $\val[\tHyb]{M}$ then $\val[\tLF]{\funHybtoLF{M}}$.
+\begin{proof}
+Again, comparing values in \langHyb{} and in \langLF{} allows us to justify this theorem:\\
+
+\begin{tabular}{ l l }
+$\val[\tHyb]{\lam A v M}$ &
+$\val[\tLF]{\lam A v M}$\\
+$\val[\tHyb]{\bbox {w_0} M}$ &
+$\val[\tLF]{\bbox M}$\\
+if ${\val [\tHyb] M}$ &
+if ${\val [\tLF] M}$ \\
+~~~then ${\val [\tHyb] {\gethere w M}}$ &
+~~~then ${\val [\tLF] {\gethere M}}$
+\end{tabular}\\
+\end{proof}
+\end{theorem}
+
+\begin{theorem}[Reduction Preservation]\em
+Assume that $M |->_w M'$ in \langHyb{} and let $\funHybtoLF{M} = N$, $\funHybtoLF{M'} = N'$. Then $N |-> N'$ in \langLF{}.
+\begin{proof}
+Simple induction on $M |->_{\tHyb} M'$ using substitution lemmas mentioned above.
+\end{proof}
+\end{theorem}
+
+
+
+\section{From \langL{} to \langHyb{}}
+
+The next two translations are incomplete -- we can show that typing is preserved, that values match in a certain sense, but not that reductions behave the way we would expect them to. We will briefly discuss the encountered problems, but first let us describe the actual transformations from \langL{} to \langHyb{}.\\
+
+Rewriting contexts between these two languages can be seen simply as bucket-sorting. For each context from $\Omega$, we extract its assumptions from $\Gamma$. The world marked as current and its corresponding context will be used as the current context in \langHyb{}, whereas the rest will be in the background. Note that we require the current context to be known in $\Omega$ for this procedure to return a correct result.\\
+
+Translation for terms is mostly straightforward, with two interesting cases: fetch and get operators. We do not have those in \langHyb{} -- instead we allow \unboxfetche{}, \getheree{} and \letdiagete{} to possibly change worlds. This forces us to use a more complicated rewrite, where we aim at finding a term with adequate conclusions and premises in its typing rules.\\
+
+Compare \getr{} rule with its simulation in \langHyb{}:\\
+
+\footnotesize
+\begin{tabular}{ l }
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Omega; \Gamma |-_\tL M ::: <*> A @ w$}
+\AxiomC{$w' \in \Omega$}
+\BinaryInfC{$\Omega; \Gamma |-_\tL \get w M ::: <*> A @ w'$}
+\DisplayProof
+\\[1cm]
+
+\AxiomC{$\mathcal D'$}
+	\noLine
+\UnaryInfC{$(w', \Gamma') :: G |- (w, \Gamma) |-_\tHyb M ::: <*>A$}
+\AxiomC{$\mathcal E$}
+	\noLine
+\UnaryInfC{$(w'', [v:::A] )::(w, \Gamma) :: G |- (w', \Gamma') |- N::: <*> A$}
+\BinaryInfC{$(w, \Gamma) :: G |- (w', \Gamma') |-_\tHyb \letdiaget{w}{v} {w''} {M}{N} ::: <*> A$}
+\DisplayProof\\[1cm]
+\normalsize
+
+where $N = \gethere{w''}{(\hyp{v})}$ and $\mathcal E$ is the following:\\[0.5cm]
+\footnotesize
+\AxiomC{$ v:::A \in [v:::A]$}
+\UnaryInfC{$(w', \Gamma')::(w, \Gamma) :: G |- (w'', [v::A]) |-_\tHyb \hyp{v} :: A$}
+\UnaryInfC{$(w'', [v:::A] )::(w, \Gamma) :: G |- (w', \Gamma') |-_\tHyb \gethere{w''}{(\hyp{v})}::: <*> A$}
+\DisplayProof\\[1cm]
+\end{tabular}\\
+\normalsize
+
+So for a fresh $v$ and $w''$, $\get[\tL]{w}{M_{\tL}}$ will be transformed into\\
+$\letdiaget[\tHyb]{w}{v}{w''}{M_{\tHyb}}{(\gethere[\tHyb]{w''}{(\hyp[\tHyb]{v})})}$.\\
+
+Similarly, for \fetche{}:\\
+
+\footnotesize
+\begin{tabular}{ @{} c }
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Omega; \Gamma |-_\tL M ::: [*]A @ w$}
+\AxiomC{$w' \in \Omega$}
+\BinaryInfC{$\Omega; \Gamma |-_\tL \fetch w M ::: [*] A @ w'$}
+\DisplayProof\\[1cm]
+
+\AxiomC{$\mathcal D'$}
+	\noLine
+\UnaryInfC{$(w', \Gamma') ::G |- (w, \Gamma) |-_\tHyb M ::: [*]A$}
+\UnaryInfC{$(w, \Gamma) :: (w', \Gamma') :: G |-  (w_0, \nnil)  |-_\tHyb \unboxfetch w M ::: A$}
+\AxiomC{$\fresh {w_0}$}
+\BinaryInfC{$(w, \Gamma) :: G |-  (w', \Gamma') |-_\tHyb \bbox {w_0} {\unboxfetch w M} ::: [*]A$}
+\DisplayProof\\[1cm]
+\end{tabular}
+\normalsize
+
+For technical reasons, explained in full detail in Appendix \ref{appendix:coq}, we actually chose 
+an alternative rewrite for \fetche{}:\\
+
+\footnotesize
+\begin{tabular}{ @{} l }
+\AxiomC{$\mathcal D'$}
+	\noLine
+\UnaryInfC{$(w', \Gamma') :: G |- (w, \Gamma) |-_\tHyb M ::: [*]A$}
+\UnaryInfC{$(w', \Gamma') :: G |- (w, \Gamma) |-_\tHyb \gethere w M ::: <*>[*]A$}
+\AxiomC{$\mathcal E$}
+\BinaryInfC{$(w, \Gamma) :: G |- w', \Gamma' |-_\tHyb \letdiaget {w}{v}{w''}{\gethere w M} {N} ::: [*]A$}
+\DisplayProof\\[1cm]
+\normalsize
+where $N = \bbox{w_0}{(\unboxfetch{w''}{(\hyp{v})})}$ and $\mathcal E$ is the following:\\[0.5cm]
+\footnotesize
+\AxiomC{$ v:::A \in [v:::A]$}
+\UnaryInfC{$(w_0, \nnil) :: (w', \Gamma')::(w, \Gamma) :: G |- (w'', [v::[*]A])  |-_\tHyb \hyp v :: [*]A$}
+\UnaryInfC{$(w'', [v:::[*]A]) :: (w', \Gamma')::(w, \Gamma) :: G |- (w_0, \nnil) |-_\tHyb \unboxfetch{w''}{(\hyp v)} :: A$}
+\UnaryInfC{$(w'', [v:::[*]A] )::(w, \Gamma) :: G |- (w', \Gamma') |-_\tHyb \bbox{w_0}{(\unboxfetch {w''} {(\hyp{v})})} ::: [*] A$}
+\DisplayProof\\[1cm]
+\end{tabular}\\
+\normalsize
+
+Another important difference between \langL{} and \langHyb{} is noticeable when comparing \unboxe{} with its equivalent, the in-place \unboxfetche{}. The latter explicitly puts the name of the current world in the term, while the former does not. It enforces the function LtoHyb to take the current world as a parameter.\\
+
+\begin{tabular} { @{} l }
+$\funLtoHyb{M_0} {w} := \match{M_0} $\\
+$~~~|~ \hyp[\tL]{v} => \hyp[\tHyb] v$\\
+$~~~|~ \lam[\tL]{v}{A}{M} => \lam[\tHyb]{v}{A}(\funLtoHyb{M}{w}) $\\
+$~~~|~ \appl[\tL]{M}{N} => \appl[\tHyb]{(\funLtoHyb{M}{w})} {(\funLtoHyb{N}{w})}$\\
+$~~~|~ \bbox[\tL]{w_0}{M} => \bbox[\tHyb]{w_0}(\funLtoHyb{M}{w_0}) $\\
+$~~~|~ \unbox[\tL]{M} => \unbox[\tHyb](\funLtoHyb{M}{w}) $\\
+$~~~|~ \here[\tL]{M} => \here[\tHyb](\funLtoHyb{M}{w}) $\\
+$~~~|~ \letdia[\tL]{v}{w_0}{M}{N} => $\\
+$~~~~~~~~~\letdiaget[\tHyb]{w}{v}{w_0}{\funLtoHyb{M}{w}}{(\funLtoHyb{N}{w})}$\\
+$~~~|~ \fetch[\tL]{w'}{M} => $\\
+~~~~~~~~ let  $w_0 := $ freshWorld in\\
+~~~~~ ~~~let  $w'' := $ freshWorld in\\
+~~~~~~~~ let  $v := $ freshVar in\\
+~~~~~~~~ let  $N := \bbox[\tHyb]{w_0}{(\unboxfetch {w''} {(\hyp{v})})}$in\\
+$~~~~~~~~~ \letdiaget[\tHyb]{w'}{v}{w''} {\gethere[\tHyb]{w'}{(\funLtoHyb{M}{w'})}} {N} $\\
+$~~~|~ \get[\tL]{w'}{M} => $\\
+~~~~~~~~ let  $w'' := $ freshWorld in\\
+~~~~~~~~ let  $v := $ freshVar in\\
+$~~~~~~~~~ \letdiaget[\tHyb]{w'}{v}{w''}{\funLtoHyb{M}{w'}}{}$\\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${(\gethere[\tHyb]{w''}{(\hyp{v})})}$ 
+\end{tabular}\\
+
+Another difficulty arising from the use of worlds in \funLtoHybe{} function for terms is not as easy to solve as the \unboxe{} vs \unboxfetche{} case: our function does not preserve term substitution the way we might want it to.\\
+
+For reduction preservation (e.g. $\beta$-reduction case) we need to have the following property:\\
+ $\funLtoHyb{\substt{M}{v}{N}}{w} = \substt{\funLtoHyb{M}{w}}{v}{(\funLtoHyb{N}{w})}$.\\
+The problem with this equality is clear when considering translation of term $\bbox[\tL]{w_0}{N}$:\\
+
+\begin{tabular}{ l }
+$\funLtoHyb{{\substt{M}{v}{(\bbox[\tL]{w_0}{N})}}}{w} = $ \\[0.1cm]
+$\funLtoHyb{\bbox[\tL]{w_0}{\substt{M}{v}{N}}}{w} = $ \\[0.1cm]
+$\bbox[\tHyb]{w_0}{(\funLtoHyb{\substt{M}{v}{N}}{w_0})}$ \\[0.5cm]
+\end{tabular}\\
+\begin{tabular}{ l }
+$\substt{\funLtoHyb{M}{w}}{v}{(\funLtoHyb{\bbox[\tL]{w_0}{N}}{w})} = $\\[0.2cm]
+$\substt{\funLtoHyb{M}{w}}{v}{(\bbox[\tHyb]{w_0}{(\funLtoHyb{N}{w_0})})} = $\\[0.2cm]
+$\bbox[\tHyb]{w_0}{(\substt{\funLtoHyb{M}{w}}{v}{{(\funLtoHyb{N}{w_0})}})}$\\[0.5cm]
+\end{tabular}\\
+
+Note the term under \bboxe{} is $\funLtoHyb{\substt{M}{v}{N}}{w_0}$ in the first equation and $\substt{\funLtoHyb{M}{w}}{v}{{(\funLtoHyb{N}{w_0})}}$ in the second. The property we have mentioned above cannot guarantee these two to be equal -- not without additional assumption that for any $w$, $w'$, $\funLtoHyb{M}{w} = \funLtoHyb{M}{w'}$. We will call terms with such property $w$-stable. This stability requirement enforces in particular that $M$ is not of the form \unbox{M'}, \letdia{v}{w}{M'}{N'} or \here{M'}. For that reason we cannot prove any more than the following lemma for general term substitution:
+
+\begin{lemma}\em
+If $C$ is $w$-stable term from \langL{}, then for any $M$, $v$, $w$ it is the case that 
+$$\funLtoHyb{\substt{C}{v}{N}}{w} = \substt{\funLtoHyb{C}{w}}{v}{(\funLtoHyb{N}{w})}$$
+\begin{proof}
+By induction on N.
+\end{proof}
+\end{lemma}
+
+For worlds renaming there are no such problems, therefore we have the following lemma:
+
+\begin{lemma}\em
+For any worlds $w_0, w_1, w$ and any term $N \in \teL$:
+$$\funLtoHyb{\substw{w_0}{w_1}{N}}{\substw{w_0}{w_1}{w}} = \substw{w_0}{w_1}{\funLtoHyb{N}{w}}$$
+\begin{proof}
+By induction on N.
+\end{proof}
+\end{lemma}
+
+As with all the other translations, we would like to prove type, value and reduction preservation. The first of those is standard:
+
+\begin{theorem}[Type preservation]\em
+Let $\funLtoHyb{\Omega}{\Gamma, w} = (G, \Delta, w)$. Assuming $\Omega; \Gamma |-_\tL M ::: A @ w$, let us denote $\funLtoHyb{M}{w}$ as $N$.\\
+Then ${G |- (w, \Delta) |-_\tHyb N ::: A}$.
+\begin{proof}
+By induction on type derivation for $M$.
+\begin{itemize}
+\item \hyp{v} case requires that translation of contexts is proper, that is if ${(v ::: A @ w) \in \Gamma}$ then ${(v:::A) \in \Delta}$ when $\Delta$ is the context named $w$, extracted from $\Gamma$;
+\item \fetch{w'}{M} and \get{w'}{M} cases were covered in the proof trees at the beginning of this section;
+\item the rest of the cases follow directly from induction hypothesis.
+\end{itemize}
+\end{proof}
+\end{theorem}
+
+Next, value preservation ensures that every value is translated to a terminating term -- that is, either to a value or to something reducible to a value in a finite number of reduction steps.
+
+\begin{theorem}[Value preservation]\em
+For all $M \in \teL{}$, if $\val[\tL]{M}$,\\
+${M' = \funLtoHyb{M}{w}}$; then $\exists V, M' *|->*_w V \wedge \val[\tHyb]V$.
+\begin{proof}
+Induction on $\val[\tL]{M}$. Compare values in these two languages:\\
+
+\begin{tabular}{ l l }
+$\val[\tL]{\lam A v M}$&
+$\val[\tHyb]{\lam A v M}$ \\
+$\val[\tL]{\bbox {w_0} M}$&
+$\val[\tHyb]{\bbox {w_0} M}$ \\
+if ${\val [\tL] M}$ &
+if ${\val [\tHyb] M}$ \\
+~~~then ${\val [\tL] {\get w (\here M)}}$&
+~~~then ${\val [\tHyb] {\gethere w M}}$
+\end{tabular}\\
+
+For $\lam{A}{v}{M}$ and $\bbox{w_0}{M}$ it is straightforward that values are preserved ($V = M'$). For $\get w' (\here M)$ we need a couple of reductions to reach the value -- that is due to the way we rewrite $\gete{}$.\\ 
+
+Let $v$ and $w_f$ be fresh variable and world, respectively. Then:\\[0.1cm]
+$\funLtoHyb{\get w' (\here M)}{w} = $\\[0.1cm]
+$\letdiaget{w'}{v}{w_f}{\funLtoHyb{\here M}{w'}}{(\gethere {w_f}{(\hyp{v})})} = $\\[0.1cm]
+$\letdiaget{w'}{v}{w_f}{\gethere {w'} {(\funLtoHyb{M}{w'})}}{}$\\[0.1cm]
+$~~~~~~~~~~~~~~~~~~~~~~{(\gethere {w_f}{(\hyp{v})})}$. \\
+
+We know that $\val[\tL]{M}$ holds and from induction hypothesis we can find $V$ such that \val[\tHyb]{V} and $\funLtoHyb{M}{w'} *|->* V$.\\
+Therefore $\gethere {w'} {(\funLtoHyb{M}{w'})} *|->*_{w'} \gethere{w'}{V}$. This is also a value, by definition from \langHyb{}. Finally:\\[0.1cm]
+$\letdiaget{w'}{v}{w_f}{\gethere{w'}{(\funLtoHyb{M}{w'})}}{}$\\[0.1cm]
+$~~~~~~~~~~~~~~~~~~~~~~{(\gethere{w_f}{(\hyp{v}))}} *|->*_w $\\[0.1cm]
+$\letdiaget{w'}{v}{w_f}{\gethere{w'} V}{(\gethere {w_f}{(\hyp{v})})} |->_w $\\[0.1cm]
+$\substt{\gethere{w'}{V}}{v}{(\substw{w'}{w_f}{(\gethere {w_f}{(\hyp{v})})})} =$\\[0.1cm]
+$\substt{\gethere{w'}{V}}{v}{(\gethere{w'}{(\hyp{v})})} = $\\[0.1cm]
+$\gethere{w'}{(\gethere{w'}{V})} $.\\[0.1cm]
+This indeed is a value.
+\end{proof}
+\end{theorem}
+
+Finally, a remark on reduction preservation. As we have mentioned, the term substitution lemma is not as strong as we wanted, which in turn causes problems for example in the $\beta$-reduction preservation. We cannot show any form of reduction preservation using $\funLtoHyb{M}{w}$.\\
+However, we can define a relation that mimics behavior of this function, except it is defined only between pairs of terms: $\relLtoHyb {M_{\tL}}{M_{\tHyb}}$. For terms like \unboxe{} or \heree{}, this relation accepts any world ($\relLtoHyb{M}{M'} ---> \forall w, \relLtoHyb{\unbox{M}}{\unboxfetch{w}{M'}}$. For \relLtoHyb{M}{N} we can try to prove some variants of reduction preservation property:
+
+\begin{theorem}[Reduction preservation]\em
+For any pair of terms $M, M'$ that do not contain \fetche{} or \gete{} and such that $M |->_w M'$, we can find $N$ and $N'$ such that $\relLtoHyb{M}{N}$ and $\relLtoHyb{M'}{N'}$  and that $N |->_w N'$.
+\begin{proof}
+Simple induction on reduction step $M |->_w M'$.
+\end{proof}
+\end{theorem}
+
+An attempt to extend such theorem with terms containing \gete{} will require a weaker conclusion: If $M |->M'$ then there exists $N, N', N''$ such that $\relLtoHyb{M}{N}$, $\relLtoHyb{M'}{N'}$ and $ N *|->* N''$, $N' *|->*N''$. This change is a result of the variant of value preservation that we have. \\
+
+Another extension is allowing \fetche{} in the term from \langL{}. The reason for \fetche{} to be problematic is the case $\fetch{w'}{M}$ with $\val{M}$. 
+In \langL{} we reduce such term to $M$. After translation to \langHyb{}, we obtain a term that in many steps reduces also to a value -- but a different one: $\bbox{w_0}{(\unboxfetch{w'}{M'})}$ where $\relLtoHyb M M'$. As this latter term is in fact $\eta$-expansion of $M'$, we can try to adapt the theorem to accept also such reductions as connected.
+
+\section{From \langLF{} to \langHyb{}}
+
+Finally, we want to talk about transition from \langLF{} to \langHyb{}. It is by far the most complicated of the four presented here -- 
+this is due to the fact that in order to create a correct term in \langHyb{} in some cases we have to look at fragments of proof trees from \langLF{} -- e.g. to know if \unbox[\tLF]{M} was local or did it change the current context. \\
+
+We will begin as usual, by context transformation.\\
+
+Suppose we have a multi-context environment $G$ from \langLF{} that is correct (i.e. no variable is repeated). Let us take another multi-context environment $G'$, this time from \langHyb{}. We will say that $G'$ is compatible with $G$ when there are no repeated worlds in $G'$ and $G ~=~ \map{\snd{}}{G'}$ -- that is $G$ is a permutation of contexts\footnote{Not only can contexts occur in a different order, but assumptions can be shuffled within the context} from $G'$, but without the names.\\
+It is easy to see that any function assigning name to each context $\Gamma \in G$ without repeating these names, creates a compatible context.\\
+
+Next, how do we rewrite the terms? There are three problematic cases: \unboxe{}, \heree{} and \letdiae{}. Their counterparts from \langHyb{} explicitly name the world that has been exchanged with the current one or use the name of current world to express no change. We therefore need a way of differentiating between these two rules in \langLF{} -- one exchanging worlds and the other leaving them as-is --  when creating translation \funLFtoHyb{}: \\
+
+\footnotesize
+\begin{tabular} {@{} l r  }
+\inference[]{G |=\Gamma |-_\tLF M ::: [*]A}
+				 {G|= \Gamma |-_\tLF \unbox M ::: A} &
+\inference[]{\Gamma' :: G |= \Gamma |-_\tLF M ::: [*]A}
+			      {\Gamma :: G |= \Gamma' |-_\tLF \unbox M ::: A}\\
+\end{tabular}\\
+\normalsize
+
+This means that the transformation will only work on terms that have a type. Note that it was not the case in any of the previous translations. Not only do we require $M \in \teLF{}$ to typecheck in order to produce its equivalent from $\langHyb{}$, we also need to look at the details of the proof to make such translation. \\
+
+Let us look at how we want \funLFtoHyb{} to work. In all cases assume:
+\begin{description}
+\item $G_{\tLF} ~=~ \map{\snd{}}{G_{\tHyb}}$,
+\item $w$ is  a name of context $\Gamma$, $w'$ is a name of context $\Gamma'$ etc.,
+\item $w_0$ is always a fresh world variable,
+\item $M_{\tHyb}$ is the equivalent of $M_{\tLF}$ in all the induction hypotheses, same for $N_{\tLF}$ and $N_{\tHyb}$.
+\end{description}
+
+\begin{tabular}{ @{} l l }
+Proof tree in \langLF{} & Result from \langHyb{}\\[0.1cm]
+\hline \\
+
+\footnotesize
+\AxiomC{$(v:::A) \in \Gamma$}
+\UnaryInfC{$G_{\tLF} |- \Gamma  |- \hyp[\tLF]{v} ::: A$}
+\DisplayProof
+&
+$\hyp[\tHyb]{v}$
+\\[0.8cm]
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-(v:::A) :: \Gamma |- M_{\tLF} ::: B$}
+\UnaryInfC{$G_{\tLF} |- \Gamma |- \lam[\tLF]{v}{A}{M_{\tLF}} ::: A ---> B$}
+\DisplayProof
+&
+$\lam[\tHyb]{v}{A}{M_{\tHyb}}$
+\\[0.8cm]
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-\Gamma |- M_{\tLF} ::: A ---> B$}
+\AxiomC{$\mathcal E$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-\Gamma |- N_{\tLF} ::: A$}
+\BinaryInfC{$G_{\tLF} |- \Gamma |- \appl[\tLF]{M_{\tLF}}{N_{\tLF}} ::: A ---> B$}
+\DisplayProof
+&
+$\appl[\tHyb]{M_{\tHyb}}{N_{\tHyb}}$
+
+\end{tabular}\\
+\begin{center}
+\begin{tabular}{ @{} l l }
+Proof tree in \langLF{} & Result from \langHyb{}\\[0.1cm]
+\hline \\
+
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Gamma :: G_{\tLF} |- \nnil{} |- M_{\tLF} ::: A$}
+\UnaryInfC{$G_{\tLF} |- \Gamma |- \bbox[\tLF]{}{M_{\tLF}} ::: [*]A$}
+\DisplayProof
+&
+$\bbox[\tHyb]{w_0}{M_{\tHyb}}$
+\\[0.8cm]
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-\Gamma |- M_{\tLF} ::: [*]A$}
+\UnaryInfC{$G_{\tLF} |-\Gamma |- \unbox[\tLF]{M_{\tLF}} ::: A$}
+\DisplayProof
+&
+$\unboxfetch[\tHyb]{w}{M_{\tHyb}}$
+\\[0.8cm]
+
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Gamma::G_{\tLF} |-\Gamma' |- M_{\tLF} ::: [*]A$}
+\UnaryInfC{$\Gamma'::G_{\tLF} |-\Gamma |- \unbox[\tLF]{M_{\tLF}} ::: A$}
+\DisplayProof
+&
+$\unboxfetch[\tHyb]{w'}{M_{\tHyb}}$
+\\[0.8cm]
+
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-\Gamma |- M_{\tLF} ::: A$}
+\UnaryInfC{$G_{\tLF} |-\Gamma |- \here[\tLF]{M_{\tLF}} ::: <*>A$}
+\DisplayProof
+&
+$\gethere[\tHyb]{w}{M_{\tHyb}}$
+\\[0.8cm]
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Gamma::G_{\tLF} |-\Gamma' |- M_{\tLF} ::: A$}
+\UnaryInfC{$\Gamma'::G_{\tLF} |-\Gamma |- \here[\tLF]{M_{\tLF}} ::: <*>A$}
+\DisplayProof
+&
+$\gethere[\tHyb]{w'}{M_{\tHyb}}$
+\normalsize
+\\[0.8cm]
+
+\multicolumn{2}{ l }{
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$G_{\tLF} |-\Gamma |- M_{\tLF} ::: <*>A$}
+\AxiomC{$\mathcal E$}
+	\noLine
+\UnaryInfC{$[(v:::A)] :: G_{\tLF} |-\Gamma |- N_{\tLF} ::: B$}
+\BinaryInfC{$G_{\tLF} |-\Gamma |- \letdia[\tLF]{}{v}{}{M_{\tLF}}{N_{\tLF}} ::: <*>A$}
+\DisplayProof ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\normalsize}\\[0.6cm]
+\multicolumn{2}{ r }{$\letdiaget[\tHyb]{w}{v}{w_0}{M_{\tHyb}}{N_{\tHyb}}$} \\[0.8cm]
+
+\multicolumn{2}{ l }{
+\footnotesize
+\AxiomC{$\mathcal D$}
+	\noLine
+\UnaryInfC{$\Gamma :: G_{\tLF} |-\Gamma' |- M_{\tLF} ::: <*>A$}
+\AxiomC{$\mathcal E$}
+	\noLine
+\UnaryInfC{$[(v:::A)] :: \Gamma'::G_{\tLF} |-\Gamma |- N_{\tLF} ::: B$}
+\BinaryInfC{$\Gamma'::G_{\tLF} |-\Gamma |- \letdia[\tLF]{v}{}{M_{\tLF}}{N_{\tLF}} ::: <*>A$}
+\DisplayProof
+\normalsize
+}\\[0.6cm]
+\multicolumn{2}{ r }{$\letdiaget[\tHyb]{w'}{v}{w_0}{M_{\tHyb}}{N_{\tHyb}}$}\\[0.5cm]
+\end{tabular}\\
+\end{center}
+
+Next we want to argue that this transformation preserves types and values.
+
+\begin{theorem}[Type preservation]\em
+Let $\Gamma :: G_{\tLF}$ be compatible with \\
+$(w, \Gamma)::G_{\tHyb}$.  Assume:
+\footnotesize
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$G_{\tLF} |- \Gamma |- M_{\tLF} ::: A$}
+\DisplayProof\\[0.5cm] \normalsize
+Then ${G_{\tHyb} |- (w, \Gamma) |- M_{\tHyb} ::: A}$ where $M_{\tHyb}$ is obtained through transformation shown above.
+\begin{proof}
+Simple induction on type derivation for $M_\tLF$.
+\end{proof}
+\end{theorem}
+
+\begin{theorem}[Value preservation]\em
+For any $M_{\tLF}$ that is a value, let $\Gamma :: G_{\tLF}$ be compatible with
+$(w, \Gamma)::G_{\tHyb}$ and assume that we have:
+\footnotesize
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$G_{\tLF} |- \Gamma |- M_{\tLF} ::: A$}
+\DisplayProof\\[0.5cm] \normalsize
+If $M_{\tHyb}$ is obtained through transformation mentioned previously, then \\
+$\val[\tHyb]{M_{\tHyb}}$.
+\begin{proof}
+Induction on $\val[\tL]{M}$. Compare values in these two languages:\\
+
+\begin{tabular}{ l l }
+$\val[\tLF]{\lam A v M}$&
+$\val[\tHyb]{\lam A v M}$ \\
+$\val[\tLF]{\bbox {} M}$&
+$\val[\tHyb]{\bbox {w_0} M}$ \\
+if ${\val [\tLF] M}$ &
+if ${\val [\tHyb] M}$ \\
+~~~then ${\val [\tLF] {\here M}}$&
+~~~then ${\val [\tHyb] {\gethere w M}}$
+\end{tabular}\\
+\end{proof}
+\end{theorem}
+
+The preservation of reductions theorem has not been formalized, but intuitively, the reductions for both languages are matching.\\
+
+\footnotesize
+\begin{tabular}{@{} l l}
+
+\langLF{}  &  \langHyb{} \\[0.1cm]
+\hline
+
+$\unbox (\bbox {} M) |-> M$  & 
+$\unboxfetch {w'} (\bbox {w_0} M) $\\
+~&
+~$|->_w \substw{w}{w_0} M$\\[0.3cm]
+
+if ${\val M}$ then&
+if ${\val M}$ then\\
+~${\letdia v {} {\here M} N |-> \substt{M}{v}{N}}$ &
+~$\letdiaget {w'} v {w_0} {\gethere {w''} M} {}$\\
+~& ~~~~~~~~~~~~~~~~~~~~~~~$N $\\
+~~~ & 
+~~~ $ |->_w \substt{M}{v_0}{\substw{w''}{w_0}{N}}$\\[0.3cm]
+
+
+$\appl {(\lam v A M)} {N} |-> \substt{N}{v}{M}$ &
+$\appl {(\lam v A M)} {N} |->_w \substt{N}{v}{M}$\\[0.3cm]
+
+if ${M |-> M'}$ then &
+if ${M |->_w M'}$ then \\
+~~~${\appl{M}{N} |->\appl{M'}{N}}$&
+~~~${\appl{M}{N} |->_w \appl{M'}{N}}$\\[0.3cm]
+
+if ${M|-> M'} $ then &
+if ${M|->_w M'} $ then \\
+~~~${\unbox M |-> \unbox M'}$&
+~${\unboxfetch w M} $\\
+~& $|->_{w'} {\unboxfetch w M'}$\\[0.3cm]
+
+
+if ${M|-> M'} $ then &
+if ${M|->_w M'}$ then \\
+~~~${\here M |-> \here M'}$&
+~~~$ {\gethere w M |->_{w'} \gethere w M'}$\\[0.3cm]
+
+if ${M|-> M'}$ then& 
+if $M|->_w M' then$ \\
+~~~$\letdia v {} M  N |->$ & 
+~~~$\letdiaget w v {w_0} M N |->_{w'} $\\
+~~~$\letdia v {} {M'} N$ &
+~~~$\letdiaget w  v {w_0} {M'} N$
+\end{tabular}\\
+\normalsize
+
+This concludes language translations between \langL{}, \langLF{} and \langHyb{}.

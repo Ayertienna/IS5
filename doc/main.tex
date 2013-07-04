@@ -1,0 +1,332 @@
+\documentclass[a4paper,12pt]{report}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+% \usepackage{txfonts} % for ::- as \Coloneq
+\usepackage{setspace}
+% \usepackage{syntax} % for nice BNFs
+\usepackage{semantic}
+\usepackage{hyperref}
+\usepackage{bussproofs}
+\usepackage{fixltx2e}
+\usepackage[utf8]{inputenc}
+\usepackage{caption}
+
+% Page style & renaming some commands
+\pagestyle{plain}
+\renewcommand\contentsname{Table of Contents}
+\renewcommand{\labelitemi}{$-$}
+
+%\renewcommand*\rmdefault{ppl}
+
+% Typing
+\mathlig{::-}{\models}
+\mathlig{|=}{\vdash} % FIXME: Properly change |= into |- at some point..
+\mathlig{|-}{\vdash}
+\mathlig{:::}{\colon}
+
+% Reduction steps
+\mathlig{|->}{\mapsto}
+\mathlig{|->*}{\overset{+}\mapsto}
+\mathlig{*|->*}{\overset{*}\mapsto}
+
+% Types
+\mathlig{<->}{\leftrightarrow}
+\mathlig{--->}{\rightarrow}
+\mathlig{<*>}{\Diamond}
+\mathlig{[*]}{\Box}
+
+% Lists
+\mathlig{::}{\colon}
+
+\mathlig{*=*}{\approx}
+\mathlig{~=~}{\cong}
+
+% Other
+% \mathlig{:=}{\mathrel{\mathop:}=} % ?
+
+% Names of logics
+\newcommand{\LL}{\mbox{$\mathcal{L}$}}
+\newcommand{\IML}{\mbox{$\mathcal{IML}$}}
+\newcommand{\IL}{\mbox{$\mathcal{IL}$}}
+\newcommand{\CML}{\mbox{$\mathcal{CML}$}}
+\newcommand{\CL}{\mbox{$\mathcal{CL}$}}
+
+\newcommand{\ND}{\mbox{$\mathcal{ND}$}}
+
+\newcommand{\LN}{LN}
+
+\newcommand{\logic}{IS5}
+\newcommand{\clogic}{S5}
+\newcommand{\mipq}{MIPQ}
+
+\newcommand{\logicL}{IS5\textsubscript{L}}
+\newcommand{\logicLF}{IS5\textsubscript{LF}}
+\newcommand{\logicHyb}{IS5\textsubscript{Hyb}}
+\newcommand{\logicSone}{S1}
+\newcommand{\logicSfour}{S4}
+\newcommand{\logicSfive}{S5}
+\newcommand{\logiciSfour}{IS4}
+\newcommand{\logiciSfive}{IS5}
+\newcommand{\logiciT}{IT}
+\newcommand{\logiciD}{ID}
+\newcommand{\logiciK}{IK}
+\newcommand{\logicT}{T}
+\newcommand{\logicD}{D}
+\newcommand{\logicK}{K}
+
+% Names of axioms
+\newcommand{\axiomK}{\textbf{K}}
+\newcommand{\axiomD}{\textbf{D}}
+\newcommand{\axiomT}{\textbf{T}}
+\newcommand{\axiomSfour}{\textbf{S4}}
+\newcommand{\axiomSfive}{\textbf{S5}}
+\newcommand{\axiomB}{\textbf{B}}
+
+% Rules
+\newcommand{\ruleMP}{\textbf{MP}}
+\newcommand{\ruleN}{\textbf{N}}
+
+% Names of the programming languages
+\newcommand{\lang}{L\textsubscript{IS5}}
+\newcommand{\langL}{L\textsubscript{IS5-L}}
+\newcommand{\langLF}{L\textsubscript{IS5-LF}}
+\newcommand{\langHyb}{L\textsubscript{IS5-Hyb}}
+\newcommand{\nodiaLangLF}{${}^ {\backslash{<*>}}\langLF{}$}
+\newcommand{\nodiaLangHyb}{${}^ {\backslash{<*>}}\langHyb{}$}
+
+% Terms as functions
+\newcommand{\bte}[1]{\underline{#1}}
+\newcommand{\fte}[1]{\overline{#1}}
+\newcommand{\bwo}[1]{\underline{#1}}
+\newcommand{\fwo}[1]{\overline{#1}}
+\newcommand{\bvar}[1]{\underline{#1}}
+\newcommand{\fvar}[1]{\overline{#1}}
+\newcommand{\varbr}[0]{\mbox{$v$}}
+\newcommand{\worldbr}[0]{\mbox{$w$}}
+
+\newcommand{\hyp}[2][]{\mbox{$\operatorname{\texttt{hyp}}_{#1} {#2}$}}
+\newcommand{\lam}[4][]{\mbox{$\lambda_{#1} (#2: #3). #4$}}
+\newcommand{\appl}[3][]{\mbox{$#2 \cdot_{#1} #3$}}
+\newcommand{\bbox}[3][]{\mbox{$\operatorname{\texttt{box}}_{#1}\ {#2}\ {#3}$}}
+\newcommand{\unbox}[2][]{\mbox{$\operatorname{\texttt{unbox}}_{#1}\ {#2}$}}
+\newcommand{\unboxfetch}[3][]{\mbox{$\operatorname{\texttt{unbox-fetch}}_{#1}\ {#2}\ {#3}$}}
+\newcommand{\fetch}[3][]{\mbox{$\operatorname{\texttt{fetch}}_{#1}\ {#2}\ {#3}$}}
+\newcommand{\here}[2][]{\mbox{$\operatorname{\texttt{here}}_{#1}\ {#2}$}}
+\newcommand{\gethere}[3][]{\mbox{$\operatorname{\texttt{get-here}}_{#1}\ {#2}\ {#3}$}}
+\newcommand{\letdia}[5][]{\mbox{$\operatorname{\texttt{letdia}}_{#1}\ {[{#2}_{#3} := #4]}\ {#5}$}}
+\newcommand{\letT}[3]{\mbox{$\operatorname{\texttt{let}}\ {[{#1} := #2]}\ {#3}$}}
+\newcommand{\letdiaget}[6][]{\mbox{$\operatorname{\texttt{letdia-get}}_{#1}\ {#2}\ {[{#3}_{#4} := #5]}\ {#6}$}}
+\newcommand{\get}[3][]{\mbox{$\operatorname{\texttt{get}}_{#1}\ {#2}\ {#3}$}}
+
+\newcommand{\lamb}[3][]{\mbox{$\lambda_{#1} #2 . #3$}}
+\newcommand{\bboxb}[2][]{\mbox{$\operatorname{\texttt{box}}_{#1} {#2}$}}
+\newcommand{\letdiab}[3][]{\mbox{$\operatorname{\texttt{letdia}}_{#1} {[#2]}{#3}$}}
+\newcommand{\letdiagetb}[5][]{\mbox{$\operatorname{\texttt{letdia-get}}_{#1} {}^{#2} {#3} {[#4]}{#5}$}}
+
+\newcommand{\shift}[1]{\mbox{${#1}^{\uparrow}$}}
+
+\newcommand{\hype}[0]{\texttt{hyp}}
+\newcommand{\bboxe}[0]{\texttt{box}}
+\newcommand{\unboxe}[0]{\texttt{unbox}}
+\newcommand{\unboxfetche}[0]{\texttt{unbox-fetch}}
+\newcommand{\fetche}[0]{\texttt{fetch}}
+\newcommand{\heree}[0]{\texttt{here}}
+\newcommand{\getheree}[0]{\texttt{get-here}}
+\newcommand{\letdiae}[0]{\texttt{letdia}}
+\newcommand{\letTe}[0]{\texttt{let}}
+\newcommand{\letdiagete}[0]{\texttt{letdia-get}}
+\newcommand{\gete}[0]{\texttt{get}}
+
+\newcommand{\hypr}[0]{\texttt{(hyp)}}
+\newcommand{\bboxr}[0]{\texttt{(box)}}
+\newcommand{\unboxr}[0]{\texttt{(unbox)}}
+\newcommand{\unboxfetchr}[0]{\texttt{(unbox-fetch)}}
+\newcommand{\fetchr}[0]{\texttt{(fetch)}}
+\newcommand{\herer}[0]{\texttt{(here)}}
+\newcommand{\getherer}[0]{\texttt{(get-here)}}
+\newcommand{\letdiar}[0]{\texttt{(letdia)}}
+\newcommand{\letdiagetr}[0]{\texttt{(letdia-get)}}
+\newcommand{\getr}[0]{\texttt{(get)}}
+\newcommand{\lamr}[0]{\texttt{(lambda)}}
+\newcommand{\applr}[0]{\texttt{(appl)}}
+
+\newcommand{\bboxrL}[0]{\mbox{$\mathtt{(box_L)}$}}
+\newcommand{\bboxrLF}[0]{\mbox{$\mathtt{(box_{LF})}$}}
+
+
+% Other language-related commands
+\newcommand{\fresh}[1]{\mbox{$\operatorname{fresh}\ {#1}$}}
+\newcommand{\val}[2][]{\mbox{$\mathrm{val}_{#1}{(#2)}$}}
+\newcommand{\substt}[3]{\mbox{$ [#1 | #2] #3$}}
+\newcommand{\substw}[3]{\mbox{$ \{#1 | #2 \} #3$}}
+\newcommand{\mergecurr}[3]{\mbox{$\{#1 \cup #2 \}_{\text{curr}} #3$}}
+\newcommand{\nnil}[0]{\mbox{$\emptyset$}}
+
+\newcommand{\map}[2]{\mbox{$\operatorname{map}\ {#1} \ {#2}$}}
+\newcommand{\concat}[1]{\mbox{$\operatorname{concat}\ {#1}$}}
+\newcommand{\flatmap}[2]{\mbox{$\operatorname{flatmap}\ {#1}\ {#2}$}}
+\newcommand{\fun}[2]{\mbox{$\operatorname{fun}{(#1)}{=>}{#2}$}}
+\newcommand{\emptyEq}[1]{\mbox{$\operatorname{emptyEquiv}{(#1)}$}}
+
+\newcommand{\fst}[0]{\mbox{$\text{fst}$}}
+\newcommand{\snd}[0]{\mbox{$\text{snd}$}}
+
+\newcommand{\prop}[1]{\mbox{${\operatorname{Prop}{#1}}$}}
+\newcommand{\false}[0]{\perp}
+
+\newcommand{\False}[0]{\texttt{false}}
+\newcommand{\True}[0]{\texttt{true}}
+
+\newcommand{\Prop}[0]{\text{Prop}}
+\newcommand{\Type}[0]{\text{Type}}
+\newcommand{\SL}[3]{\mbox{$\operatorname{SL}{#1}\ {#2}\ {#3}$}}
+
+\newcommand{\IdK}[1]{\mbox{$\operatorname{IdK}_{#1}$}}
+
+\newcommand{\annotateworlds}[2]{\mbox{$\operatorname{annotateWorlds}({#1}, {#2})$}}
+
+% Other usefull commands
+\newcommand{\ifthen}[2]{\mbox{\text{if}\ $#1$,\ \text{then}\ $#2$}}
+\newcommand{\ifthenelse}[3]{\mbox{\text{if}\ $#1$,\  \text{then}\ $#2$\  \text{else}\ $#3$}}
+\newcommand{\fixme}[1]{\textbf{FIXME: #1\\}}
+\newcommand{\match}[1]{\mbox{$\text{match }{#1}\text{ with}$}}
+\newcommand{\tlc}{\texttt{tlc}}
+\newcommand{\gatherkeys}[2]{\mbox{$\operatorname{gatherKeys}({#1}, {#2})$}}
+\newcommand{\bucketsort}[2]{\mbox{$\operatorname{bucketSort}({#1}, {#2})$}}
+
+\newcommand{\lct}[1]{\mbox{${\operatorname{LC_t} {#1}}$}}
+\newcommand{\lcw}[1]{\mbox{${\operatorname{LC_w} {#1}}$}}
+\newcommand{\lctn}[2]{\mbox{${\operatorname{LC_t}({#1}) {#2}}$}}
+\newcommand{\lcwn}[2]{\mbox{${\operatorname{LC_w}({#1}) {#2}}$}}
+
+\newcommand{\fv}[1]{\mbox{$\operatorname{FV}({#1})$}}
+\newcommand{\ok}[2][]{\mbox{$\operatorname{Ok}_{#1}{(#2)}$}}
+\newcommand{\oke}[2][]{\mbox{$\operatorname{Ok}_{#1}{#2}$}}
+
+\newcommand{\termin}[1]{\mbox{${#1}\downarrow$}}
+\newcommand{\SN}[1]{\mbox{$\operatorname{SN}{#1}$}}
+\newcommand{\Red}[2]{\mbox{$\operatorname{Red}_{#2}{#1}$}}
+\newcommand{\Q}[2]{\mbox{$\operatorname{Q}_{#2}{#1}$}}
+\newcommand{\RedK}[2]{\mbox{$\operatorname{Red}_{#2}^{K}{#1}$}}
+\newcommand{\terminh}[2]{\mbox{$({#1}, {#2})\downarrow$}}
+\newcommand{\Redh}[3]{\mbox{$\operatorname{Red}_{#2}({#1}, {#3})$}}
+
+% Suffixes
+\newcommand{\tHyb}{\text{Hyb}}
+\newcommand{\tL}{\text{L}}
+\newcommand{\tLF}{\text{LF}}
+
+% Translations between languages
+\newcommand{\funHybtoL}[1]{\mbox{${\operatorname{HybtoL}{(#1)}}$}}
+\newcommand{\funHybtoLe}[1]{\mbox{${\operatorname{HybtoL}{#1}}$}}
+\newcommand{\funHybtoLF}[1]{\mbox{$\operatorname{HybtoLF} {(#1)}$}}
+\newcommand{\funHybtoLFe}[1]{\mbox{$\operatorname{HybtoLF} {#1}$}}
+\newcommand{\funLtoHyb}[2]{\mbox{$\operatorname{LtoHyb}({#1}, {#2})$}}
+\newcommand{\funLtoHybe}[1]{\mbox{$\operatorname{LtoHyb}{#1}$}}
+\newcommand{\relLtoHyb}[2]{\mbox{$\operatorname{LtoHyb_R}({#1}, {#2})$}}
+\newcommand{\funLFtoHyb}[0]{\mbox{$\operatorname{LFtoHyb}$}}
+
+% Theorems
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem*{introtheorem}{}
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{property}{Property}[subsection]
+\newtheorem*{propertyb}{Property}
+\newtheorem*{note}{Note}
+\newtheorem*{observation}{Observation}
+\renewcommand{\qedsymbol}{}
+\newtheoremstyle{introtheoremBstyle}% name of the style to be used
+  {1mm}% measure of space to leave above the theorem. E.g.: 3pt
+  {1mm}% measure of space to leave below the theorem. E.g.: 3pt
+  {\slshape}% name of font to use in the body of the theorem
+  {6pt}% measure of space to indent
+  {\slshape}% name of head font
+  { }% punctuation between head and body
+  {1mm}% space after theorem head
+  {}% Manually specify head
+\theoremstyle{introtheoremBstyle}
+\theoremstyle{plain}
+\newtheorem{introtheoremB}{}
+
+% Terms
+\newcommand{\teL}[0]{\mbox{$\operatorname{term_\tL}$}}
+\newcommand{\teLF}[0]{\mbox{$\operatorname{term_{\tLF}}$}}
+\newcommand{\teHyb}[0]{\mbox{$\operatorname{term_{\tHyb}}$}}
+
+\begin{document}
+
+% Title page
+\newpage
+\begin{center}
+\textsc{\large Uniwersytet Wrocławski\\
+Wydział Matematyki i Informatyki\\
+Instytut Informatyki}\\
+\vspace{4cm}
+\Huge{\textbf{Intuitionistic Modal Logic \logic}}\\
+\Large{\textmd{Formalizations, Interpretation, Analysis}}\\
+\vspace{3cm}
+\textmd{\Large Agata Murawska}\\
+\vspace{3cm}
+{\large A Master's Thesis written under the supervision of\\Małgorzata Biernacka }
+\end{center}
+\vfill
+\begin{center}
+\textsc{Wrocław, May 2013}
+\end{center}
+
+% Empty second page
+\newpage
+\mbox{}
+
+% Abstract
+\newpage
+\chapter*{Abstract}
+\logic{} is an intuitionistic variant of \clogic{} modal logic,  one of the normal modal logics, with accessibility relation defined as an equivalence. In this thesis we formalize two known variants of natural deduction systems for \logic{} along with their corresponding languages. First, the syntactically pure \logicLF{} variant that does not name the modal worlds, is due to Galmiche and Sahli. The second one, \logicL{}, using world names (labels) in inference rules and in terms of its language, is due to Tom Murphy et al.\\
+
+For each of the languages accompanying these logics we prove standard properties such as progress and preservation. We show the connection between these languages via a series of type-preserving transformations of terms and contexts. Finally, we give a proof of termination for the call-by-name strategy of evaluation using logical relations method.\\
+
+The formalization of all of the above properties is done in Coq\footnote{The Coq development  is available at author's github page, \url{http://github.com/Ayertienna/IS5}.} proof assistant. In particular, the proof of termination allows -- via Curry-Howard isomorphism -- to extract the evaluator in OCaml from the proof.\\
+
+Our contributions include providing a term language \langLF{} for \logicLF{}, as well as creating an in-between logic \logicHyb{} and the corresponding language \langHyb{}, used when showing the connection between \langL{} and \langLF{}. For the former language we formalize the termination of call-by-name evaluation strategy. 
+
+% Empty fourth page
+\newpage
+\mbox{}
+
+% Acknowledgments
+\newpage
+\chapter*{Acknowledgments}
+I would like to thank my supervisor, Małgorzata Biernacka, for her support and guidance during the time when I was actively working on this thesis and for her patience during the time when I was not. Not only has she guided me towards the (happy) ending, but she has also devoted many hours to review draft versions of this thesis. I could not be more grateful for that.\\
+
+I probably would not even begin writing the code that created a base for this thesis without the help and encouragement from my friend, Filip Sieczkowski, who guided me through at the beginning, when I was considering the possible approaches to this formalization. His experience with Coq was of immense value at multiple occasions, when there were more questions than answers. I would have most certainly gone mad without his advice, especially in the early stages.\\
+
+Last but definitely not least I want to thank my partner, Krzysztof Sakwerda, who not only provided moral support throughout this year, but also had the patience to listen to my rants and raves when a proof ``just would not go through``. On numerous such occasions he would -- after listening to my approach to a problematic proof -- ask this one simple question that gave me the final idea.  At times I wondered if he understands more of my work than I do.\\[2cm]
+
+Agata Murawska
+
+% Empty sixth page
+\newpage
+\mbox{}
+
+% List of contents
+\tableofcontents
+
+% Actual thesis - split into chapters
+\include{introduction}
+\include{intuitionistic_modal_logic}
+\include{languages_description}
+\include{relations_between_languages}
+\include{termination}
+\include{summary}
+
+% Appendix with COQ implementation details
+\appendix
+\input{appendix_implementation}
+
+% Bibliography and references
+\bibliographystyle{plain}
+\bibliography{biblio}
+
+
+\end{document}

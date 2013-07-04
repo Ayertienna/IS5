@@ -1,0 +1,673 @@
+\chapter{Term languages for \logic{}} \label{chapter:lang}
+
+\begin{quote}
+\small
+In this chapter we describe syntax and operational semantics for languages corresponding to three variants of \logic{}'s \ND{} systems presented in the previous chapter. We also justify correctness of one of these languages by presenting proofs of progress and preservation.
+\end{quote}
+
+\section{Syntax}
+Keeping in mind applications mentioned in the previous chapter, we begin by describing the syntax of a prototypical programming language\footnote{When giving examples of inference rules throughout this section, we will use \langL{}, which will be formally introduced later in this chapter.} for distributed computations. This language will use \logic{} as a type system via the Curry-Howard isomorphism. This will allow us to relate proofs in \logic{} with programs in \lang{}, as mentioned previously.\\
+
+Note that as our interest lies in the properties of the formal system rather than the practicality of the language, our prototype is a $\lambda$-calculus-like language rather then, say, SML-like one. In particular, it is not intended for actual programming, but it could be enriched in various constructs like ML5, a real-life language with \logic{}-based type system(\cite{labeled}, \cite{labeledphd}, \cite{ml5}).\\
+
+\subsection{Non-modal terms}
+The specific language features we are interested concern mobility, therefore for the non-modal terms we limit ourselves to functions and variable usage -- adding pairs as interpretation for conjunction should not cause problems, other typing rules may prove more challenging -- \cite{labelfree} is a good starting point for adding them.\\
+
+Our syntax for this part is identical to the standard lambda calculus:
+\begin{description}
+\item [$\lam{v}{A}{M}$] is a unary function term, taking one argument of type $A$ and computing term $M$. Term $M$ may contain free occurrences of variable $v$, which is bound under $\lambda$.
+\item [$\appl{M}{N}$] is an application of term $M$ to $N$.
+\item [$\hyp{v}$] marks assumption of a certain variable $v$.
+\end{description}
+
+Typing rules for \lam v A M and \appl M N correspond to $--->$ introduction and elimination rules in \logic{}.
+
+\subsection{Mobile code}
+The rest of the syntax for the language of distributed computations is new -- we will start with type $[*]A$ for \emph{mobile} code of type $A$. When we say 'mobile code' we mean code that can be executed in any location in the network, regardless of its place of origin.\\
+
+Since we want to be able to run mobile code in every accessible world, we need means to move between them. This is achieved using \fetch{w}{M}, an operation explicitly moving execution from one place to another. We only want to allow mobile code to be moved in this manner. The rule \fetchr{} below captures this restriction in a type system for \langL{}, one of the languages we will describe later in this chapter:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\inference[\fetchr{}~]{w' \in \Omega & \Omega; \Gamma |- M ::: [*]A @ w}
+			      {\Omega; \Gamma |- \fetch w M ::: [*]A @ w'}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+Note that the only requirement we have apart from $M$ being of mobile type is that host $w'$ is known to us.\\
+
+We know how to move the mobile code from one world to another. What about declaring something to be mobile? This is done using \bbox{w}{M}.\\
+As we have already mentioned, mobile code can be executed anywhere. Treating this description as an actual specification, we may say that for code $M$ to be mobile, we require it to have a certain type $A$ in every accessible world. There is however a problem with such an approach.\\
+
+What is the status of shared memory? Do we have it? Do we want it? Say that we have assumption $v ::: A$ in each of known worlds. Does this mean that such assumption $\hyp{v}$ should be mobile? Probably not. One good reason is that we want to be able to expand the set of known worlds, possibly with a world that has no assumptions in its context. After such expansion (usually referred to as weakening) our once mobile code $\hyp{v}$ stops being mobile.\\
+But how do we prevent this from happening? The simplest way is to require for $M$ to have type $A$ in a fresh world, of which nothing is yet known. If we can construct a type without any assumptions, we can also do it with them. The appropriate rule in \langL{} is of the form:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\inference[\bboxr{}~]{\fresh{w_0} & w \in \Omega & w_0 :: \Omega; \Gamma |- M ::: A @ w_0}
+			     {\Omega; \Gamma |- \bbox {} M ::: [*]A @ w}
+\end{tabular}\\[0.1cm]
+\normalsize
+\end{center}
+
+Freshness of $w_0$ in this case means that $\Gamma$ does not contain any assumptions of the form $x ::: A @ {w_0}$ and that $w_0$ is not known in $\Omega$.\\
+
+Lastly, to actually execute code that is considered to be mobile, we need to be able to remove the mobility marker $[*]$. This is done using the unbox operator and corresponds to $[*]$ elimination rule. Of course, if it happens that introduction and elimination rules are used one after the other when typing a term ($\unbox (\bbox {w_0} M)$), we can simply use construction used to type $M$ in a fresh world $w_0$. It will surely be a correct proof  tree as it uses no assumptions about the current world.
+
+\subsection{Addresses}
+Dually to universally executable modal code, we can introduce remote addresses. If code $M$ has type $A$ at world $w$, then in this very world we can obtain the address of such code, which will be a term $\here M$ of type $<*>A$. The modality $<*>$ denotes address.\\
+
+In order to move a term of address type between hosts, we will need a get operator, strongly resembling fetch, but used  on addresses rather than mobile code.\\
+
+Finally, how do we use addresses? Suppose that in order to type a term $N$ we require some knowledge about code of type $A$. We do not know what this code looks like or where it can be found, only that it is somewhere within the network. We can emulate such knowledge by adding a variable $v$ of type $A$ to a freshly created host $w_0$.\\
+
+Now, once we have found some term $M$ that is of type $<*>A$, we can remove the fake fresh host.
+The operator to do so is called letdia.\\
+An example of its formalization in \langL{} would look like this:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ c }
+\inference[\letdiar{}~]
+	{\Omega; \Gamma |- M ::: <*>A @ w & \fresh w_0 &
+	w_0 :: \Omega; (v ::: A @ w_0) :: \Gamma |- N ::: B @ w}
+	{\Omega; \Gamma |- \letdia {v} {w_0} M N ::: B @ w}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+Note that we do not yet make any real substitutions - term N will still contain occurrences of variable $v$. Instead, we have knowledge of an address of $A$-typed term, thus ensuring that it will eventually be able to remove the variable $v$ and use a real value instead. If, however, we happen to be in a situation where $ M = \here {M_0}$, then intuitively we can replace $v$ with $M_0$, as it is of the right type -- $A$.
+
+
+\section{A labeled language}
+The first formalization we will look into in more details comes from \cite{labeled}. It focuses on the global state of a distributed system, as we only have one context containing all the assumptions.
+
+\subsection{Type system}
+
+We will start by giving typing rules for the system. Some of them are standard and identical as in natural deduction systems for intuitionistic logic (except using slightly different judgments), others come from new operators, i.e.: \bboxe{}, \unboxe{}, \fetche{}, \heree{}, \letdiae{} and \gete{}. The previous section provides intent for their interpretation.\\
+
+Let us review the notations used in \langL{}:
+\begin{itemize}
+\item[$\Omega$] denotes a set of known worlds -- hosts in the network
+\item[$\Gamma$] is a global context, containing assumptions of the form $v:::A @ w$. We require each assumption's name $v$ to be unique - not only within its host $w$, but globally.
+\item[$A@w$] reads ``type $A$ on host $w$``
+\end{itemize}
+
+Syntax for terms of \langL{} is summarized as:
+\begin{align*}
+M ~:=&~~ \hyp {\varbr} ~|~ \lam{\varbr{}}{\tau} M ~|~ \appl{M}{M} ~|~ \bbox{\worldbr{}} M ~|~ \unbox{} M \\
+	&|~ \fetch \worldbr{} M ~|~ \here M ~|~ \letdia \varbr{} \worldbr{} M M ~|~ \get \worldbr{} M
+\end{align*}
+where $w$ denotes worlds, $v$ denotes variables and $\tau$ denotes types (with $\iota$ denoting the base type):
+$\tau ~:=~ \iota ~|~ \tau ---> \tau ~|~ [*] \tau ~|~ <*> \tau$ .
+
+\begin{center}
+\footnotesize
+\begin{spacing}{3}
+\begin{tabular}{@{} c }
+
+\inference[\hypr{}~]{w \in \Omega & (v ::: A @ w) \in \Gamma}
+			    {\Omega; \Gamma |- \hyp{v} ::: A @ w}\\
+
+\inference[\lamr{}~]{\fresh {v_0} & \Omega; ({v_0} ::: A @ w) :: \Gamma |- M ::: B @ w}
+			    {\Omega; \Gamma |- \lam {v_0} A M ::: (A --->B) @ w}\\
+
+\inference[\applr{}~]{\Omega; \Gamma |- M ::: (A ---> B) @ w & \Omega; \Gamma |- N ::: A @ w}
+			     {\Omega; \Gamma |- \appl M N ::: B @ w}\\
+
+\inference[\bboxr{}~]{w \in \Omega & \fresh{w_0} & w_0 :: \Omega; \Gamma |- M ::: A @ w_0}
+			     {\Omega; \Gamma |- \bbox {w_0} M ::: [*]A @ w}\\
+
+\inference[\fetchr{}~]{w \in \Omega & \Omega; \Gamma |- M ::: [*]A @ w'}
+			      {\Omega; \Gamma |- \fetch {w'} M ::: [*]A @ w}~~~
+\inference[\unboxr{}~]{\Omega; \Gamma |- M ::: [*]A @ w}
+				 {\Omega; \Gamma |- \unbox M ::: A @ w}\\
+
+\inference[\herer{}~]{\Omega ; \Gamma |- M ::: A @ w}
+			     {\Omega; \Gamma |- \here M ::: <*> A @ w}~~~
+\inference[\getr{}~] {w \in \Omega & \Omega; \Gamma |- M ::: <*> A @ w'}
+ 			    {\Omega; \Gamma |- \get {w'} M ::: <*>A @ w}\\
+
+\inference[\letdiar{}~]
+	{ \Omega; \Gamma |- M ::: <*>A @ w ~~ \fresh w_0, \fresh {v} ~~ 
+	w_0 :: \Omega; (v ::: A @ w_0) :: \Gamma |- N ::: B @ w}
+	{\Omega; \Gamma |- \letdia {v}{w_0} M N ::: B @ w}
+\end{tabular}
+\end{spacing}
+\normalsize
+\end{center}
+
+\subsection{Operational semantics}
+
+We are now able to write type-correct programs in \langL{}; the next step is to assign them meaning by giving structural operational semantics to each term. There are of course expressions we consider to be final -- values. First, a function is a value as usual, since we do not know what is the given argument and therefore cannot continue evaluation. Next, $\bbox {w_0} M$ is a value, as for the mobile code we do not know what host we will run it at. Finally, for an address $\get w (\here M)$ to be a value we require that the term $M$ is a value as well. We will denote the fact that $M$ is a value by $\val{M}$ further on.\\
+
+For some of the reductions we are about to describe we will require operations we haven't mentioned before -- term substitution $\substt M v N$ and world merge $\substw w {w'} N$. They are both defined inductively on N, their interpretations are standard: $\substt M v N$ replaces each occurrence of $\hyp v$ by $M$ and $\substw w {w'} N$ replaces each occurrence of world $w'$ by world $w$, effectively merging these two into one.\\
+
+Final remark is that reduction in \langL{} is a relation not just between terms. It requires also knowledge about the current host. To see that, consider what should happen when we are evaluating a program of the form $\unbox (\bbox {w_0} M)$. We want to use (that is, unbox) mobile code we have just created ($\bbox {w_0} M$), but to do so, we need to know at what host we will evaluate $M$. We will denote reduction taking place at host $w$ as $|->_w$.\\
+
+The most interesting part of operational semantics comes from local soundness of the connectives. We begin with necessity introduction followed by its elimination case that we have used to motivate introduction of host parameter into reduction relation:
+\begin{center}
+\begin{tabular}{ c }
+$\unbox (\bbox {w_0} M) |->_{w} \substw{w}{w_0}{M}$
+\end{tabular}
+\end{center}
+
+Intuitively, this is clear -- we want to execute code that has just been made mobile, so we are simply replacing fresh name $w_0$ with the actual one -- $w$. This can be justified by the following reduction (simplification) of the proof tree:\\
+
+\footnotesize
+\begin{tabular}{@{} c c c }
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$w_0 :: \Omega; \Gamma |- M ::: A @ w_0$}
+	\LeftLabel{$[*] I$}
+	\RightLabel{$w \in \Omega,\fresh w_0$}
+\UnaryInfC{$\Omega; \Gamma |- \bbox {w_0} M :: [*]A @ w$}
+	\LeftLabel{$[*] E$}
+\UnaryInfC{$\Omega; \Gamma |- \unbox (\bbox {w_0} M) :::  A @ w$}
+\DisplayProof
+~
+$\Rightarrow_R$
+~
+\AxiomC{$\substw{w}{w_0}{\mathcal{D}}$}
+\noLine
+\UnaryInfC{$\Omega; \Gamma |- \substw{w}{w_0}{M} ::: A @ w$}
+\DisplayProof
+\end{tabular}
+\normalsize\\[0.2cm]
+
+When writing $\substw w {w_0} {\mathcal{D}}$ we mean merging $w$ with $w_0$ through all: $w_0::\Omega$, $\Gamma$, the term, and the type part.\\
+In particular for the last judgment,  we have an assumption $w \in \Omega$ and we treat $\Omega$ as a set. In addition $\substw w {w_0} \Gamma = \Gamma$, since we chose $w_0$ to be fresh - thus not known in $\Gamma$. Therefore:\\
+$\substw w {w_0} (w_0 :: \Omega; \Gamma |- M ::: A @ w_0) = \Omega; \Gamma |- \substw{w}{w_0}{M} ::: A @ w$.\\
+
+Next, let us take a closer look at local soundness of addresses:
+
+\begin{center}
+\begin{tabular}{c}
+$\letdia {v}{w_0} {\get {w'} (\here M)} N |->_w \substt{M}{v}{\substw{w'}{w_0}{N}}$\\
+\end{tabular}
+\end{center}
+
+Again, the proof tree justifies the reduction ($w_0$ and $v$ are fresh outside $\mathcal{E}$ subtree):\\
+
+\footnotesize
+\begin{tabular}{@{} c}
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$\Omega; \Gamma |- M ::: A @ w'$}
+	\LeftLabel{$<*>I$}
+\UnaryInfC{$\Omega; \Gamma |- \here M ::: <*> A @ w'$}
+\UnaryInfC{$\Omega; \Gamma |- \get {w'} (\here M) ::: <*> A @ w$}
+\AxiomC{$\mathcal{E}$}
+\noLine
+\UnaryInfC{${w_0} :: \Omega; (v ::: A@ {w_0}) :: \Gamma |- N ::: B @ w$}
+	\LeftLabel{$<*>E$}
+\BinaryInfC{$\Omega; \Gamma |- \letdia v {w_0} {\get {w'} (\here M)} N ::: B @ w$}
+\DisplayProof \\[1.3cm]
+$\Rightarrow_R$
+~
+\AxiomC{$\substt{\mathcal{D}}{v}{\substw{w'} {w_0} {\mathcal{E}}}$}
+\noLine
+\UnaryInfC{$\Omega; \Gamma |- \substt {M}{v}{\substw {w'} {w_0} N} ::: B @ w$}
+\DisplayProof
+\end{tabular}
+\normalsize
+
+We have discussed most substitutions used here in the previous case, the only new one is $\substt {\mathcal D} v {\substw {w'} {w_0} {\mathcal E}}$ --  this just means using proof tree $\mathcal D$ whenever we want to use the fact that $v$ is a variable of type $A$ in a given context.\\
+
+Next, there are compatibility rules for the new connectives:
+\begin{spacing}{1.5}
+\begin{tabular}{ l }
+$\ifthen{M|->_w M'} {\unbox M |->_w \unbox M'}$\\
+$\ifthen{M|->_{w'} M'} {\fetch {w'} M |->_{w} \fetch {w'} M'}$\\
+$\ifthen{M|->_{w'} M'} {\get {w'} M |->_{w} \get {w'} M'}$\\
+$\ifthen{M|->_w M'} {\letdia v {w_0} M  N |->_w \letdia v {w_0} {M'} N}$\\
+$\ifthen{M|->_w M'} {\here M |->_w \here M'}$
+\end{tabular}
+\end{spacing}
+
+along with two special rules for moving between hosts, that do require a comment:
+\begin{spacing}{1.5}
+\begin{tabular}{ l }
+$\ifthen{\val M} {\fetch {w'} M |->_w M}$\\
+$\ifthen{\val M} {\here M |->_w \get w (\here M)}$
+\end{tabular}
+\end{spacing}
+
+
+The rule for \heree{} operator is motivated by looking at definitions of values in \langL{}. $\get{w}{(\here M)}$ will already be a value since $M$ is a value -- thus, the purpose of this rule is to mark the end of evaluation. Instead of this rule we can add "$\ifthen {\val M} {\val{\here{M}}}$" to the set of values.\\
+The first rule also seems artificial, but note that in the \fetche{} case for any well-typed program, $M$ must be of the form \bbox{w_0}{M'} (since it is a value) - we can therefore safely skip any world merging and just choose a different host when declaring code to be mobile.\\
+
+Finally we have $\beta$-reduction and the rules expressing compatibility with respect to application:\\
+
+\begin{spacing}{1.5}
+\begin{tabular}{ l l}
+$\beta$-reduction: & $ \appl {(\lam v A M)} {N} |->_w \substt{N}{v}{M}$\\
+compatibility with application: & $ \ifthen {M |->_w M'} {\appl{M}{N} |->_w \appl{M'}{N}}$
+\end{tabular}
+\end{spacing}
+
+\section{A label-free language}
+Looking at the global state of the system, as in the previous section, is not the only possibility for environment formalization. The label-free logic \logicLF{} described in \cite{labelfree} uses a multi-contextual environment where each host has its own context. There is however no language given as an application for \logicLF{}. We fill that gap here by introducing \langLF{}.\\
+
+In this particular formalization we do not give names to the hosts at all. There is no way to distinguish between two hosts containing the same assumptions (or no assumptions at all). However, as we do require all variable names to be distinctive, only hosts with no assumptions are truly indistinguishable one from another.\\
+
+This changes interpretation a little bit, as we cannot use host names in our programs. Therefore we have no way of delegating execution to some specific host. One might think that it should be possible to use sets of assumptions true in specific hosts instead of host names, but this does not seem feasible, as these assumptions may change during execution when contexts are expanded (e.g. rule for \lam{v}{A}{M}). As a result, having only code of a program in \langLF{} does not give us enough information to tell if this program uses resources outside its host. Only a proof tree can show that information.\\
+
+We will split all contexts into the current context $\Gamma$ and the background $G$. By that we mean that computations take place in $\Gamma$ and all hosts which are connected to the current one are in $G$.\\
+
+\subsection{Type system}
+As there are no rules like \fetchr{} or \getr{} from \langL{}, we can only move between hosts upon creating or using modal-typed terms. This is why there are two ways of creating terms \heree{}, \unboxe{} and \letdiae{}. \\
+In the article\cite{labelfree} that introduces this variant of \logic{} logic the authors did not add terms at all. They did, however, use two variants of $[*]E$, $<*>I$ and $<*>E$ rules, one changing the current context into another one from the background and the other leaving it with no change. Our decision not to differentiate these two situations also at the term level was a technical one. Granted, using different terms (say, \unboxe{} and \unboxfetche{}) in these two situations would make it possible to tell -- just from the program -- if it is run locally or if it needs external resources. But there were too many complications arising from such decision; for example, when we are merging two hosts' contexts, how do we tell if some \unboxfetche{} instance should not be turned into \unbox{} after the merge? This would require looking at the entire proof tree! Therefore, we have only one term for both variants of \unboxr{} rule (same for \herer{} and \letdiar{}).\\
+
+Syntax for terms of \langLF{} is summarized as:
+\begin{align*}
+M ~:=&~~ \hyp {\varbr} ~|~ \lam{\varbr{}}{\tau} M ~|~ \appl{M}{M} ~|~ \bboxe{}\ M ~|~ \unbox{} M \\
+	&|~ \here M ~|~ \letdia {\varbr{}}{} {M} {M}
+\end{align*}
+
+\begin{center}
+\footnotesize
+\begin{spacing}{3}
+\begin{tabular}{ c }
+\inference[\hypr{}~]{(v ::: A) \in \Gamma}
+			{G |= \Gamma |- \hyp{v} ::: A}\\
+\inference[\lamr{}~]{\fresh {v_0} & G |= ({v_0} ::: A) :: \Gamma |- M ::: B}
+			    {G |= \Gamma |- \lam {v_0} A M ::: A --->B}\\
+\inference[\applr{}~]{G|= \Gamma |- M ::: A ---> B & G|= \Gamma |- N ::: A}
+			     {G|= \Gamma |- \appl M N ::: B}\\
+
+\inference[\bboxr{}~]{\Gamma :: G |= \nnil |- M ::: A}
+			     {G |= \Gamma |- \bboxe{}\ M ::: [*]A}  \\
+
+\inference[\unboxr{}~]{G |=\Gamma |- M ::: [*]A}
+				 {G|= \Gamma |- \unbox M ::: A} ~~~
+\inference[\unboxfetchr{}~]{\Gamma' :: G |= \Gamma |- M ::: [*]A}
+			      {\Gamma :: G |= \Gamma' |- \unbox M ::: A}\\
+
+\inference[\herer{}~]{G|=\Gamma |- M ::: A}
+			     {G|=\Gamma |- \here M ::: <*> A} ~~~
+\inference[\getherer{}~]{\Gamma' :: G |= \Gamma |- M ::: A}
+			     {\Gamma :: G |= \Gamma' |- \here M ::: <*> A}\\
+
+\inference[\letdiar{}~]
+	{G |= \Gamma |- M ::: <*>A  & \fresh {v_0} &
+	[v_0:::A] :: G  |= \Gamma |- N ::: B}
+	{G |=\Gamma |- \letdia {v_0} {} M N ::: B}\\
+
+\inference[\letdiagetr{}~]
+	{\Gamma :: G |= \Gamma' |- M ::: <*>A  &  \fresh {v_0} &
+	[v_0 ::: A] :: \Gamma' :: G  |= \Gamma |- N ::: B}
+	{\Gamma' :: G |=\Gamma |- \letdia {v_0} {} M N ::: B}
+\end{tabular}
+\end{spacing}
+\normalsize
+\end{center}
+
+As we can see, the rules of this language are a bit more natural; they do not use too many syntax extensions. Compare the rule for box operator in \langLF{} with similar rule in \langL{}:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{} l l }
+\inference[\bboxrLF{}~]{\Gamma :: G |= \nnil |- M ::: A}
+			     {G |= \Gamma |- \bboxe{}\ M ::: [*]A} &
+\inference[\bboxrL{}~]{w \in \Omega & \fresh{w_0} & w_0 :: \Omega; \Gamma |- M ::: A @ w_0}
+			     {\Omega; \Gamma |- \bbox {w_0} M ::: [*]A @ w}
+\end{tabular}
+\normalsize
+\end{center}
+
+We notice for example that to create a new world it is enough to just add an empty context to the environment. As there are no names, it must be fresh by definition.\\
+
+Another fact to observe is the difference between \herer{} and \getherer{} (or any other pair of constructors/destructors of the same type) and corresponding terms from \langL{}. In particular, \getherer{} is exactly a result of flattening rules \getr{} and \herer{}:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{} l l }
+\inference[\getherer{}~]{\Gamma' :: G |= \Gamma |- M ::: A}
+			     {\Gamma :: G |= \Gamma' |- \here M ::: <*> A}
+ ~
+\AxiomC{$w \in \Omega$}
+\AxiomC{$\Omega ; \Gamma |- M ::: A @ w'$}
+	\RightLabel{\herer{}}
+\UnaryInfC{$\Omega; \Gamma |- \here M ::: <*> A @ w'$}
+	\RightLabel{\getr{}}
+\BinaryInfC{$\Omega; \Gamma |- \get {w'} {(\here M)} ::: <*> A @ w$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+\end{center}
+
+\subsection{Operational semantics}
+Operational semantics for \langLF{} resembles the one for \langL{}. Values are the same: $\val{\lam v A M}$, $\val{\bboxe{}\ M}$, except there is no \gete{} operation, therefore \heree{} itself can be a value: $\ifthen {\val M} {\val{\here{M}}}$.\\
+
+Most reductions are also similar, but they do not use host name as an additional parameter.\\
+
+As per its name, label-free formalization does not use labels for contexts at any point, so there is no need to define world merging operation on terms. Soundness-motivated reduction for $[*]$ type is therefore as simple as the following:
+\begin{center}
+\begin{tabular}{ c }
+$\unbox (\bboxe{}\ M) |-> M$
+\end{tabular}\\
+\end{center}
+
+This is justified by the following proof trees -- there are two as there are two possibilities of how \unboxe{} operation looks like -- it either changes the host or it does not:\\
+
+\footnotesize
+\begin{tabular}{ l c r}
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$\Gamma :: G |= \nnil |- M ::: A$}
+	\RightLabel{$[*] I$}
+\UnaryInfC{$G |= \Gamma |- \bboxe{}\ M :: [*]A$}
+	\RightLabel{$[*] E$}
+\UnaryInfC{$G |= \Gamma |- \unbox (\bboxe{}\ M) :::  A$}
+\DisplayProof
+&
+$\Rightarrow_R$
+&
+\AxiomC{$\mergecurr{\Gamma}{\nnil}{\mathcal{D}}$}
+\noLine
+\UnaryInfC{$G |= \Gamma |- M ::: A$}
+\DisplayProof
+
+\\[1cm]
+
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$\Gamma' ::\Gamma:: G |= \nnil |- M ::: A$}
+	\LeftLabel{$[*] I$}
+\UnaryInfC{$\Gamma::G |= \Gamma' |- \bboxe{}\ M :: [*]A$}
+	\LeftLabel{$[*] E$}
+\UnaryInfC{$\Gamma':: G |= \Gamma |- \unbox (\bboxe{}\ M) :::  A$}
+\DisplayProof
+&
+$\Rightarrow_R$
+&
+\AxiomC{$\mergecurr{\Gamma}{\nnil}{\mathcal{D}}$}
+\noLine
+\UnaryInfC{$\Gamma' :: G |= \Gamma |- M ::: A$}
+\DisplayProof
+\end{tabular}\\
+\normalsize 
+
+The operation $\mergecurr{\Gamma}{\Delta}{}$ merges $\Gamma$ and $\Delta$ when $\Delta$ is the current context. So in this case it merges $\Gamma$ with $\nnil$, effectively moving $\Gamma$ to be the current context. In terms there is no distinction between moving between contexts and staying in place, so we do not have to change anything in $M$.\\
+Note that $\mergecurr{\Gamma}{\nnil}(\Gamma :: G |= \nnil |- M ::: A) = G |= \Gamma |- M ::: A$ and\\
+$\mergecurr{\Gamma}{\nnil}(\Gamma' :: \Gamma :: G |= \nnil |- M ::: A) = \Gamma' :: G |= \Gamma |- M ::: A$. \\
+
+Similarly for $<*>$ type we have:
+\begin{center}
+\begin{tabular}{ c }
+$\ifthen{\val M}{\letdia v {} {\here M} N |-> \substt{M}{v}{N}}$
+\end{tabular}\\
+\end{center}
+
+This is justified by:\\
+
+\footnotesize
+\begin{tabular}{l}
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$G |= \Gamma |- M ::: A$}
+	\LeftLabel{$<*>I$}
+\UnaryInfC{$G |= \Gamma |- \here M ::: <*> A$}
+\AxiomC{\fresh v}
+\AxiomC{$\mathcal{E}$}
+\noLine
+\UnaryInfC{$((v ::: A) :: \nnil) :: G |- \Gamma |- N ::: B$}
+	\LeftLabel{$<*>E$}
+\TrinaryInfC{$G |= \Gamma |- \letdia v {} {\here M} N ::: B @ w$}
+\DisplayProof
+\\[1.5cm]
+$\Longrightarrow_R$ ~~~
+\AxiomC{$\substt{\mathcal{D}}{v}{\mergecurr{(v, A)::\nnil}{\Gamma}{\ \mathcal{E}}}$}
+\noLine
+\UnaryInfC{$G |= \Gamma |- \substt {M}{v}{N} ::: B @ w$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+
+This is just one possible proof tree for $\letdia v {} {(\here M)} N$, as both \letdiae{} and \heree{} can exchange current context, giving a total of four combinations.\\
+
+The rest of the rules, including $\beta-$reduction and compatibility rules are as follows:\\
+
+\begin{spacing}{1.5}
+\begin{tabular}{l}
+$\appl {(\lam v A M)} {N} |-> \substt{N}{v}{M}$\\
+$\ifthen {M |-> M'} {\appl{M}{N} |->\appl{M'}{N}}$\\[0.5cm]
+$\ifthen{M|-> M'} {\unbox M |-> \unbox M'}$\\
+$\ifthen{M|-> M'} {\here M |-> \here M'}$\\
+$\ifthen{M|-> M'} {\letdia v {} M  N |->\letdia v {} {M'} N}$
+\end{tabular}
+\end{spacing}
+
+\section{A hybrid language}
+
+The third language we would like to introduce in this thesis, \langHyb{}, is a combination of both previous ones. It uses multi-contextual environment, but at the same time still uses names for hosts. It is fairly simple to turn any program written in \langHyb{} into both \langL{} and \langLF{} -- as we will see in the next chapter. In that sense it acts as a bridge between these two languages.
+
+\subsection{Type system}
+The type system for \langHyb{} is derived from the one for \langLF{}, except each context has a name. We require that variable names be unique, as well as host names.\\
+
+Syntax for terms of \langHyb{} is summarized as follows:
+\begin{align*}
+ M ~:=&~~ \hyp {\varbr} ~|~ \lam{\varbr{}}{\tau} M ~|~ \appl{M}{M} ~|~ \bbox{\worldbr{}} M ~|~ \unboxfetch \worldbr{} M \\
+	&|~ \gethere \worldbr{} M ~|~ \letdiaget{\worldbr{}}{\varbr{}}{\worldbr{}}{M}{M}
+\end{align*}
+
+\begin{center}
+\footnotesize
+\begin{spacing}{3}
+\begin{tabular}{ @{} c}
+\inference[\hypr{}~]{(v ::: A) \in \Gamma}
+			{G |= (w, \Gamma) |- \hyp{v}::: A}\\
+\inference[\lamr{}~]{\fresh {v_0} & G |= (w, (v_0 ::: A) :: \Gamma) |- M ::: B}
+			    {G |= (w, \Gamma) |- \lam {v_0} A M ::: A --->B}\\
+\inference[\applr{}~]{G|= (w, \Gamma) |- M ::: A ---> B & G|= (w, \Gamma) |- N ::: A}
+			     {G|= (w, \Gamma) |- \appl M N ::: B}\\
+\inference[\bboxr{}~]{\fresh w_0 & (w, \Gamma) :: G |=( w_0, \nnil) |- M ::: A}
+			     {G |= (w, \Gamma) |- \bbox {w_0} M ::: [*]A}\\
+\inference[\unboxr{}~]{G |=(w, \Gamma) |- M ::: [*]A}
+				 {G|= (w, \Gamma) |- \unboxfetch w M ::: A}\\
+\inference[\unboxfetchr{}~]{(w', \Gamma') :: G |= (w, \Gamma) |- M ::: [*]A}
+			      {(w, \Gamma) :: G |= (w', \Gamma') |- \unboxfetch w M ::: A}\\
+\inference[\herer{}~]{G|=(w, \Gamma) |- M ::: A}
+			     {G|=(w, \Gamma) |- \gethere w M ::: <*> A}\\
+\inference[\getherer{}~]{(w', \Gamma') ::: G |= (w, \Gamma) |- M ::: A}
+			     {(w, \Gamma) :: G |= (w', \Gamma') |- \gethere w M ::: <*> A}\\
+\end{tabular}\\[0.5cm]
+\begin{tabular}{ @{} l}
+\inference[\letdiar{}~]
+	{& & \fresh w_0, \fresh v  \\\\ G |= (w, \Gamma) |- M ::: <*>A  &
+	  (w_0, [v :: A]), G  |= (w, \Gamma) |- N ::: B} 
+	{G |=(w, \Gamma) |- \letdiaget w {v} {w_0} M N ::: B} \\[0.5cm] 
+
+\inference[\letdiagetr{}]{(w', \Gamma') :: G |= (w, \Gamma) |- M ::: <*>A & & & & \fresh w_0, \fresh v  \\\\
+	 & (w_0, [v:: A]) :: (w, \Gamma) :: G  |= (w', \Gamma') |- N ::: B}
+      {(w, \Gamma) :: G |=(w', \Gamma') |- \letdiaget w {v} {w_0} M N ::: B}
+\end{tabular}
+\end{spacing}
+
+\normalsize
+\end{center}
+
+Note that despite the fact that this type system is so similar to the one for \langLF{}, by adding host names in terms we are getting significantly more information. In \langLF{} in order to decide whether or not contexts were swapped (e.g. in unbox rules) we needed to look at the whole proof tree. In \langHyb{} however, it is enough to know the name of current host: $w$ - we can differentiate between, say, in-place \unboxfetche{} and host swapping one by simply comparing name of the current world $w$ with name used in the term \unboxfetch {w'} M. If $ w = w'$ then there was no exchange, otherwise there was one.
+
+\subsection{Operational semantics}
+Just like the typing system, the operational semantics of \langHyb{} mimics that of \langLF{} -- except making explicit use of host names.\\
+
+The set of values is defined as:\\
+
+\begin{spacing}{1.5}
+\begin{tabular}{ l }
+$\val{\lam A v M}$\\
+$\val{\bbox {w_0} M}$\\
+$\ifthen {\val M} {\val{\gethere w M}}$
+\end{tabular}\\
+\end{spacing}
+
+Note that reductions again take host name as a parameter. \\
+
+\begin{spacing}{1.5}
+\begin{tabular}{ l }
+$\appl {(\lam v A M)} {N} |->_w \substt{N}{v}{M}$\\
+$ \ifthen {M |->_w M'} {\appl{M}{N} |->_w \appl{M'}{N}}$\\[0.5cm]
+
+$\ifthen{M|->_w M'} {\unboxfetch w M |->_{w'} \unboxfetch w M'}$\\
+$\ifthen{M|->_w M'} {\gethere w M |->_{w'} \gethere w M'}$\\
+if ${M|->_w M'}$, \\[-0.2cm]
+~~~~ then $\letdiaget w v {w_0} M N |->_{w'}$ \\[-0.2cm]
+~~~~~~~~~~~~$\letdiaget w  v {w_0} {M'} N$ \\[0.5cm]
+$\unboxfetch {w'} (\bbox {w_0} M) |->_w \substw{w}{w_0} M$\\
+if ${\val M}$, \\[-0.2cm]
+~~~~ then ${\letdiaget {w'} v {w_0} {(\gethere {w''} M)} N |->_w}$\\[-0.2cm]
+~~~~~~~~~~~~${ \substt{M}{v_0}{\substw{w''}{w_0}{N}}}$
+\end{tabular}\\
+\end{spacing}
+As usual, proof trees for last two of these reduction rules look like this:
+
+\footnotesize
+\begin{tabular}{ r }
+\AxiomC{$\fresh w_0$} 
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$(w', \Gamma') ::(w, \Gamma) ::G |= w_0 :: \nnil |- M ::: A$}
+	\LeftLabel{$[*] I$}
+\BinaryInfC{$(w, \Gamma) :: G |= (w', \Gamma') |- \bbox {w_0} M :: [*]A$}
+	\LeftLabel{$[*] E$}
+\UnaryInfC{$(w', \Gamma') :: G |= (w, \Gamma) |- \unboxfetch {w'} (\bbox {w_0} M) :::  A$}
+\DisplayProof
+~~~ $\Longrightarrow_R$ \\[1 cm]
+
+\AxiomC{$\substw{w}{w_0}{\mathcal{D}}$}
+\noLine
+\UnaryInfC{$ (w', \Gamma') :: G |= (w, \Gamma) |- \substw{w}{w_0}{M} ::: A$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+
+where: $\substw{w}{w_0}{((w', \Gamma') ::(w, \Gamma) ::G |= w_0 :: \nnil |- M ::: A)} = $ \\ $
+(w', \Gamma;) :: G |= (w, \Gamma) |- \substw{w}{w_0}{M} ::: A$.\\
+
+Let $G' = (w', \Gamma') :: (w, \Gamma) :: G$, $G'' = (w'', \Gamma'') :: (w', \Gamma') :: G$  and let $\fresh v$\\
+and $\fresh{w_0}$ in $\star$ \\
+
+\footnotesize
+\begin{tabular}{ @{} r }
+\AxiomC{$\mathcal{D}$}
+\noLine
+\UnaryInfC{$G' |= (w'', \Gamma'') |- M ::: A$}
+	\LeftLabel{$<*>I$}
+\UnaryInfC{$G' |= (w', \Gamma') |- \gethere {w''} M ::: <*> A$}
+\AxiomC{$\mathcal{E}$}
+\noLine
+\UnaryInfC{$({w_0}, [v ::: A]) :: G'' |= (w, \Gamma) |- N ::: B$}
+	\LeftLabel{$<*>E$}
+	\RightLabel{$\star$}
+\BinaryInfC{$G'' |= (w, \Gamma) |- \letdiaget {w'} v {w_0} {\gethere {w''} M} N ::: B$}
+\DisplayProof
+\\[1.5cm]
+$\Rightarrow_R$~~
+\AxiomC{$\substt{\mathcal{D}}{v}{\substw{w'} {w_0} {\mathcal{E}}}$}
+\noLine
+\UnaryInfC{$G'' |- (w, \Gamma) |- \substt {M}{v}{\substw {w''} {w_0} N} ::: B$}
+\DisplayProof
+\end{tabular}\\
+\normalsize
+
+Note that just like in \langLF{} these trees are only one of several possibilities, as there are a two for $\unboxfetche{}\ (\bboxe{}\ {M})$ case and four in $\letdiae \ (\getheree{}\ {M})$.
+
+\section{Progress and preservation}
+
+Our goal in this section is to justify that the three previously introduced languages behave the way we would expect them to. One measure we can take is checking if every term that we can type starting with an empty context, is either a value or there exists an evaluation step that we can make. This is usually referred to as progress.\\
+The second property that we want to hold in a system is preservation of types. Say we have a term $M$ of certain type $A$ (again, with empty context). If this term $M$ reduces then to $M'$, then we want $M'$ to be of type $A$ as well.\\
+
+What makes preservation and progress important? Progress ensures that we can continue evaluating every valid non-value expression -- not necessarily to a value, but we will never be stuck with a computation due to a lack of reduction rules. Preservation property allows us to be certain that evaluation will not change the type.
+
+\subsection {Progress}
+We have already given an informal definition of the progress property. The formal one of course depends on the language. We will use \langL{} as an example, but in all three languages, the proof follows the same pattern and is rather straightforward.
+
+\begin{theorem}[Progress] \em
+\label{L_Progress}
+If $\Omega; \nnil |- M ::: A @ w$ then either M is a value or $\exists M', M |->_w M'$.
+\begin{proof}
+By induction on $M$:
+\begin{itemize}
+\item \hyp{v} does not type in the empty environment, so it contradicts the precondition;
+\item \lam v A M is a value;
+\item \appl M N is never a value, what it evaluates to depends on the result of induction hypothesis for $M$:\\
+ - if $M$ is a value, then (from the fact that it has a $--->$ type) it must be that $ M = \lam{v}{A} {M_0}$, and $\beta$-reduction can occur, resulting in $M' = \substt{v}{N}{M_0}$\\
+ - otherwise we have $M_0$ such that $M |->_w M_0$ and we can continue evaluation of $M$ under application, so $M' = \appl{M_0}{N}$;
+\item \bbox {w_0} M is a value;
+\item \unbox M is similar to \appl M N in that the reduction result depends on the induction hypothesis for $M$ - if it turns out to be a value -- \bbox {w_0} {M_0} expression, then we can reduce \unbox M to $\substw {w}{w_0} M_0$. Otherwise we continue evaluation under \unbox{};
+\item \here M is the same; if $M$ is a value then we reduce to \get w (\here M), otherwise continue evaluating under \heree{};
+\item \letdia v {w_0} M N follows the same pattern as \appl M N and \unbox M;
+\item \fetch w M can be reduced either to $M$ (when it is a value) or to \fetch w M' (when $M |->_w M'$);
+\item \get w M may sometimes be a value - that is, when $M$ is a value. Otherwise we continue execution under \gete{}.
+\end{itemize}
+\end{proof}
+\end{theorem}
+
+\subsection {Preservation}
+
+Again we will state it formally for \langL{}:
+\begin{introtheorem}[Preservation] \em
+If $\Omega; \nnil |- M ::: A @ w$ and $M |->_w M'$ then $\Omega; \nnil |- M' ::: A @ w$.
+\end{introtheorem}
+
+Preservation is a bit trickier to prove, we will therefore require a number of lemmas, in particular about type preservation through various substitutions -- because of reductions such as $\appl{(\lam{v}{A}{M})}{N} |->_w \substt{N}{v}{M}$ and $\unbox (\bbox {w_0} M) |->_w \substw{w}{w_0}{M}$. To prove those lemmas we will in turn require properties that allow us to extend the assumptions list or the set of known worlds while preserving the typing. We will start with these, as we will call them, weakening properties.
+
+\begin{property}[Context weakening]\em
+\label{L_WeakeningGamma}
+If $\Omega; \Gamma |- M ::: A @ w$ then for any $\Delta$ s.t. $\Delta \cap \Gamma = \emptyset$, we have $\Omega; \Gamma \cup \Delta |- M ::: A @ w$.
+\begin{proof}
+Simple induction on the type derivation for $M$. We should note here that order of assumptions in context does not matter.
+\end{proof}
+\end{property}
+
+\begin{property}[Known worlds weakening]\em
+\label{L_WeakeningOmega}
+If $\Omega; \Gamma |- M ::: A @ w$ then for any $w_0$ s.t. $w_0 \notin \Omega$, $w_0::\Omega; \Gamma |- M ::: A @ w$.
+\begin{proof}
+Simple induction on the type derivation for $M$.
+\end{proof}
+\end{property}
+
+Next, two results regarding types preserved by substitution.
+\begin{lemma}
+\label{L_SubstTPreserv}\em
+If $\Omega; (v ::: A @ w'), \Gamma |- N ::: B @ w$ and $\Omega; \nnil |- M ::: A @ w'$ then\\
+$\Omega; \Gamma |- \substt{M}{v}{N} ::: B @ w$.
+\begin{proof}
+Induction on type derivation for $N$. One interesting case is $\hyp{v'}$ when $v = v'$. We then need to show that $\Omega; \Gamma |- M ::: B @ w$. Uniqueness of variable names gives us $A =B$, $w= w'$. Then, using weakening variant from \ref{L_WeakeningGamma}, we can remove context $\Gamma$ and prove this case.\\
+Note that for \bboxe{}{} and \letdiae{} cases, simple as they are, we actually need \ref{L_WeakeningOmega} to be able to use induction hypothesis.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}
+\label{L_RenameWPreserv}\em
+If $w_0 \in \Omega$ and ${w_1}::\Omega; \Gamma |- M ::: A @ w$ then\\
+$\Omega; \substw{w_0}{w_1}{\Gamma} |- \substw{w_0}{w_1}M ::: A@(\substw{w_0}{w_1}{w})$.
+\begin{proof}
+Induction on type derivation for $M$. This proof involves a lot of careful case analysis, in particular for \fetche{} and \gete{} cases, as the host name might have changed because of this substitution.
+\end{proof}
+\end{lemma}
+
+Finally, the sketch of Preservation proof:
+
+\begin{theorem}[Preservation]
+\label{L_Preservation}\em
+If $\Omega; \nnil |- M ::: A @ w$ and $M |->_w M'$ then ${\Omega; \nnil |- M' ::: A @ w}$.
+\begin{proof}
+Induction first on type derivation for $M$, then on reduction from $M$ to $M'$.
+\begin{itemize}
+\item $\appl {(\lam v A M)} {N} |->_w \substt{N}{v}{M}$ from \ref{L_SubstTPreserv}
+\item $\unbox (\bbox {w_0} M) |->_{w} \substw{w}{w_0}{M}$ from \ref{L_RenameWPreserv}
+\item $\letdia v {w_0} {\get {w'} (\here M)} N |->_w \substt{M}{v}{\substw{w'}{w_0}{N}}$ requires both \ref{L_SubstTPreserv} and \ref{L_RenameWPreserv}, we also need to take into account that $w$ may be equal to $w'$ or not
+\item $\fetch {w'} M |->_w M$ knowing that $\val M$ we deduce $M = \bbox {w_0} {M_0}$; we can then choose $w$ instead of $w'$ in $[*]$-intro rule
+\end{itemize}
+The rest of the cases are simple and follow directly from induction hypothesis.
+\end{proof}
+\end{theorem}
+
+We have only talked about progress and preservation in \langL{}. As it turns out, there aren't any differences when one wants to do the same in \langLF{} or \langHyb{}. In fact, these languages are similar enough to create translations between them.

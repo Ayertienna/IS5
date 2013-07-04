@@ -1,0 +1,800 @@
+\chapter{Implementation in COQ}\label{appendix:coq}
+
+Starting from chapter 3, all the formalizations and lemmas described in this thesis are implemented in the Coq proof assistant. This guarantees correctness of proofs and allows extracting evaluation algorithm from the formalization of termination proof. We will describe some of the technical aspects of our implementation, as well as a technique used for formalizing $\lambda$-calculus and its variants in a tool such as Coq, with no built-in $\alpha$-conversion.
+
+\section{Representation of terms}
+
+When formalizing a programming language in a proof assistant such as Coq, we have to make a number of decisions, including the one regarding the way we represent terms and manipulate them -- in particular, when dealing with variable binding. In ``pen-and-paper`` proofs, the standard approach is to use $\alpha$-conversion when talking about variable binding -- this allows us to consider $\lam{v}{A}{v}$ and $\lam{v'}{A}{v'}$ as $\alpha$-equivalent. Coq is not equipped with tools that could help mimic this behavior (as is e.g. Twelf), so if we wanted to use $\alpha$-conversion it would actually have to be implemented manually in some way. One possible approach is using variable names as usual and ensuring by a series of lemmas that $\alpha$-equivalent terms are treated as such. What seems simple and natural to reason about is actually extremely complicated to implement.
+
+Another possible implementation is de Bruijn indices. Instead of using named variables which have to match some binding (e.g. in $\lambda$), it uses indices indicating "how many bindings ago was this variable bound?". Compare these two formulas for a function that takes two arguments and returns the first one: $\lam{x}{A}{\lam{y}{B}{x}}$ is a standard term, $\lambda {A}.{\lambda {B}.{1}}$ is a version using de Bruijn indices.\\
+This is without doubt something simple to implement in Coq. It is also fairly easy to use in case of term variables. One drawback of using this idea is that de Bruijn indices are far from natural to read and reason about. When formalizing a language we want to be as close to an actual language description, as possible -- and with these, we are actually quite far away. Especially for languages like \langHyb{} or \langL{}, where not only do we have term variables, but also world variables, this becomes a serious problem when trying to relate traditional proof with its Coq code. Additional problems arise from using indices in formalizations of \langLF{} and \langHyb{}. With de Bruijn indices, order of elements matters within each context. This makes merging two contexts together very unnatural and hard to implement.\\
+
+Each of these representations for variables has its flaws. The combination of them as proposed in~\cite{charg08} tries to minimize them.
+
+\subsection{Locally nameless representation}
+In locally nameless (\LN{}) representation terms under binding are still encoded using de Bruijn indices. However, variables from the context occurring free in the term are represented using names. For $\alpha$-equivalence the problems arise only with binding, so we can safely use names for free variables. On the other hand, for bound variables de Bruijn indices remain the simplest to implement and since the indices are not used for free variable binding, order of elements in contexts does not matter anymore, and merging worlds is simple.\\
+
+In order to use \LN{} representation we also need a way of moving from bound variables (written with numbers and underline: $\bvar{k}$) to free ones (usual variable names like $v, w, \dots$ and overline: $\fvar{v}$) and vice versa. Take for instance the original $\lambda$-introduction from \langLF{}:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ l }
+\inference[\lamr{}~]{\fresh {v_0} & G |= (v_0 ::: A) :: \Gamma |- M ::: B}
+			    {G |= \Gamma |- \lam {v_0} A M ::: A --->B}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+To represent it using \LN{} we have to change this rule into one where term under $\lambda$ does not use a named variable anymore, but rather an index. We define two operations dual to each other: opening and closing the term. Opening ($M^{\fvar{x}}$) replaces last introduced bound variable with a free variable, closing (${}^ {\backslash{\fvar{x}}} M$) does the reverse. For example:
+$(\hyp{\bvar 0}A)^{\fvar{x}} = \hyp{\fvar{x}}A$, ${}^ {\backslash{\fvar{x}}} (\hyp{\fvar{x}}A) = \hyp{\bvar{0}}A$
+
+We can think of opening and closing operations in terms of substitution. Opening can then be expressed as simply $ M ^ {\fvar{x}} = \substt{\hyp{\fvar{x}}A}{\bvar{0}}{M}$, closing similarly as ${}^ {\backslash{\fvar{x}}} M = \substt{\hyp{\bvar{0}A}}{\fvar{x}}{M}$\footnote{We will actually abuse this notation and allow opening with arbitrary term: $M^C = \substt{C}{\bvar{0}}{M}$. For variables we will use $M ^ {\fvar{x}}$ as a short form of $M^{\hyp{\fvar{x}}A}$.} 
+Note that substitution accepts both free and bound variables as arguments. For bound variables, whenever moving through a variable binder like $\lambda$ or $\letdiae$, we increase the index of substituted variable, like so:\\
+$(\lamb{A}{\hyp{\bvar 1}A})^{\fvar x}= \substt{\hyp{\fvar{x}}A}{\bvar{0}}{(\lamb{A}{\hyp{\bvar 1}A})} = \lamb{A}{(\substt{\hyp{\fvar{x}}A}{\bvar{1}} {(\hyp{\bvar{1}}A)})} =$\\$ \lamb{A}{\hyp{\fvar{x}}A}$\\
+
+New $\lambda$-introduction rule in \langLF{} will look like this:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ l }
+\inference[\lamr{}~]{\fresh {v_0} & G |= (v_0 ::: A) :: \Gamma |- M^{\fvar{v_0}} ::: B}
+			    {G |= \Gamma |- \lamb A M ::: A --->B}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+One might notice that our example with $\lambda$-opening used a term we would not consider proper: in the body of $\lamb{A}{\hyp{\bvar 1}B}$ we use variable bound two bindings away ($\bvar 1$), but the term has only one binder ($\lambda$). This leads to the definition of \emph{locally closed} terms: terms that use bound variables only after their binder. In particular, $\lamb{A}{\hyp{\bvar 1}B}$ is not locally closed, but $\lamb{A}{\hyp{\bvar 0}A}$ is.\\
+
+For two other languages, \langHyb{} and \langL{}, we use not only term variables, but also variables for worlds. We define similar opening and closing operations for them, again defined in terms of substitution as $ t ^ {\fvar{w}} = \substw{\fvar{w}}{\bvar{0}}{t}$ and ${}^ {\backslash{\fvar{w}}} t = \substw{\bvar{0}}{\fvar{w}}{t}$. We change substitution to accept both bound and free world variables and make a shift for bound variables whenever moving through a binder -- in this case, \bboxe{} or \letdiae{}. Finally, we define the second version of locally closed terms - this time with respect to world variables.\\
+
+In our formalization we hardly ever use term closing, but term opening (both with world and term variables) is used extensively. Additionally, many of the lemmas we aim at proving in Coq require that terms are locally closed. Below we provide sample implementations of
+term and world substitution, as well as both definitions of locally closed terms -- all are given for \langHyb{} case, but they are similar in other languages.\\
+
+We begin with a shifting operation, defined for both free and bound variables. For bound variables (be it world or term ones), we increase the binding by one, for free variables we make no change.\\
+
+\begin{align*}
+&\shift{x} := \match{x}\\
+&~~~|~ \fvar{v} => \fvar{v}\\
+&~~~|~ \bvar{k} => \bvar{k+1}\\
+\end{align*}
+
+The term substitution is defined as the following:
+\begin{align*}
+&\substt{C_0}{x_0}{M_0} := \match{M_0} \\
+&~~~~|~ \hyp x A => \ifthenelse{x_0=x}{C_0}{\hyp x A} \\
+&~~~~|~ \lamb A M => \lamb A (\substt{C_0}{\shift{x_0}}{M}) \\
+&~~~~|~ \appl M N => \appl {(\substt{C_0}{x_0}{M})} {(\substt{C_0}{x_0}{N})}\\
+&~~~~|~ \bboxb {M} => \bboxb {(\substt{C_0}{x_0}{M})} \\
+&~~~~|~ \unboxfetch w M => \unboxfetch w {(\substt{C_0}{x_0}{M})}\\
+&~~~~|~ \gethere w M => \gethere w {(\substt{C_0}{x_0}{M})}\\
+&~~~~|~ \letdiagetb A w M N => \letdiagetb A w {\substt{C_0}{x_0}{M}} {(\substt{C_0}{\shift{x_0}}{N})}
+\end{align*}
+
+Note that world substitution shifts both sides of $\substw{w_0}{w_1}{}$:
+\begin{align*}
+&\substw{w_0}{w_1}{M_0} := \match{M_0} \\
+&~~~~|~ \hyp x A => \hyp x A\\
+&~~~~|~ \lamb A M => \lamb A (\substw{w_0}{w_1}{M}) \\
+&~~~~|~ \appl M N => \appl {(\substw{w_0}{w_1}{M})} {(\substw{w_0}{w_1}{N})}\\
+&~~~~|~ \bboxb {M} => \bboxb {(\substw{\shift{w_0}}{\shift{w_1}}{M})} \\
+&~~~~|~ \unboxfetch w M => \unboxfetch {(\substw{w_0}{w_1}{w})} {(\substw{w_0}{w_1}{M})}\\
+&~~~~|~ \gethere w M => \gethere {(\substw{w_0}{w_1}{w})} {(\substw{w_0}{w_1}{M})}\\
+&~~~~|~ \letdiagetb A w M N => \\
+&~~~~~~~~~\letdiagetb A {(\substw{w_0}{w_1}{w})} {\substw{w_0}{w_1}{M}} {(\substw{\shift{w_0}}{\shift{w_1}}{N})}
+\end{align*}
+
+We finish this part by giving definitions of locally closed terms. \lct{M} denotes that term $M$ is closed with respect to term variables, \lcw{M} states the same for world variables.
+
+\begin{align*}
+&\lctn{n}{M_0} := \match{M_0} \\
+&~~~~|~ \hyp{\fvar{v}} A => \True\\
+&~~~~|~ \hyp{\bvar{k}} A => \ifthenelse{k < n}{\True}{\False}\\
+&~~~~|~ \lamb A M => \lctn {n+1}{M} \\
+&~~~~|~ \appl M N => \lctn{n}{M} \wedge \lctn{n}{N}\\
+&~~~~|~ \bboxb {M} => \lctn{n}{M}\\
+&~~~~|~ \unboxfetch w M => \lctn{n}{M}\\
+&~~~~|~ \gethere w M => \lctn{n}{M}\\
+&~~~~|~ \letdiagetb A w M N => \lctn{n}{M} \wedge \lctn{n+1}{N}\\
+&\lct M = \lctn{0}{M}
+\end{align*}
+
+\begin{align*}
+&\lcwn{n}{M_0} := \match{M_0} \\
+&~~~~|~ \hyp{v} A => \True\\
+&~~~~|~ \lamb A M => \lcwn {n}{M} \\
+&~~~~|~ \appl M N => \lcwn{n}{M} \wedge \lcwn{n}{N}\\
+&~~~~|~ \bboxb {M} => \lcwn{n+1}{M}\\
+&~~~~|~ \unboxfetch w M => \lcwn{n}{M}\\
+&~~~~|~ \gethere w M => \lcwn{n}{M}\\
+&~~~~|~ \letdiagetb A w M N => \lcwn{n}{M} \wedge \lcwn{n+1}{N}\\
+&\lcw M = \lcwn{0}{M}
+\end{align*}
+
+\subsection {Cofinite quantification}
+Another concept mentioned in Chargu{\'e}raud's et al. article~\cite{charg08} that we have used in formalization of variants of \lang{} is cofinite quantification. It is used to strengthen the induction principle on typing derivation. 
+
+After changes mentioned in the previous section, the rule for $\lambda$-introduction is the following:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ l }
+\inference[\lamr{}~]{\fresh {v_0} & G |= (v_0 ::: A) :: \Gamma |- M^{\fvar{v_0}} ::: B}
+			    {G |= \Gamma |- \lamb A M ::: A --->B}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+
+What is of interest to us now is the ``$\fresh{v_0}$`` statement. What we usually mean by freshness is simply $v_0 \notin \fv{M}$. Sometimes such assumption is weak -- not necessarily  weak enough to make some property not true, but enough to make it very challenging to formalize the proof, i.e. requiring renaming of variables.\\
+
+To overcome such difficulties we use alternative approach -- cofinite quantification. Instead of showing that some property holds for a given $x$ outside of $\fv{M}$, we want to state that it holds for all $x \notin L$ for some finite set $L$. This changes our $\lambda$-introduction rule into:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ l }
+\inference[\lamr{}~]{\forall v_0 \notin L,  G |= (v_0 ::: A) :: \Gamma |- M^{\fvar{v_0}} ::: B}
+			    {G |= \Gamma |- \lamb A M ::: A --->B}
+\end{tabular}\\
+\normalsize
+\end{center}
+
+The equivalence of cofinite definitions with their more standard counterparts for $\lambda$-calculus is shown in~\cite{charg08}.
+
+\section{Languages for \logic{}}
+
+Languages used throughout this thesis -- \langL{}, \langLF{} and \langHyb{}  -- were all formalized using the representation of terms mentioned in the previous section. In this and the subsequent sections we would like to discuss the changes between description and actual formalization.
+
+\subsection{Environment representation}
+
+We have not yet mentioned how environments are encoded. For all the languages, a single context is represented as a list modulo permutation. For that we use permutations from \tlc{} library, extended with some additional lemmas. To express that one context is a permutation of the other we use $ \Gamma *=* \Gamma'$ notation.\\
+Since in \langLF{} and \langHyb{} there are multiple contexts within an environment, we have another notion of permutation. $G ~=~ G'$ expresses the fact that two multi-context environments are a permutation of each other. The order of contexts in $G$ and $G'$ is irrelevant, as is order of assumption within one context. In \langLF{} it is therefore the case that $ \Gamma *=* \Gamma' ---> \Gamma :: G ~=~ \Gamma' :: G$; similar property in \langHyb{} looks like this: $ \Gamma *=* \Gamma' ---> (w, \Gamma) :: G ~=~ (w, \Gamma') :: G$. We may think of $~=~$ as a ``two-level`` permutation.\\
+In \langL{} the $\Omega$ set (containing all the known worlds) is also formalized as a list modulo permutation.\\
+
+Another aspect of environment representation is its correctness -- that is, our requirement that no variable (neither world not term one) can be repeated. We will use a predicate like $\ok{\Omega, \Gamma}$,  or $\ok{G}$ to express that.\\
+
+Finally, for properties like preservation, we need to be able to find an environment containing no assumptions at all, but with all the worlds intact. This we will denote as $\emptyEq G$. As for \langL{} this is simply setting $\Gamma = \nnil$, there we will omit the use of such function.
+
+\subsection{\langL{}}
+
+Differences between description and implementation of type system for \langL{} come from the change in term representation and follow the scheme presented for $\lambda$ in previous section. All the rules below are also extended with a requirement $\ok{\Omega, \Gamma}$ and all occurrences of variables in terms are now free variables ($\fvar{v}$ instead of $v$, $\fvar{w}$ instead of $w$).\\
+
+\begin{center}
+\footnotesize
+\begin{spacing}{3}
+\begin{tabular} { l }
+\inference[]{\fresh {v_0} & \Omega; ({v_0} ::: A @ w) :: \Gamma |- M ::: B @ w}
+			    {\Omega; \Gamma |- \lam {v_0} A M ::: (A --->B) @ w} ~~~ $\rightarrow$\\
+\multicolumn{1}{ r }{
+ \inference[]{\forall {v_0} \notin L, \  \Omega; ({v_0} ::: A @ w) :: \Gamma |- M^{\fvar{v_0}} ::: B @ w}
+			    {\Omega; \Gamma |- \lamb A M ::: (A --->B) @ w}}\\[0.5cm]
+
+\inference[]{w \in \Omega & \fresh{w_0} & w_0 :: \Omega; \Gamma |- M ::: A @ w_0}
+			     {\Omega; \Gamma |- \bbox {w_0} M ::: [*]A @ w} ~~~ $\rightarrow$\\
+\multicolumn{1}{ r }{
+\inference[]{ w \in \Omega & \forall {w_0} \notin L, \ w_0 :: \Omega; \Gamma |- M ^{\fvar{w_0}}::: A @ w_0}
+			     {\Omega; \Gamma |- \bboxb M ::: [*]A @ w}} \\[0.8cm]
+
+\inference[]
+	{ &  &  &\fresh{w_0}, \fresh {v} & \\\\
+	\Omega; \Gamma |- M ::: <*>A @ w &
+	w_0 :: \Omega; (v ::: A @ w_0) :: \Gamma |- N ::: B @ w}
+	{\Omega; \Gamma |- \letdia {v} A {w_0} M N ::: B @ w} ~~~ $\rightarrow$\\
+
+\multicolumn{1}{ r }{
+\inference[]
+	{\Omega; \Gamma |- M ::: <*>A @ w &
+	\forall {w_0} \notin L_w, \ \forall v \notin L_t,\  w_0 :: \Omega; (v ::: A @ w_0) :: \Gamma |- (N^{\fvar{w_0}})^{\fvar{v}}  ::: B @ w}
+	{\Omega; \Gamma |- \letdiab A M N ::: B @ w}} \\
+\end{tabular}
+\end{spacing}
+\normalsize
+\end{center}
+
+Typing is implemented in Coq as an inductive predicate; we will only give a snippet with two cases:
+\begin{verbatim}
+Inductive types_L: 
+    worlds_L -> ctx_L -> te_L -> ty -> var -> Prop :=
+
+| t_hyp_L: forall Omega Gamma v A w
+  (Ok: ok_L Omega Gamma)
+  (World: Mem w Omega)
+  (HT: Mem (w, v, A) Gamma),
+  Omega; Gamma |- hyp_L (fte v) ::: A @ w
+
+| t_lam_L: forall L Omega Gamma w A B M
+  (Ok: ok_L Omega Gamma)
+  (HT: forall x, x \notin L ->
+    Omega; (w, x, A)::Gamma |- 
+           (M ^t^ (hyp_L (fte x))) ::: B @ w),
+  Omega; Gamma |- lam_L A M ::: A ---> B @ w
+
+(...)
+
+where " Omega ';' Gamma '|-' M ':::' A '@' w " := 
+    (types_L Omega Gamma M A w): labeled_is5_scope.
+\end{verbatim}
+
+The operational semantics do not differ much from the description either. We only add a requirement that terms are locally closed: $\lct{M}$, $\lcw{M}$. Reduction step, $M |->_w N$ is again an inductive predicate, same as $\val{M}$. These are again small snippets from the actual implementation:
+\begin{verbatim}
+Inductive value_L: te_L -> Prop :=
+| val_lam_L: forall A M, value_L (lam_L A M)
+| val_box_L: forall M, value_L (box_L M)
+| val_get_here_L: forall M w (HT: value_L M), 
+    value_L (get_L w (here_L M)).
+
+Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
+| red_appl_lam_L: forall A M N w,
+   lc_w_L M -> lc_t_L (M ^t^ N) ->
+   lc_w_L N -> lc_t_L N ->
+   (appl_L (lam_L A M) N, w) |-> (M ^t^ N, w)
+| red_unbox_box_L: forall M w,
+   lc_t_L M -> lc_w_L (M ^w^ w) ->
+   (unbox_L (box_L M), w) |-> (M ^w^ w, w)
+| red_letd_get_here_L: forall M N w w',
+   lc_t_L M -> lc_w_L M ->
+   lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w') -> value_L M ->
+   (letd_L (get_L w' (here_L M)) N, w) |-> ((N ^w^ w') ^t^ M, w)
+| red_appl_L: forall M N M' w (HRed: (M, w) |-> (M', w)),
+   lc_t_L M -> lc_w_L M ->
+   lc_t_L N -> lc_w_L N ->
+   (appl_L M N, w) |-> (appl_L M' N, w)
+(...)
+where " M |-> N " := (step_L M N ) : labeled_is5_scope.
+\end{verbatim}
+
+Proof of the progress property remains straightforward -- we have not changed anything in the definition of reduction, so there is no reason why it should be any different. The preservation proof has changed a little bit, as we use the locally nameless representation and cofinite quantification. In particular for variable-binding terms, $\lambda$, $\bboxe{}$ and $\letdiae{}$, we now have a different-looking induction hypothesis.\\
+The lemma that we are proving is the following:
+\begin{verbatim}
+Lemma PreservationL:
+forall Omega M N A w w'
+  (HType: Omega; nil |- M ::: A@w)
+  (HStep: (M, fwo w) |-> (N,fwo w')),
+  Omega; nil |- N ::: A@w'.
+\end{verbatim}
+
+Let us discuss only the $\beta$-reduction case.\\
+We have to show $\Omega; \nnil |- M ^ N ::: B @ w'$. From typing of $\lamb{A}{M}$ we can conclude that
+$\forall v \notin L,\ \Omega; (v :: A @ w') :: \Gamma |- M ^ {\fvar{v}} ::: B @ w'$.\\
+It suffices to express $M ^ N$ as a combination of two substitutions using a fresh variable as the ``in between`` argument. $ M ^ N = \substt{N}{\bvar{0}}{M} = \substt{N}{\fvar{v}}{\substt{\fvar{v}}{\bvar{0}}{M}} = \substt{N}{\fvar{v}}{M ^ {\fvar{v}}}$. Now, for this equality to hold we simply take $v$ that is not in L and not used anywhere in $N$.\\
+We then use typing preservation under term substitution, which leaves us with showing that $\Omega; (v :: A @ w') :: \Gamma |- M ^ {\fvar{v}} ::: B @ w'$ -- but that follows from the fact that $ v \notin L$.\\
+Proofs for two other cases that have changed compared to the proof described in Chapter \ref{chapter:lang}, $\unbox (\bboxb M) |->_{w} M ^ w$ and $\letdiab A {\get {w'} (\here M)} N |->_w (N ^ {w'}) ^M$, use the same idea of split substitution.
+
+\subsection{\langLF{} and \langHyb{}}
+Despite the fact that in \langLF{} we do not use worlds and in \langHyb{} we do, these languages are similar enough that formalization and most of the proofs are almost identical, even in a proof assistant such as Coq. Most of the difficulties with both of these systems come from the background vs. current context split -- with world-changing operations we need to control the exchange, but at the same time allow arbitrary order of contexts in the background (via two-level permutations, $ G ~=~ G'$). To give an example look at a fragment of typing predicate for two versions of \unboxe{} in \langLF{}:
+\begin{verbatim}
+Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
+(...)
+| t_unbox_LF: forall G Gamma M A
+  (Ok: ok_Bg_LF (Gamma :: G))
+  (H: G |= Gamma |- M ::: [*] A),
+  G |= Gamma |- unbox_LF M ::: A
+
+| t_unbox_fetch_LF: forall G Gamma Gamma' M A
+  (Ok: ok_Bg_LF (Gamma:: G & Gamma'))
+  (H: G & Gamma' |= Gamma |- M ::: [*] A),
+  forall G', G & Gamma ~=~ G' ->
+    G' |= Gamma' |- unbox_LF M ::: A
+(...)
+where " G '|=' Gamma '|-' M ':::' A" := (types_LF G Gamma M A).
+\end{verbatim}
+Here we explicitly use permutations of background contexts in order to express that in context-changing version of unbox operation, we can choose any context from the background.\\
+
+Unfortunately, this leads to a lot of overhead, as if almost every proof we are forced to show that two environments are each other's permutation. We rely heavily on Coq's notion of setoids and morphisms to reduce that overhead as much as possible.\\
+
+Another technical difficulty becomes visible when looking at lemmas on type preserving substitutions and merges. In Chapter \ref{chapter:lang} we have described worlds merging for \langL{}; the formulation for \langHyb{} would be the following:\\[0.2cm]
+If $G |- (w, \Gamma) |- M ::: A$ then $\substw{w_0}{w_1}{((w, \Gamma) :: G)} |- \substw{w_0}{w_1}M ::: A$.\\[0.2cm]
+Here ``$\substw{w_0}{w_1}{((w, \Gamma) :: G)}$`` merges contexts of $w_0$ and $w_1$. It then returns the after-merge equivalent of $(w, \Gamma)$ as the current context and puts the rest to the background.\\
+Note that there are three distinctive cases: $w_0 = w$, $w_1 = w$ or none of them are equal.
+\begin{itemize}
+\item[] In the first case, we add something from the background, enriching the current context (e.g. $\substw{w_0}{w_1}{((w_0, \Gamma) :: ((w_1, \Gamma')::G))} = ((w_0, \Gamma + \Gamma'), G)$).
+\item[] In the second, the current context changes its name and is enriched again: $\substw{w_0}{w_1}{((w_1, \Gamma) :: ((w_0, \Gamma')::G))} = ((w_0, \Gamma + \Gamma'), G)$.
+\item[] In the last case, two contexts from the background are merged: \\
+$\substw{w_0}{w_1}{((w, \Gamma) :: ((w_0, \Gamma')::(w_1, \Gamma'') :: G))} = ((w, \Gamma), (w_0, \Gamma' +\Gamma) ::G)$.
+\end{itemize}
+This is already a lot of case analysis! But now consider that for term like $\unboxfetch{w'}{M}$ we have to distinguish all these cases again, this time for $w'$ instead of $w$.\\
+
+Similar problems arise when dealing with type preservation under term substitution:\\[0.2cm]
+If $ (w, \Gamma) :: G ~=~ (w', \Gamma') :: G'$, $\emptyEq{G'} |- w', \nnil |- M ::: A$ and\\
+$G^{*} |- (w, \Gamma)^{*} |- N ::: B$\footnote{$(w, \Gamma)^{*}$ means that if $ w= w'$ then we extend context with a pair $(v, A)$; $G^{*}$ does that for every context in the background}, then $ G |- (w, \Gamma) |- \substt{M}{v}{N} ::: B$
+\\
+
+Either $w=w'$ and we extend current context, or not -- and additional assumption is added to one of the contexts in the background. Again, for context-changing terms like $\unboxfetch{w''}{M}$, we have to consider cases $w''=w'$ and $w''\neq w'$.\\
+
+Proofs of preservation and progress -- except for requiring more case analysis and term rewriting -- are no different than in \langL{} case.
+
+\section{Languages equivalence}
+
+Relations between languages described in Chapter \ref{chapter:relations} are also formalized in Coq. Conversions of terms usually turn out to be simple and straightforward -- almost exactly like the pseudo-code we have shown in their descriptions. It is actually contexts rewriting that requires more work. When describing the translations we almost did not mention properties of rewritten contexts, as their correctness was intuitive and matched our expectations (e.g. bucket-sorting a context does not change its correctness with respect to variable repetition). In Coq we have to formalize all these properties. Additionally, we now want the translations to preserve locally closed properties -- this is something we did not have to consider previously.\\
+
+Rewriting contexts and terms for translations from \langHyb{} to \langL{} and to \langLF{} is very simple; Coq implementation of these rewrites is exactly as described in Chapter \ref{chapter:relations}. The proofs are also straightforward and easy to follow, allowing us to skip description of these translations and focus on the two remaining cases.
+
+\subsection{From \langL{} to \langHyb{}}
+
+When describing this translation we have mentioned that rewriting contexts between \langL{} and \langHyb{} is done via bucket-sort procedure. This proves to be particularly tricky to formalize -- even more so to prove correctness.
+\begin{verbatim}
+Fixpoint gather_keys_L (k: var) (l: ctx_L) :=
+match l with
+| nil => nil
+| (k', v) :: l' =>
+  if (eq_var_dec k k')
+  then v :: (gather_keys_L k l')
+  else gather_keys_L k l'
+end.
+
+Fixpoint bucket_sort_L
+         (keys: worlds_L)
+         (l: ctx_L) :=
+match keys with
+| nil => nil
+| k :: keys' =>
+  (k, gather_keys_L k l) :: bucket_sort_L keys' l
+end.
+\end{verbatim}
+So far there is nothing worrying here -- for each world $k$ we gather all assumptions regarding $k$ from $l$. The problematic part begins when we want to obtain  the result as a pair (background, current context). We cannot be sure that the world marked as current in \langL{} is actually in $\Omega$ -- therefore we have to make the current context optional:
+\begin{verbatim}
+Fixpoint split_at_Hyb (l: bg_Hyb) (k: var) :=
+match l with
+| nil => (nil, None)
+| (k', l) :: l' =>
+  if (eq_var_dec k k')
+    then (l', Some (k', l))
+  else 
+    let res := split_at_Hyb l' k in
+    ((k',l) :: fst res, snd res)
+end.
+
+
+Definition L_to_Hyb_ctx
+         (Omega_L: worlds_L)
+         (Gamma_L: ctx_L)
+         (w_L: var) :
+         (bg_Hyb * option ctx_Hyb) :=
+  let G := bucket_sort_L Omega_L Gamma_L in
+  split_at_Hyb G w_L.
+\end{verbatim}
+In order for this procedure to be useful we have to show that if $w_{\tL} \in \Omega$ then the result is not None.\\
+
+When using permutations, in many lemmas for \langHyb{} (and \langLF{}) we do not care about the distinction between current context and background -- it is therefore useful to realize, that bucket-sort result is in fact a permutation LtoHybCtx result. This will be used in the proof that a correct ($\oke[\tL]{}$) context from \langL{} rewrites to a correct one from \langHyb{} ($\oke[\tHyb]{}$).\\
+
+As to the rewrite of terms -- there are two things to notice, highlighted also in Chapter \ref{chapter:relations}. First is that in \langL{}, in terms like $\unbox{M}$ or $\here{M}$, there is no mention of the current world within them. To rewrite them into \langHyb{} without the knowledge of current world is impossible -- thus, our function takes current world (be it bound or free) as an argument, resulting in the following signature:
+\begin{verbatim}
+Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb
+\end{verbatim}
+
+Second, as \langHyb{} does not have \fetche{} or \gete{} operations, we need to simulate them somehow. Back in Chapter \ref{chapter:relations} we said that for technical reasons we want to rewrite $\fetch{w'}{M}$ in world $w$ into an overly complicated term:
+
+\begin{center}
+\begin{tabular}{ l }
+$\fetch[\tL]{w'}{M} =>$\\
+let  $w_0 := $ freshWorld in\\
+~~~let  $w'' := $ freshWorld in\\
+~~~let  $v := $ freshVar in\\
+~~~let  $N := \bbox[\tHyb]{w_0}{(\unboxfetch {w''} {(\hyp{v}A)})}$ in\\
+~~~$\letdiaget[\tHyb]{w'}{v}A{w''} {\gethere[\tHyb]{w'}{(\funLtoHyb{M}{w'})}} {N} $\\
+\end{tabular}
+\end{center}
+
+In current term representation this does not require generation of fresh variables:
+\begin{center}
+\begin{tabular}{ l }
+$\fetch[\tL]{w'}{M} =>$\\
+let  $N := \bboxb[\tHyb]{(\unboxfetch {\bvar{0}} {(\hyp{\bvar{1}}A)})}$ in\\
+$\letdiagetb[\tHyb]A{w'}{\gethere[\tHyb]{w'}{(\funLtoHyb{M}{w'})}} {N}$,\\
+\end{tabular}
+\end{center}
+but this is still not an obvious rewrite to propose. The most natural way to rewrite $\fetch{w}{M}$ is by using $\bboxb{(\unboxfetch{w}{(\funLtoHyb{M}{w})})}$. What is the problem with such approach? Let us take a closer look.\\
+
+If there are no bound world variables\footnote{Note that this is a stronger requirement than \lcw{M}} in $\fetch{w'}{M}$, then indeed\\
+ $\funLtoHyb{\fetch{w'}{M}}{w}{} = \bboxb{(\unboxfetch{w}{(\funLtoHyb{M}{w})})}$. Otherwise we need to take into account that \bboxe{} adds one bound world variable -- simplest example to observe how such a rewrite works is to take $w' = \bvar{0}$. Then $\funLtoHyb{\fetch{\bvar{0}}{M}}{w} = \bboxb{(\unboxfetch{\bvar{0}}{\funLtoHyb{M}{w'}})}$. This does not look right - we started with a term in \langL{} that was not locally closed, but ended up with one that is! \\
+We can of course try to fix it by shifting: $\funLtoHyb{\fetch{w'}{M}}{w} => \bboxb{(\unboxfetch{\shift{w'}}{(\funLtoHyb{M}{ w'})})}$, but the same problem may re-appear in the result of $\funLtoHyb{M}{w'}$. \\
+Another solution is to actually shift the resulting term\footnote{We define such operation inductively as a shift on each world in the term} -- that is:\\
+$\funLtoHyb{\fetch{w'}{M}}{w} = \bboxb{(\unboxfetch{\shift{w'}}{\shift{(\funLtoHyb{M}{w'})}})}$. This is better, but very unnatural to work with -- for example, how do we tell when a shifted term types?\\
+
+Our solution is to ignore this problem for as long as possible by postponing the introduction of new world variable (in \bboxe{}). Note that in 
+\begin{center}
+\begin{tabular}{ l }
+$\funHybtoL{\fetch[\tL]{w'}{M}}{w}= $\\
+let  $N := \bboxb[\tHyb]{(\unboxfetch {\bvar{0}} {(\hyp{\bvar{1}})A})}$ in\\
+$\letdiagetb[\tHyb]A{w'}{\gethere[\tHyb]{w'}{(\funLtoHyb{M}{w'})}} {N}$,\\
+\end{tabular}
+\end{center}
+we do not create any new world variables for the subterm in which we make a recursive call.\\
+
+Complete term rewriting function is as follows:
+\begin{verbatim}
+Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb :=
+match M0 with
+| hyp_L v => hyp_Hyb v
+| lam_L A M => lam_Hyb A (L_to_Hyb_term w M)
+| appl_L M1 M2 => 
+      appl_Hyb (L_to_Hyb_term w M1) (L_to_Hyb_term w M2)
+| box_L M => box_Hyb (L_to_Hyb_term (bwo 0) M)
+| unbox_L M =>  unbox_fetch_Hyb w (L_to_Hyb_term w M)
+| here_L M => get_here_Hyb w (L_to_Hyb_term w M)
+| letd_L M1 M2 => 
+      letdia_get_Hyb w 
+           (L_to_Hyb_term w M1) 
+           (L_to_Hyb_term (shift_vwo w) M2)
+| fetch_L w' M => 
+      letdia_get_Hyb w' 
+           (get_here_Hyb w' (L_to_Hyb_term w' M))
+           (box_Hyb (unbox_fetch_Hyb (bwo 1) (hyp_Hyb (bte 0))))
+| get_L w' M => 
+      letdia_get_Hyb w' 
+          (L_to_Hyb_term w' M)
+          (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))
+end.
+\end{verbatim}
+Note that in the \bboxe{} case recursion call we use a bound world variable instead of a fresh one. This is fine because we open this term with a fresh world in the premise of typing rule for \bboxe{}.\\
+
+Proof of typing preservation is again simple, but with a lot of overhead coming from context rewriting.\\
+
+We also provide an alternative translation using a relation. It is defined based on the function described above, except it connects $\unbox[\tL]{M}$ with every $\unboxfetch[\tHyb]{w}{M'}$ for which $M$ is connected to $M'$ (same for \heree{} and \letdiae{}). Obviously this relation is capturing too many pairs or terms, but -- as it does not use world as a parameter -- it is much simpler to work with. In particular, we can prove lemma regarding term substitution without requiring any term to be stable.
+\begin{verbatim}
+Lemma L_to_Hyb_term_R_subst_t:
+forall M M' C1 C2 v,
+  L_to_Hyb_term_R C1 C2 ->
+  L_to_Hyb_term_R M M' ->
+  L_to_Hyb_term_R (subst_t_L C1 v M) (subst_t_Hyb C2 v M').
+\end{verbatim}
+
+It is trivial to see that pair ($M$, $\funLtoHyb{M}{w}$) will satisfy this relation. We can then show the value preservation lemma for relation and use this result for a function:
+\begin{verbatim}
+Lemma L_to_Hyb_term_R_value:
+forall M M',
+ lc_w_Hyb M' -> lc_t_Hyb M' ->
+  value_L M -> L_to_Hyb_term_R M M' ->
+  value_Hyb M' \/
+  forall w, exists M'', steps_Hyb (M', w) (M'', w) /\ value_Hyb M''.
+
+Lemma L_to_Hyb_term_value:
+forall M M' w,
+ lc_w_Hyb M' -> lc_t_Hyb M' ->
+  value_L M -> (M' = L_to_Hyb_term w M) ->
+  value_Hyb M' \/
+  exists M'', steps_Hyb (M', w) (M'', w) /\ value_Hyb M''.
+intros; destruct L_to_Hyb_term_R_value with M M'; subst; eauto.
+Qed.
+\end{verbatim}
+
+As the relation does not need worlds, the proof of value preservation for it is almost trivial.
+
+\subsection{From \langLF{} to \langHyb{}}
+
+In the second translation we will describe here, we cannot use functions to rewrite neither contexts nor terms. For contexts, our motivation is mostly pragmatic -- a function assigning fresh names to contexts would most probably be order-dependent. It is very likely that we will need permutations in some of the proofs, therefore it is preferable to define a relation accepting any unique assignment of names to contexts. The relation we define is simply:
+\begin{verbatim}
+Definition LF_to_Hyb_ctx (G: bg_LF) (G': bg_Hyb) :=
+  PPermut_LF (map snd_ G') G /\ ok_Hyb G' nil.
+\end{verbatim}
+
+In case of terms, we do not have much of a choice. This transformation can only work for well-typed terms -- and we do actually use type trees to create resulting term in \langHyb{}. In a way, this development is formalizing the table we have shown in chapter 4.
+
+Signature of the relation is the following:
+\begin{verbatim}
+Inductive LF_to_Hyb_term_R: ctx_LF  -> te_LF  -> ty ->
+                         bg_Hyb -> var -> te_Hyb -> Prop
+\end{verbatim}
+In each case, the relation will require that the term from \langLF{} types in the environment passed as one of the arguments. If that is the case, we can reconstruct the corresponding \langHyb{} term.\\
+
+Note that we use only the environment from \langHyb{} -- this is to provide consistency with the induction hypothesis. For example in case of unbox:
+\begin{verbatim}
+| unbox_LF_Hyb:
+    forall G Gamma G' w M N A,
+      G |= Gamma |- (unbox_LF M) ::: A ->
+      LF_to_Hyb_ctx (Gamma::G) ((w, Gamma)::G') ->
+      LF_to_Hyb_term_R Gamma M ([*]A) G' w N ->
+      LF_to_Hyb_term_R Gamma (unbox_LF M) A
+                    G' w (unbox_fetch_Hyb (fwo w) N)
+
+| unbox_fetch_LF_Hyb:
+    forall G Gamma Gamma' G' w w' M N A G'',
+      w <> w' ->
+      (Gamma'::G) |= Gamma |- (unbox_LF M)  ::: A ->
+      LF_to_Hyb_ctx (Gamma::Gamma'::G) 
+                    ((w, Gamma)::(w', Gamma')::G') ->
+      LF_to_Hyb_term_R Gamma' M ([*]A)
+                    ((w, Gamma)::G') w' N ->
+      ((w', Gamma')::G') ~=~ G'' ->
+      LF_to_Hyb_term_R Gamma (unbox_LF M) A
+                    G'' w (unbox_fetch_Hyb (fwo w') N)
+\end{verbatim}
+we need to be certain that  there was no change in assignment of worlds to contexts. Otherwise we will not be able to distinguish two above cases.\\
+
+It is not a surprise that a relation using typing preserves types. The preservation of values is also trivial to show.
+
+\section{Termination of evaluation}
+
+Termination of evaluation is particularly interesting to formalize in Coq because from it we can extract the evaluator. This requires the definitions to be in sort \Type{} rather than \Prop{}, but this is usually easy to change -- in most cases with minimal effort. In our formalization we give a proof of \langLF{} without $<*>$ in an extractable form, leaving the rest of languages formalized with proof-irrelevance.\\
+
+This is a technical decision. We normally treat permutations as equivalence relations with all the benefits of rewriting using Setoid type. When moving from \Prop{} to \Type{} it turns out to be necessary to change the definition of permutation ($~=~$~) as well -- and this of course disallows us from treating permutations as relations\footnote{This is because in Coq relation is a defined as $ A ---> A ---> \Prop{}$}. Such change is surely not critical -- we can still prove everything we could before -- but it requires all rewrites to be more manual, as we cannot use setoid rewrites.
+
+It is worth noting that these technical difficulties are most probably due to ambiguity of typing. When using a la Church type system with disambiguous typing, changes going so deeply would most likely be avoidable. \\
+
+We should also mention that to prove termination for a sublanguage without $<*>$, we actually have to re-create such language with type $<*>$ and terms that use it (\heree{}, \letdiae{}, etc.) removed -- it is a bit cumbersome, but otherwise analysis of $<*>$ type has to be included in the proof.\\
+
+In the next part of this section we intend to describe the $<*>$-free sublanguage of \langLF{}. Next we turn our attention to the complete \langLF{} laguage.
+
+\subsection{\langLF{} without $<*>$}
+The definitions of properties and lemmas formalized in Coq differ from the ones described in the thesis only in that the former have to ensure that terms are locally closed and contexts correct. Therefore, the definitions of termination and reducibility in \langLF{}  are as follows:
+
+\begin{verbatim}
+Inductive WHT: te_LF -> Type :=
+| val_WHT: forall M, value_LF M -> WHT M
+| step_WHT: forall M,
+              { V & (value_LF V) * (steps_LF M V)) -> WHT M.
+
+
+Fixpoint Red (M: te_LF) (A: ty) : Type :=
+match A with
+| tvar => WHT M
+| tarrow A1 A2 =>
+    (WHT M) *
+    (forall N,
+       lc_t_LF N ->
+       Red N A1 ->
+      Red (appl_LF M N) A2)
+| tbox A1 => (WHT M) * (Red (unbox_LF M) A1)
+end.
+\end{verbatim}
+
+As this sublanguage has the property that every term has at most one redex, we can show that
+
+\begin{verbatim}
+Lemma WHT_step:
+forall M M',
+  WHT M ->
+  M |-> M' ->
+  WHT M'.
+
+Lemma WHT_step_back:
+forall M M',
+  M |-> M' ->
+WHT M' -> WHT M.
+\end{verbatim}
+
+Next, we can define and prove the three properties (CR1 -- CR3) that we require to hold for reducibility relation; these proofs are completely straightforward, we will therefore omit their descriptions. They state that reduction preserves reducibility (in both directions) and that every reducible term's evaluation terminates.\\
+
+With these definitions and properties ready, the next step is defining simultaneous substitution.  
+\begin{verbatim}
+Fixpoint SL (L: list (var * ty * te_LF)) (M: te_LF) : te_LF :=
+match M with
+| hyp_LF (bte v) => M
+| hyp_LF (fte v) =>
+  let x := find_var L v in
+  match x with
+    | Some (v, A, M) => M
+    | None => hyp_LF (fte v)
+  end
+| lam_LF A M => lam_LF A (SL L M)
+| appl_LF M N => appl_LF (SL L M) (SL L N)
+| box_LF M => box_LF (SL L M)
+| unbox_LF M => unbox_LF (SL L M)
+end.
+\end{verbatim}
+
+When describing the properties of this substitution ($\substt{L}{X}{N}$) in Chapter \ref{chapter:termin}, we have mentioned that the list of variables $X$ should contain all free variables from term $M$. For this concrete implementation, we might want to be more specific. There is a number of options:
+\begin{enumerate}
+\item We may require exactly variables from $\fv{M}$ -- this causes a number of problems for example in (othewise trivial) $\appl{M}{N}$ case, as free variables from $M$ and $N$ do not have to be exactly the same;
+\item We may require at least the variables from $\fv{M}$ to be present, which solves the above problem;
+\item We can also simply take all the known variables, that is every variable present in the environment.
+\end{enumerate}
+The second variant will require an additional lemma stating that ``a term well-typed in an empty environment has no free term variables`` to obtain the termination result; the third one makes transition between reducibility theorem and termination theorem the simplest. We therefore chose to use all known term variables in the substitution.\\
+
+The complete formalization of reducibility theorem in \langHyb{} is therefore the following:
+\begin{verbatim}
+Theorem red_theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  forall L,
+    OkL L nil ->
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Red c b) ->
+    Red (SL L M) A.
+\end{verbatim}
+
+There are three cases worth mentioning: $\hype{}$, $\lambda$ and $\bboxe{}$.
+\begin{itemize}
+\item In $\hyp{\fvar{v}}A$ case (with $(v, A) \in \Gamma$) we have to show that the substitution was indeed done -- that is, by the definition, that we have found a tuple containing variable $v$ in $L$. Then the term substituted for \hyp{\fte{v}}A is, by our assumptions on L, reducible. It remains to argue that it is in fact reducible exactly at $A$.
+
+\item For $\lamb{A}{M}$ we have to show that for every reducible term $N$, it is the case that
+	$\Red{(\appl{(\lamb{A}{(\SL{L}{W}{M})})}{N})}{B}$. By using one of the properties of reducibility (CR3), we end up having to prove:
+
+\newpage
+\begin{verbatim} 
+  n : x \notin (...)
+  X1 : forall V : te_LF,
+       Red V A -> 
+       lc_t_LF V -> 
+
+       Red (SL ((x, A, V) :: L0) 
+       [hyp_LF (fte x) // bte 0]M) B
+  N : te_LF
+  H3 : lc_t_LF N
+  X2 : Red N A
+  ============================
+   Red (SL L0 M ^t^ N) B
+\end{verbatim}
+We will use the same split of substitution as we have described for the Preservation proof in Section 1: $(\SL {L_0} W M)^N = \substt{N}{x}{(\SL{L_0}{W}{M})^x}$. Now we can extend $L_0$ with $(x, A, V)$ and change $(\SL {L_0} W M)^x$ into $\SL{L_0}{W}{M^x}$, as all terms in $L_0$ are locally closed -- therefore opening does not affect them.
+\item Lastly, $\bboxb{M}$ follows the same pattern as $\lamb{A}{M}$, except extending $W$ rather than $L$.
+\end{itemize}
+
+Finally, the termination theorem is simply given as:
+\begin{verbatim}
+Theorem termination_theorem:
+forall G M A,
+  emptyEquiv_LF G |= nil |- M ::: A ->
+  WHT M.
+\end{verbatim}
+
+\subsection{Complete \langLF{}}
+In the description of termination for the complete \langLF{} language we have introduced some new concepts, not present in the sublanguage variant. These include continuations and mutually inductive logical relations.
+
+First, as conceptually complicated as they are, continuations are actually almost trivial to formalize:
+\begin{verbatim}
+Inductive Cont :=
+| IdK: ty -> Cont
+| ConsU: Cont -> ty -> Cont
+| ConsD: Cont -> te_LF -> ty -> ty -> Cont
+| ConsA: Cont -> te_LF -> ty -> ty -> Cont.
+
+Fixpoint ContAppl (K: Cont) (M: te_LF) : te_LF :=
+match K with
+| IdK A => M
+| ConsU K' A => ContAppl K' (unbox_LF M)
+| ConsD K' N A B => ContAppl K' (letdia_LF M N)
+| ConsA K' N A B => ContAppl K' (appl_LF M N)
+end.
+
+Notation " K '@' M " := (ContAppl K M) (at level 65).
+
+Inductive ContLC: Cont -> Prop :=
+| ContId_lc: forall A, ContLC (IdK A)
+| ContU_lc: forall K A, ContLC K -> ContLC (ConsU K A)
+| ContD_lc: forall K N A B,
+                 ContLC K -> lc_t_n_LF 1 N -> 
+                 ContLC (ConsD K N A B)
+| ContA_lc: forall K N A B,
+                 ContLC K -> lc_t_LF N -> 
+                 ContLC (ConsA K N A B)
+
+\end{verbatim}
+
+Logical relations for \langLF{} on the other hand, however rather straightforward and simple to describe on paper, are actually quite tricky\footnote{And mostly unreadable.}  to encode in Coq. There are two reasons for this -- first is that we cannot define these relations as inductive types (just as we couldn't do it in the sublanguage), since Coq requires strictly positive occurrences of inductively defined types in their definitions. Second, when using fixpoint (or function) with mutually recursive definitions, the system requires such recursion to be structural -- meaning that we have to explicitly use ``smaller`` argument for the recursion call.\\
+\newpage
+This leads to the following definition of logical relations:
+\begin{verbatim}
+Fixpoint R M A {struct A} : Prop :=
+let Q M A := forall K,
+               lc_t_LF M -> ContLC K -> RC K A ->
+               WT (K @ M) in
+match A with
+| tvar => WT M
+| A1 ---> A2 => WT M /\
+                (forall N,
+                   lc_t_LF N ->
+                   Q N A1 ->
+                   Q (appl_LF M N) A2)
+| [*]A1 => WT M /\ forall K, RC K A1 -> WT (K @ (unbox_LF M))
+| <*>A1 => forall K, ContLC K ->
+                     (forall V,
+                        lc_t_LF V ->
+                        R V A1 ->
+                        WT (K @ (here_LF V))) ->
+                     WT (K @ M)
+end
+with RC K A {struct A} : Prop :=
+let Q M A := (..) (* same as above *)
+match A with
+| tvar => forall V, lc_t_LF V -> WT V -> WT (K @ V)
+| tbox A1 => forall V, lc_t_LF V ->
+                       (WT V /\
+                        forall K0, ContLC K0 ->
+                                   RC K0 A1 ->
+                                   WT (K0 @ (unbox_LF V))) ->
+                       WT (K @ V)
+| A1 ---> A2 => forall V, lc_t_LF V ->
+                  (WT V /\
+                   (forall N,
+                      lc_t_LF N ->
+                      Q N A1 ->
+                      Q (appl_LF V N) A2)) ->
+                  WT (K @ V)
+| <*> A1 => forall V, lc_t_LF V ->
+                       Q V A1 -> WT (K @ (here_LF V))
+end.
+\end{verbatim}
+
+Luckily, the proof of reducibility is straightforward enough that complex analysis of these two relations is not required.
+\begin{verbatim}
+Theorem red_theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+ forall L,
+    OkL L nil ->
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Q c b) ->
+    forall K,
+      ContLC K ->
+      RC K A ->
+      WT (K @ (SL L M)).
+\end{verbatim}
+
+Main result -- the termination theorem -- is defined exactly as in the sublanguage case.
+
+\subsection{Evaluator extraction}
+
+One final piece of code that deserves mention in the technical part of this thesis is the evaluator extracted from termination proof for \nodiaLangLF{}. The code that -- upon running -- produces the (almost) complete evaluator can be as simple as:
+\begin{verbatim}
+Extraction "termination_LF_nodia" termination_language.
+\end{verbatim}
+
+If however we feel that there is no need to re-define types such as list, nat, bool etc -- we can add the following lines:
+\begin{verbatim}
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+Extract Inductive prod => "(*)"  [ "(,)" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+
+Extract Inductive nat => "int"
+  [ "0" "(fun x -> x + 1)" ]
+  "(fun zero succ n ->
+      if n=0 then zero () else succ (n-1))".
+\end{verbatim}
+
+This is completely optional. What is not is the realization of axioms. When extracting code with unrealized axioms, we are being warned:
+\begin{verbatim}
+Warning: The following axioms must be realized in the 
+extracted code:
+  eq_var_dec LibAxioms.indefinite_description.
+\end{verbatim}
+
+In case of the evaluator we have extracted, the two axioms both have to do with variables -- decidability of their equality and creation of a fresh one. 
+
+Looking into the extracted code (or an external Coq library that produces it -- \tlc{}) makes us realize that var is defined as interger, so \verb|eq_var_dec| can be realized using equality for integers. 
+
+As for the other axiom -- it comes from the same \tlc{} library and is used only in the definition of fresh variable generator taking a finite set as an argument. 
+\begin{verbatim}
+(** val indefinite_description : __ -> 'a1 **)
+
+let indefinite_description =
+  failwith "AXIOM TO BE REALIZED"
+
+(** val classicT : bool **)
+
+let classicT =
+  let h = indefinite_description __ in if h then true else false
+(...)
+(** val epsilon_def : __ -> 'a1 **)
+
+let epsilon_def _ =
+  if classicT then indefinite_description __ else inhab_witness __
+
+(** val epsilon : __ -> 'a1 **)
+
+let epsilon _ =
+  epsilon_def __
+
+module Variables = 
+ struct 
+  type var = int
+(...)
+  type vars = var FsetImpl.fset
+  
+  (** val var_gen_list : int list -> int **)
+  
+  let var_gen_list l =
+    plus ((fun x -> x + 1) 0) (fold_right plus 0 l)
+  
+  (** val var_gen : vars -> var **)
+  
+  let var_gen e =
+    var_gen_list (epsilon __)
+(...)
+\end{verbatim}
+In this case we might want to replace the entire finite set module with a standard set implementation. Then, we can use standard function \verb|elements| to move from \verb|var_gen| to \verb|var_gen_list|.\\
+
+After making these two changes we have a complete evaluator of \nodiaLangLF{} extracted from the proof.

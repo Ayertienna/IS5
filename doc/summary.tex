@@ -1,0 +1,15 @@
+\chapter{Summary} \label{chapter:summary}
+
+In this thesis we have formalized languages for three variants of \ND{} system for \logic{}. One of these systems, \langL{} along with the corresponding language was known beforehand, as the work of Tom Murphy VII et al.~\cite{labeled}. For the second one, the logic (\logicLF{})  was described by Galmiche and Sahli~\cite{labelfree}, but the language itself is our contribution. Finally, \langHyb{} is a new language for logic \logicHyb{} (our variant of \logicLF{} which is not syntacticly pure) we have proposed in this thesis.\\
+
+By creating an intermediate language between \langLF{} and \langL{}, we were able to determine the connection between these two languages. We have shown how to transform terms from one language to the other in a type-preserving manner, using a two-step transformation with \langHyb{} as an intermediate step. This immediately provides an equivalence of type systems (\ND{} systems) for all three of these languages -- that is, for three variants of \logic{}.
+
+Further in Chapter \ref{chapter:relations} we have managed to immerse \langHyb{} into both \langLF{} and \langL{} in a reduction-preserving manner. Moving in the other direction (from \langL{} and \langLF{} to \langHyb{}) while preserving reductions is an interesting future challenge, that would allow to identify syntactically pure \langLF{} with nicely interpretable \langL{}.\\
+
+We have discussed the termination of \langLF{} in Chapter \ref{chapter:termin}. Using a simple adaptation of Tait's method, we provided termination result for \langLF{} without $<*>$. We have also automatically extracted the evaluator for \nodiaLangLF{} from the proofs.
+
+Finally, what we consider the biggest contribution of this thesis, we have shown termination of full \langLF{} using continuations.\\
+
+We believe that an interesting extension of this thesis would be to consider termination of \langHyb{} and compare the obtained evaluator with both the one extractable from our proof of \langLF{} termination and the one described in~\cite{labeledphd} for \langL{}.\\
+
+It is worth noting that all the above mentioned contributions were formalized using Coq proof assistant. Most of this work has not been formalized ever before, and to the best of our knowledge none of it was defined in a proof assistant using the representation and system that we have chosen.

@@ -1,0 +1,1786 @@
+UniwersytetWrocl􏰀awski
+Wydzia􏰀l Matematyki i Informatyki Instytut Informatyki
+Intuitionistic Modal Logic IS5
+Formalizations, Interpretation, Analysis
+Agata Murawska
+A Master’s Thesis written under the supervision of Ma􏰀lgorzata Biernacka
+Wrocl􏰀aw,May2013
+1
+2
+Abstract
+IS5 is an intuitionistic variant of S5 modal logic, one of the normal modal logics, with accessibility relation defined as an equivalence. In this thesis we formalize two known variants of natural deduction systems for IS5 along with their corresponding languages. First, the syntactically pure IS5LF vari- ant that does not name the modal worlds, is due to Galmiche and Sahli. The second one, IS5L, using world names (labels) in inference rules and in terms of its language, is due to Tom Murphy et al.
+For each of the languages accompanying these logics we prove standard properties such as progress and preservation. We show the connection be- tween these languages via a series of type-preserving transformations of terms and contexts. Finally, we give a proof of termination for the call-by-name strategy of evaluation using logical relations method.
+The formalization of all of the above properties is done in Coq1 proof assistant. In particular, the proof of termination allows – via Curry-Howard isomorphism – to extract the evaluator in OCaml from the proof.
+Our contributions include providing a term language LIS5-LF for IS5LF, as well as creating an in-between logic IS5Hyb and the corresponding language LIS5-Hyb, used when showing the connection between LIS5-L and LIS5-LF. For the former language we formalize the termination of call-by-name evaluation strategy.
+1The Coq development is available at author’s github page, http://github.com/ Ayertienna/IS5.
+3
+￼
+4
+Acknowledgments
+I would like to thank my supervisor, Ma􏰀lgorzata Biernacka, for her support and guidance during the time when I was actively working on this thesis and for her patience during the time when I was not. Not only has she guided me towards the (happy) ending, but she has also devoted many hours to review draft versions of this thesis. I could not be more grateful for that.
+I probably would not even begin writing the code that created a base for this thesis without the help and encouragement from my friend, Filip Sieczkowski, who guided me through at the beginning, when I was consider- ing the possible approaches to this formalization. His experience with Coq was of immense value at multiple occasions, when there were more questions than answers. I would have most certainly gone mad without his advice, especially in the early stages.
+Last but definitely not least I want to thank my partner, Krzysztof Sak- werda, who not only provided moral support throughout this year, but also had the patience to listen to my rants and raves when a proof “just would not go through“. On numerous such occasions he would – after listening to my approach to a problematic proof – ask this one simple question that gave me the final idea. At times I wondered if he understands more of my work than I do.
+Agata Murawska
+5
+6
+Table of Contents
+1 Introduction 9
+1.1 Goalsandapproach........................ 11 1.1.1 FormalizationinCoq................... 12
+1.2 Planofthethesis ......................... 13
+2 Intuitionistic modal logic 14
+2.1 Modallogic ............................ 14 2.1.1 Kripkesemantics ..................... 15 2.1.2 Axiomatization ...................... 16
+2.2 Intuitionisticmodality ...................... 17 2.2.1 Kripkesemantics ..................... 18 2.2.2 AxiomatizationofIK................... 20
+2.3 FormalizationsofIS5....................... 20 2.3.1 Expressivepowerandlimitations . . . . . . . . . . . . 20 2.3.2 Axiomatization ...................... 21 2.3.3 Naturaldeduction..................... 23
+2.4 Applications............................ 27 2.4.1 Curry-Howardisomorphism ............... 28
+3 Term languages for IS5 31
+3.1 Syntax............................... 31 3.1.1 Non-modalterms ..................... 31 3.1.2 Mobilecode........................ 32 3.1.3 Addresses ......................... 33
+3.2 Alabeledlanguage ........................ 34 3.2.1 Typesystem........................ 34 3.2.2 Operationalsemantics .................. 35
+3.3 Alabel-freelanguage....................... 37 3.3.1 Typesystem........................ 38 3.3.2 Operationalsemantics .................. 40
+3.4 Ahybridlanguage ........................ 41 7
+3.4.1 Typesystem........................ 42
+3.4.2 Operationalsemantics .................. 43 3.5 Progressandpreservation .................... 44 3.5.1 Progress.......................... 45 3.5.2 Preservation........................ 46
+4 Relations between languages 48
+4.1 FromLIS5-HybtoLIS5-L ...................... 49 4.2 FromLIS5-HybtoLIS5-LF...................... 52 4.3 FromLIS5-LtoLIS5-Hyb ...................... 54 4.4 FromLIS5-LFtoLIS5-Hyb...................... 59
+5 Termination of evaluation 63
+5.1 LIS5-LFwithout♦ ......................... 64 5.2 CompleteLIS5-LF ......................... 66
+6 Summary 71
+A Implementation in COQ 73
+A.1 Representationofterms ..................... 73 A.1.1 Locallynamelessrepresentation . . . . . . . . . . . . . 74 A.1.2 Cofinitequantification .................. 77
+A.2 LanguagesforIS5......................... 78 A.2.1 Environmentrepresentation ............... 78 A.2.2 LIS5-L............................ 79 A.2.3 LIS5-LFandLIS5-Hyb .................... 81
+A.3 Languagesequivalence ...................... 83 A.3.1 FromLIS5-LtoLIS5-Hyb .................. 84 A.3.2 FromLIS5-LFtoLIS5-Hyb.................. 88
+A.4 Terminationofevaluation .................... 89 A.4.1 LIS5-LFwithout♦..................... 90 A.4.2 CompleteLIS5-LF ..................... 93 A.4.3 Evaluatorextraction ................... 96
+8
+Chapter 1 Introduction
+When thinking about truth value of a sentence such as ”I am sad”, we have to put it in a context. Am I sad now? In general? Or maybe just sometimes? This context – ”now”, ”in general”, ”sometimes” – can be thought of as a form of truth qualification: ”I am always sad”, for instance, might lead us to believe that in this particular moment, I am sad as well. The reverse is usually not true – just because I am sad right now, does not make me sad every single day. We can think of ”in general”, ”right now” and other qualifiers as modals.
+Statements of logic can be qualified in a similar manner: for a logic to be considered modal it has to qualify the truth. Alethic modalities talk about possibility, necessity and impossibility; epistemic logics treat knowledge and belief as qualifiers; deontic modalities use obligation and permission. Such qualifications are not a new concept – modal logic as a discipline of philos- ophy dates back to ancient Greece [9], to the works of Aristotle with later developments of Diodorus Cronus, Philo the Dialectician and Chrysippus. They were considering, among other, the problem of future contingents – that is, whether one can meaningfully regard future contingents as true or false now, given that the future is still open and undecided. This lead to developments in both modal and temporal logic.
+Modality in philosophy was for many years controversial, not widely used and far from a formal discipline. It wasn’t until C. I. Lewis’s series of articles and finally his book ”Symbolic Logic” from 1932, that modern modal logic was born [2]. Lewis introduced five modal systems, S1 through S5, last two of which are examples of what we now consider normal modal systems. His approach was to change the definition of implication – making it more in line with its natural interpretation, that one proposition implies the other if the second can be deduced logically from the first. In particular, in Lewis’s opinion it should not be the case that p → (q → p). Using possibility (♦) as a
+9
+modal primitive allowed him to redefine implication as p → q := ¬♦(p ∧ ¬q). He did not yet think of modality as we tend to do nowadays – there was no separation of possibility from propositional rules, as is the case in almost all current formalizations. While we tend to interpret modality as something additional, with its own set of rules, Lewis saw it as embedded in all the definitions and inseparable. Even though his approach did not last, systems he introduced – in particular S4 and S5 – are still subjects of active research.
+Just as C.I. Lewis is considered the father of the syntactic tradition, Saul Kripke is the father of modal semantics. In his 1959 article [10] he introduced what is now referred to as Kripke semantics or possible worlds semantics, a formal semantics for non-classical logic systems. This allowed modal logics to further develop as a field of formal reasoning.
+Even before the formal semantics for modalities were developed, another important concept was introduced by Fitch [6]: intuitionistic modal logic – first defined as modal logic T extended with formula ∀x, 􏰉F x → 􏰉∀x, F x (known as the Barcan formula), with formalization given as both Hilbert- style axiomatization and Gentzen-style sequent calculus. It was not very influential, not nearly as much as the subsequent work in this field by Prior in his ”Time and Modality” [17], where MIPQ logic – now known as IS5 – was defined. Another milestone was a PhD thesis of Alex K. Simpson [18], where he analyses proof theory and semantics for a family of intuitionis- tic modal logics. Simpson’s natural deduction systems based on geometric theories were further developed to better reflect the interpretations given to various modal logics, for example by Pfenning and Davies [15] or Galmiche and Sahli [7].
+Another concept crucial for this thesis is a correspondence between com- puter programs and formal proofs known as Curry-Howard isomorphism. It was first observed by Curry in 1934 that axioms of simple intuitionistic impli- cation logic can be viewed as types for combinators. In 1958 Curry extended this observation by noticing that Hilbert-style deduction systems and a frag- ment of combinatory logic, used as a standard model of computation, are one and the same thing. Finally, in 1969 Howard made the discovery that natural deduction intuitionistic proofs can be interpreted as typed lambda calculus. The relation between programs and proofs did not stop there – increasingly complicated formal systems were being developed, giving birth to the field of modern type theory.
+One particularly interesting calculus that uses higher-order logic, created within this trend is Calculus of Constructions [5] – a basis for the Coq auto- matic prover, where proving theorems means writing programs. An example
+10
+of Coq is particularly important to us as we use it for the formalizations of IS5 logic presented in this thesis. That being said, there were of course other languages developed based on this concept, including ones that gave intuitionistic modal logics meaning as programming languages.
+One example of such language is ML5 [12], a language developed by Tom Murphy VII et al. as part of the ConCert platform. It is a programming language based on ML with support for parallel computations. The base for its type system is exactly the logic that is of interest to us – IS5. Another variant of IS5 formalization, this time without language accompanying the logic, came from Galmiche and Salhi’s article [7] where they gave an alterna- tive decidability result for intuitionistic S5. These two papers form a base for this thesis. They present different approaches, as Galmiche and Salhi do not use labels for their formalism, resulting in syntactically pure logic, whereas Tom Murphy et al. name contexts, thus extending the usual syntax with labels.
+1.1 Goals and approach
+The natural deduction system that formed the base for Murphy’s ML5 was formalized in Twelf [14], but most articles on modal logics lack verifiable implementations in a theorem prover. In particular an alternative natural deduction system using multi-contextual environment [7] does not have a formal implementation. One of our goals is therefore filling that gap using Coq.
+As our interest lies more in theoretical results of variants of IS5, rather than practical implementations, we have chosen Lambda 5 with its simple external language [14], rather than full system with configuration, networks and tables. We provide an alternative (Coq, rather than Twelf) implementa- tion of Lambda 5, but also, using similar syntax, extend Galmiche’s natural deduction for LIS5 with terms. As the resulting language does not use labels to express changing worlds, we also propose a new variant of this system that uses labels for worlds, but is otherwise very similar to label-free version of IS5, in particular in the use of multi-context environment.
+With a number of different implementations of IS5 and their correspond- ing languages, attempting to translate one language into another is a natu- ral problem. Logical systems in all of the formalisms are considered to be variants of the same logic, IS5, thus we expect them to be equivalent. As programming languages, these systems do differ a little, making translation
+11
+a less trivial task.
+Our new hybrid language, LIS5-Hyb, is easily embedded in both labeled and
+label-free implementations (LIS5-L and LIS5-LF, respectively) – in both cases the translation preserves types and reductions. To go in the other direction – that is, from LIS5-L to LIS5-Hyb or from LIS5-LF to LIS5-Hyb – proved to be a more difficult and technical problem, to which we only provide a partial solution.
+Finally, one of the most important features of a logical programming lan- guage is the termination of its evaluation. In languages with solid theoretical foundations and without general recursion it is often the case that we can prove termination of well-typed programs. Languages based on IS5 are, in that respect, no different. We show termination of evaluation for variant of LIS5-LF without possibility (♦) using standard Tait’s method for simply-typed λ-calculus. We then provide extension of this result to a full LIS5-LF language.
+It is worth noting that from the proof of termination formalized in Coq we can extract the evaluator in OCaml programming language. In fact, such evaluator has been extracted for the LIS5-LF without possibility.
+1.1.1 Formalization in Coq
+The logical (and type) systems and all the theorems mentioned throughout this thesis have been formalized in Coq. We have left implementation details out of the main text; all the remarks on Coq development can be found in Appendix A. One thing to mention is the libraries and λ-calculus formal- ization that we chose. We use first-order representation, not higher-order abstract syntax, as α-conversion is not done automatically in Coq. We have chosen Chargu ́eraud’s metatheory package([1], [4]) and an approach known as locally nameless representation. The idea behind it is a combination of de Bruijn indices used for bound variables and fresh, named binders for free variables. To give an example, an identity function in such representation looks like: λA.0, rather than λ(v : A).v, but expressing a hypothesis that is already in a context does not use indices: hyp v.
+Another important difference is cofinite quantification [1] when introduc- ing new variables. An example of this approach is the following inference rule:
+∀v ∈/ L, (v : A) : Γ ⊢ M v : B
+Γ ⊢ λA.M : A → B
+Mv is an operation replacing 0 with v in term M. Note that the premise
+(v: A): Γ ⊢ Mv : B is required to hold for any v from outside some given set 12
+￼￼￼￼￼
+L – not necessary the set of free variables used in M. We interpret rule v ∈/ L as freshness and read this condition as ”for any v that is fresh enough”. We will expand this topic in the Appendix A.
+1.2 Plan of the thesis
+In Chapter 2 we give formal introduction to modality, intuitionistic modality and – in particular – IS5. For the latter, we describe axiomatization as well as a number of deduction systems, including the one that was developed as part of this thesis. We also expand the topic of applications of IS5, motivat- ing its usage as a type system.
+In Chapter 3 we introduce three languages: LIS5-L, LIS5-LF and LIS5-Hyb, corresponding to the three variants of natural deduction system for IS5 that were presented in Chapter 2. We justify correctness of these languages by presenting proofs of progress and preservation.
+In Chapter 4 we establish relationships between the languages introduced in Chapter 3. This is done via a series of translations LIS5-L ↔ LIS5-Hyb ↔ LIS5-LF, all of which preserve type inference.
+In Chapter 5 we discuss termination results – first for sublanguage of LIS5-LF without ♦ type, then for complete LIS5-LF, which requires slightly more complicated approach using continuations.
+Finally, Chapter 6 summarizes contributions of this thesis.
+Orthogonally to the above mentioned chapters, we discuss implementa- tion details in Appendix A. Its structure corresponds to the structure of chapters, but in there we focus more on the challenges coming from using Coq proof assistant and differences between paper description and actual implementation.
+13
+Chapter 2
+Intuitionistic modal logic
+2.1
+In this chapter we introduce modal logics and intuitionistic modal logics. Our focus is on particular IS5, for which we present an axiom- atization and three variants of a natural deduction system. Finally we provide motivation and means by which IS5 can be used as a type system. This chapter concludes with a short introduction to Curry- Howard isomorphism.
+Modal logic
+We begin by giving a general overview of modal logics. Where do we place them in relation to standard logic, be it classical or intuitionistic? How can we motivate the construction? What can it express?
+Suppose we have such a simple logic L, non-modal, as of yet. It may be classical or intuitionistic, but we want to consider it a simple one – typically it would be using a single context to store assumptions and it would have →, possibly along with some other logical connectives like ∨ or ∧, ¬ etc. We can think of logic L as describing a single world, associated with a sin- gular context it uses. What if we have many worlds? In each of them we can use L – but that is all. However, if these worlds are connected (like in a directed graph), we may want to be able to say something more, express some properties of edges, of moving between worlds.
+We can be interested in expressing, for example, that for the current world, wherever we move, we are in a place where φ holds. Such a property will be written as 􏰉φ. This is very much like saying ”for all worlds connected to this one, φ”. We can therefore think of 􏰉 type as a variant of ∀ talking about connected worlds.
+14
+Where we have ∀, it is usually possible to find ∃ equivalent as well. To say that there is a world connected to the current one in which ψ holds, we will write ♦ψ.
+These two operators, 􏰉 and ♦, are what we call modal operators. We read 􏰉 as ”it is necessary” and ♦ as ”it is possible”. There are more possi- bilities of modal operators – for example in epistemic logics there are modal operators expressing knowledge (K) and belief (B). In our formalizations we will however limit ourselves to 􏰉 and ♦.
+Different modal logics are distinguished based on both the logic under- neath modal operators (intuitionistic, classical, linear, etc.) and accessibility relation. Further in this section we will describe axioms of some standard modal logics. As we are more interested in intuitionistic logics rather than classical ones, we will not dwell into details, rather provide axioms which are used to extend standard Hilbert calculus into a system for modal logic (Hilbert-Lewis system). To give the intuitive meaning of connectives, we will use formal semantics usually referred to as Kripke semantics, described below.
+For simplicity, we chose logic that has only four operators: →, ¬, 􏰉, ♦ and propositional variables p, q, . . . .
+2.1.1 Kripke semantics
+The notion of logical consequence for modal logics is defined using Kripke semantics.
+We begin by defining a frame, that is a pair F = (W,R), where W is a set of worlds and R ⊆ W × W is an accessibility relation: (w, v) ∈ R when we can move from world w to world v directly. We may simply think of F as of a directed graph.
+Next we extend such frame F into a model M = (W,R,V) where V is a function relating worlds from w with sets of propositions which are true in this world. Finally, |=, often referred to as evaluation relation, is an extension of V to formulas, defined inductively as:
+w |= p if and only if p ∈ V (w)
+w |= ¬A if and only if w ̸|= A
+w |= A → B if and only if w ̸|= A or w |= B w|=􏰉Aifandonlyifforallu∈W suchthat(w,u)∈R,u|=A
+15
+w|=♦Aifandonlyifthereexistsu∈W suchthat(w,u)∈Randu|=A
+w |=⊥ should never be true
+We read w |= A as ”A is satisfied in w”.
+A given formula φ is considered valid
+− in a model (M |= φ), if it is satisfied in every world of that model,
+w |= φ for all w ∈ WM
+− in a frame (F |= φ), if it is valid for every possible model of that frame
+(that is for any choice of V), M |= φ for all M extending F
+Below are some variants of modal logics where relation R has some general
+properties, usually referred to as frame conditions.
+K enforces no conditions on R;
+D requires R to be serial, meaning that we always have some world connected to the current one: ∀w∈W ∃v∈W (w, v) ∈ R;
+T requires R to be reflexive;
+S4 requires R to be reflexive and transitive;
+S5 requires R to be reflexive, symmetric and transitive and Euclidean (mean- ing that ∀w1,w2,w3∈W(w1,w2) ∈ R∧(w1,w3) ∈ R → (w2,w3) ∈ R and ∀w1,w2,w3∈W (w1, w3) ∈ R ∧ (w2, w3) ∈ R → (w1, w2) ∈ R; transitive and symmetric relation is always Euclidean, Euclidean and reflexive relation is always symmetric and transitive).
+2.1.2 Axiomatization
+For the previously mentioned logics we also want to have a syntax. We will provide it using Hilbert-style axiomatization, by adding necessitation rule (N) and a number of axioms to the original propositional calculus.
+Note that in classical modal logics we can define ♦ in terms of 􏰉: ♦p := ¬􏰉¬p.
+MPA→BA NA B 􏰉A
+Subst: All substitution instances of theorems of propositional calculus Distribution Axiom K: 􏰉(p → q) → (􏰉p → 􏰉q)
+16
+￼￼
+Reflexivity Axiom T: 􏰉p → p Axiom S4: 􏰉p → 􏰉􏰉p
+Axiom B: p −→ 􏰉♦p
+Axiom D: 􏰉p → ♦p
+Axiom S5: ♦p → 􏰉♦p
+From these axioms we can construct a number of normal modal logics, starting with K = K + N + MP + Subst, which is the smallest normal modal logic. Adding T to K gives us T logic, which is more in line with intuition of ”if something is necessarily true, than it is true” – this is the logic used as base for Fitch system [6]. An alternative to T is adding D to K, resulting in D system, which eliminates ”loose ends” - in D, if something is necessary then it is possible, as there always exists at least one world con- nected to current one.
+More complicated logic arises when T is further enhanced with S4, resulting in S4 system. Finally, enriching S4 with S5 results in S5 logic.
+The intuitionistic counterparts of the last two systems have interesting applications in programming languages. IS4 (intuitionistic S4) can be used for staged computations, as described in [15]. IS5 on the other hand is a good model for distributed systems. We will describe this last example in more detail in the final section of this chapter. Before that, however, we need to add intuitionism to modality.
+2.2 Intuitionistic modality
+As we have already discussed modality in general, we now need to understand how intuitionistic logics differ from classical ones. What changes is the defi- nition of true statements. In classical logics we know that every statement is either true or false. In intuitionistic logics however, a statement is true only if there is a constructive proof that it is true and – dually – it is false only if there is a constructive proof that it is false.
+For example in axiomatic calculi for intuitionistic logic we remove from clas- sical axiomatization the law of excluded middle (p∨¬p) and double negation elimination (¬¬p → p) along with any other axioms that would allow us to prove any of these two (e.g. Peirce’s law ((p → q) → p) → p).
+17
+Knowing this, we should ask ourselves a question: how to create an intu- itionistic analogue of a given standard logic?
+What is definite and beyond question is that, just as classical modal logic requires its propositional fragment to be classical logic, intuitionistic modal logic IML requires such fragment to be intuitionistic logic (IL).
+In addition, every instance of a theorem in IL should be a theorem in IML. We also expect that adding the law of excluded middle (or double negation elimination etc.) to any variant of IML results in the appropriate classical counterpart.
+This is all very natural, but we have hardly touched on the topic of modal operators. We require them to be independent – meaning that no theorems such as 􏰉A ↔ ¬♦¬A can hold, just as they do not hold for ∨ and ∧ in intuitionistic propositional logic.
+2.2.1 Kripke semantics
+Similarly to classical modal logics, we can define Kripke models for intuition- istic ones. The definitions are combination of Kripke semantics for intuition- istic logic (without modality) and for modal logic. We have already given Kripke semantics for modal logic in the previous section – now we will give them for intuitionistic logic (IL).
+Kripke semantics for IL
+An intuitionistic Kripke model is a tuple M = (W, ≤, V ), where W is a set of Kripke worlds and ≤ is a pre-order on W . V is then a function from worlds to sets of propositions such that for w ≤ w′, Vw(p) ⊆ Vw′(p). Based on V we create a satisfaction relation |= parametrized by Kripke world w:
+w |= p if and only if p ∈ V (w)
+w |= A → B if and only if for all u ≥ w, u |= A implies u |= B w |=⊥ should never be true
+Note that typically ¬A is defined in terms of → and ⊥ as: ¬A := A →⊥
+Such semantics use worlds as states of knowledge – the w ≤ w′ relation between them intuitively expresses that w′ is an extension of w. In particular, it should be the case that all the knowledge from w is preserved in w′. This is captured in the following lemma:
+18
+Lemma 2.2.1 (Monotonicity). If w ≤ w’ and w |= φ then w′ |= φ. Proof. Proof is by induction on the structure of φ.
+Kripke semantics for IML
+As we have mentioned, semantics for IML combines definitions for modal and intuitionistic logic. We have two types of worlds - modal and Kripke. Kripke worlds (states1) are exactly the same as in IL; for a given state w we will have a set of modal worlds known in this state, a relation between these modal worlds and a function evaluating propositions.
+W aspreviouslyisasetofstates.SameasinIL,werequireittobepartially ordered using ≤ relation
+{Dw}w∈W gives worlds known in the given state; for w ∈ W, Dw is a non- empty set of modal worlds such that w ≤ w′ implies Dw ⊆ Dw′
+{Rw}w∈W is a family of relations on Dw × Dw, defining modal world acces- sibility and such that w ≤ w′ implies Rw ⊆ Rw′
+{Vw}w∈W for each w ∈ W, Vw is a function accepting modal worlds from Dw and returning a set of propositions which are true in this modal world; if w ≤ w′ then Vw(p) ⊆ Vw′(p)
+These form a birelation model B = (W≤, {Rw}w∈W , {Dw}w∈W , {Vw}w∈W ) We then define |= as follows:
+w,d |= p if and only if p ∈ Vw(d)
+w,d|=A→Bifandonlyifforallw′ ∈W suchthatw′ ≥w,w′,d|=A
+implies w′, d |= B
+w,d|=􏰉Aifandonlyifforallw′ ≥w,foralld′ ∈Dw′,ifRw′(d,d′)then
+w′,d′ |=A
+w,d |= ♦A if and only if there exists d′ ∈ Dw such that Rw(d,d′) and
+w,d′ |=A
+Again, there may be frame conditions on Rw that lead to semantics of
+certain logics like IK, IT, IS4 or IS5.
+Lemma 2.2.2 (Monotonicity). If w ≤ w’ and w, d |= φ then w′, d |= φ.
+Proof. Induction on the structure of φ.
+1It may be confusing to use “worlds“ both for members of W – Kripke worlds, and for modal worlds known at a given Kripke world. We will therefore call Kripke worlds “states“ to avoid confusion.
+19
+￼
+2.2.2 Axiomatization of IK
+We will finish description of intuitionistic modal logics by presenting an ax- iomatization of IK as per Plotkin’s 1986 article [16]. In the next section we will extend this axiomatization into one for IS5.
+An axiomatization of IK is the following:
+All substitution instances of theorems of intuitionistic logic 􏰉(A −→ B) → (􏰉A → 􏰉B) – distribution axiom K
+􏰉(A → B) → (♦A → ♦B) – another variant of distribution (♦A → 􏰉B) → 􏰉(A → B)
+Along with two standard rules of inference:
+MPA→BA NA B 􏰉A
+2.3 Formalizations of IS5
+The accessibility relation in IS5 is, same as in S5, an equivalence. We will look at only one connected component at a time, as it makes no change in expressive power – the only operators that use worlds at all are 􏰉 and ♦ and they are limited to connected worlds. With such assumption we do not need to mention accessibility relation at all – as all the worlds in W are connected to each other.
+For IS5 we would like to look at several different formalizations. We are also interested in limits of expressive power in this logic – i.e. what cannot we prove in IS5? What can we prove, that we couldn’t in weaker logics like IS4?
+2.3.1 Expressive power and limitations
+When thinking about limitations of IS5, we observe that they either come from the fact that IS5 is intuitionistic or from the expectations that we set for modal logics in general.
+An example of the first category can be ̸⊢ 􏰉A ↔ ¬♦¬A, lack of explicit connection between ♦ an 􏰉 mentioned in one of the previous sections. Note that this formula requires a classical axiom to prove and that it holds in S5.
+20
+￼￼
+Second type of limitations are for example ̸⊢ A → 􏰉A and ̸⊢ ♦A → A. These express different strength of three statements: 􏰉A is stronger than A (but we do not want it to be so strong as to never be true), A is stronger than ♦A (but again, ♦A should not be always true).
+These two statements, along with ⊢ A → ♦A and ⊢ 􏰉A → A capture exactlywhatL􏰀ukasiewiczexpectedmodaloperatorstobehave–howeverhe also expected them to be interdefinable. Prior [17] makes this definition more liberal, excluding the interdefinability, thus defining the intuitionistic variant.
+As to expressive power, the following formulas are true in IS5, but not in IS4:
+⊢ ♦A → 􏰉♦A
+⊢ ♦􏰉A → 􏰉A
+They are both variants of axiom S5. The first one reads ”if A is possible, then it is necessarily possible”, the second ”if A is possibly necessary, then it is necessary”.
+2.3.2 Axiomatization
+An axiomatization of IS5 extends IK with the following axioms: 􏰉A → A – reflexivity axiom T
+A → ♦A – an instance of reflexivity axiom; “if something is true, then it is possible“
+􏰉A → 􏰉􏰉A– S4, guaranteeing transitivity ♦♦A→♦A–avariantof S4for♦
+♦A → 􏰉♦A – axiom S5, stating that the relation is Euclidean ♦􏰉A→􏰉A–avariantof S5
+We can observe that, from the point of view of the axioms, IS5 is to S5 just as IK is to K. Next we want to ensure that this axiomatization matches the intuitive meaning of IS5.
+21
+Soundness and Completeness
+We want to ensure that the system we have just given is sound and com- plete. Soundness of a system means that its inference rules provide only valid formulas, where validity of a formula is determined by Kripke semantics2.
+Theorem 2.1 (Soundness). For every theorem φ of IS5, |= φ.
+Proof. We will validate only new axioms added to IK in the previous section.
+For proof of IK soundness please refer to [18].
+−􏰉A→A: Wewanttojustifyw,d|=􏰉A→Aforanygivenw,d. By definition this requires that for any w′ ≥ w, w′,d |= 􏰉A implies w′,d |= A. By definition of w′,d |= 􏰉A, for all w′′ ≥ w′ and for all d′ ∈ Dw′ , if Rw′ (d, d′) then w′, d′ |= A. From that we want to conclude w′,d |= A. Note that as our relation is an equivalence, we can take d′ = d. Therefore by definition of w′,d |= 􏰉A we can conclude that w ′ , d |= A .
+− A → ♦A: A similar argument is used; this time we want to exists such d′ ∈ Dw Rw(d,d′) and w,d′ |= A. d′ = d (in which w,d |= A) satisfies both of these conditions.
+− 􏰉A → 􏰉􏰉A: Having w,d |= 􏰉A we want to show that w,d |= 􏰉􏰉A. The latter requires that for all w′ ≥ w, for all d ∈ Dw′, if Rw′(d,d′) then w′,d′ |= 􏰉A. Let us take any such w′ and d′. We want to argue that w′, d′ |= 􏰉A. This requires that for all w′′ ≥ w′, for all d′′ ∈ Dw′′, if Rw′ (d′, d′′) then w′′, d′′ |= A. From definition of w, d |= 􏰉A, the fact that ≥ is a preorder and that Dw′ ⊆ Dw′′ we have that w′′, d′′ |= A.
+− ♦♦A → ♦A: Dually to the previous proof.
+− ♦A→􏰉♦A: Wewanttoarguethatifforallw′ ≥w,ifw′,d|=♦A then w′,d |= 􏰉♦A. The former means that there exists d ∈ Dw′ such
+that Rw′ (d, d′) and w′, d′ |= A. Let us denote such existing d′ as e. We have to conclude from that w′,d |= 􏰉♦A, meaning that for w′′ ≥ w′, d′ ∈ Dw′′, if Rw′′(d,d′) then w′′,d′ |= ♦A. Now we can use e as the modal world that the definition demands. indeed in w′′, d′ and e are connected (from Rw′(d,e) and properties of the relation Rw) and w′′, e |= A follows from monotonicity lemma.
+− ♦􏰉A → 􏰉A: Analogously as before.
+2From this moment on, when talking about Kripke semantics we will specifically mean semantics for IS5 – where R has to be an equivalence relation.
+22
+￼
+Completeness provides the opposite – everything that is considered valid under certain conditions, should also be syntactically derivable.
+Theorem 2.2 (Completeness). If |= φ then φ is derivable. The proof can be found e.g. in Simpson’s PhD thesis [18].
+2.3.3 Natural deduction
+Having axiomatization we can now move to natural deduction, a formalism in which it is easy to use proof-theoretic techniques when showing properties of the logic. We present here three natural deduction systems for IS5. The first one is IS5L, labeled logic, as described in [14] and [13]. It makes explicit use of worlds, but avoids mentioning relation R between them completely. This is possible as all the worlds are connected to each other, so R(w,w′) holds for any pair of worlds w, w′.
+One significant difference between IS5L and any generic formalizations of intuitionistic modal logics, such as by Simpson [18] is that most of the rules – with just three exceptions – act locally: both premises and the con- clusion use the same world. This is motivated by the aimed application of this particular logic – we will talk more about it in the next section and the subsequent chapter. Two of the exceptions we have just mentioned are op- erations referred to as fetch and get. They act on modal connectives, 􏰉 and ♦ respectively, and do not change the propositions, but rather the world in which the proof is. The last exception is 􏰉-introduction rule, which requires something to be true in a fresh world in order for it to be universally true.
+The complete ND system for IS5 in labeled variant is presented below. The following notations are used:
+Ω denotes the set of known worlds; it has the same role as W in Kripke models
+Γ is a context, containing all assumptions. As the assumptions are being made in a specific world, this world’s name is also part of the assump- tion
+A@w points to the world, in which A holds – in this case, w
+23
+IS5L
+(→ I) (􏰉I)
+(hyp)
+Ω;(A@w): Γ ⊢ B@w
+Ω; Γ ⊢ (A → B)@w
+w ∈ Ω (A@w) ∈ Γ
+Ω;Γ ⊢ A@w
+(→ E) Ω;Γ ⊢ (A → B)@w Ω;Γ ⊢ A@w
+￼￼￼w∈Ω
+fresh w0
+w0:Ω;Γ⊢A@w0
+Ω; Γ ⊢ B@w
+(􏰉E) Ω;Γ⊢􏰉A@w
+￼￼(♦I) Ω;Γ⊢A@w Ω;Γ ⊢ ♦A@w
+w ∈ Ω
+(fetch) Ω; Γ ⊢ 􏰉A@w
+Ω;Γ ⊢ 􏰉A@w
+(♦E) Ω;Γ⊢♦A@w fresh w0 w0:Ω;(A@w0):Γ⊢B@w
+Ω;Γ ⊢ B@w
+w ∈ Ω Ω; Γ ⊢ ♦A@w′
+(get) Ω; Γ ⊢ ♦A@w
+Ω; Γ ⊢ 􏰉A@w′
+Ω;Γ ⊢ A@w
+￼￼￼￼Most of the rules here look rather natural. In particular hyp, → I and → E are standard and used also in ND systems for IL. The new logical connectives rules 􏰉E and ♦I follow from the reflexivity axioms, 􏰉I is moti- vated by the necessitation rule. Finally, ♦E is a standard rule in any natural deduction system for intuitionistic modal logic.
+Proofs of a number of axioms of IS5 are given below. We begin with a proof for distribution axiom 􏰉(A → B) → (􏰉A → 􏰉B). Let w be any world from Ω and let Γ = [􏰉A@w, 􏰉(A → B)@w].
+􏰉(A → B)@w ∈ Γ
+􏰉A@w ∈ Γ
+￼￼w0:Ω;Γ⊢􏰉(A→B)@w w0 ∈w0:Ω w0:Ω;Γ⊢􏰉A@w w0 ∈w0:Ω w0 : Ω; Γ ⊢ (A → B)@w0 w0 : Ω; Γ ⊢ A@w0
+w0:Ω;Γ⊢B@w0 w∈Ω,fresh w0 Ω; Γ ⊢ 􏰉B@w
+Ω; [􏰉(A → B)@w] ⊢ (􏰉A → 􏰉B)@w
+Ω; ∅ ⊢ 􏰉(A → B) → (􏰉A → 􏰉B)@w
+Next example is (♦A → 􏰉B) → 􏰉(A → B). Again, w can be any world
+from Ω and by Γ we mean [A@w0, ♦A → 􏰉B@w].
+A@w0 ∈ Γ
+w0 : Ω; Γ ⊢ A@w0
+♦A→􏰉B@w∈Γ w0:Ω;Γ⊢♦A@w0 w0 ∈w0:Ω w0 : Ω; Γ ⊢ ♦A → 􏰉B@w w0 : Ω; Γ ⊢ ♦A@w
+w0:Ω;Γ⊢􏰉B@w w0∈w0:Ω w0 : Ω; Γ ⊢ B@w0
+w0:Ω;[♦A→􏰉B@w]⊢(A→B)@w0 w∈Ω,fresh w0 Ω; [♦A → 􏰉B@w] ⊢ 􏰉(A → B)@w
+Ω; ∅ ⊢ (♦A → 􏰉B) → 􏰉(A → B)@w 24
+￼￼￼￼￼￼￼￼￼￼￼￼￼￼￼
+Reflexivity axioms for both 􏰉 and ♦ is actually captured in the rules, so we will skip those.
+Next, transitivity in the ♦ case: ♦♦A → ♦A in w ∈ Ω.
+♦A@w0 ∈ [♦A@w0, ♦♦A@w]
+♦♦A@w ∈ [♦♦A@w] w0 : Ω; [♦A@w0, ♦♦A@w] ⊢ ♦A@w0 w ∈ Ω Ω; [♦♦A@w] ⊢ ♦♦A@w w0 : Ω; [♦A@w0, ♦♦A@w] ⊢ ♦A@w
+Ω; [♦♦A@w] ⊢ ♦A@w
+Ω; ∅ ⊢ (♦♦A → ♦A)@w
+We will conclude with the proof of axiom S5: ♦A → 􏰉♦A in any w ∈ Ω.
+♦A@w ∈ [♦A@w]
+w0:Ω;[♦A@w]⊢♦A@w w0 ∈w0:Ω w0:Ω;[♦A@w]⊢♦A@w0 fresh w0,w∈Ω
+Ω; [♦A@w] ⊢ 􏰉♦A@w
+Ω; ∅ ⊢ (♦A → 􏰉♦A)@w Soundness and completeness
+Again, we want to be sure that the system is sound and complete. Proofs for the two theorems below can be found in Simpson’s PhD thesis [18].
+Theorem 2.3 (Soundness). Let Ω be a set of known worlds. For every theorem φ of IS5L: Ω; ∅ ⊢ φ, it follows that |= φ.
+Proof. Induction on structure of derivation Ω; ∅ ⊢ φ.
+Theorem 2.4 (Completeness). Let Ω be a set of known worlds. If |= φ then
+Ω; ∅ ⊢ φ.
+Alternative ND systems - IS5LF and IS5Hyb
+Before we move towards applications, we would like to introduce two alter- native natural deduction-style formalizations of IS5.
+The first is due to a paper by Galmiche and Salhi [7]. It does not use world names at all, instead using a separate context for each world. We will refer to it as IS5LF.
+The syntax used in IS5LF’s ND system uses the following: Γ is the current context, about which we reason
+G is what we call a background – it is simply an environment containing all the other, non-current contexts
+25
+￼￼￼￼￼￼￼￼￼
+IS5LF
+A∈Γ
+G⊢Γ⊢A
+G ⊢ A: Γ ⊢ B (→ E) G ⊢ Γ ⊢ A → B G ⊢ Γ ⊢ A
+G⊢Γ⊢A→B G⊢Γ⊢B
+(hyp)
+￼(→ I)
+(􏰉I) Γ: G ⊢ ∅ ⊢ A
+(􏰉E1) G ⊢ Γ ⊢ 􏰉A (􏰉E2) Γ′ : G ⊢ Γ ⊢ 􏰉A G⊢Γ⊢A Γ:G⊢Γ′ ⊢A
+￼￼￼￼￼G⊢Γ⊢􏰉A (♦I1)
+G ⊢ Γ ⊢ A
+G⊢Γ⊢♦A
+(♦I2) Γ′ : G ⊢ Γ ⊢ A Γ:G⊢Γ′ ⊢♦A
+(A: ∅): G ⊢ Γ ⊢ B
+￼￼(♦E1 )
+G ⊢ Γ ⊢ ♦A
+￼(→ I)
+G ⊢ (w, Γ) ⊢ A
+G ⊢ (w,A: Γ) ⊢ B (→ E) G ⊢ (w,Γ) ⊢ A → B G ⊢ (w,Γ) ⊢ A
+G ⊢ (w, Γ) ⊢ A → B G ⊢ (w, Γ) ⊢ B
+fresh w0 (w,Γ): G ⊢ (w0,∅) ⊢ A
+(♦E2 )
+G⊢Γ⊢B
+Γ:G⊢Γ′ ⊢♦A (A:∅):Γ′:G⊢Γ⊢B
+￼Γ′ : G ⊢ Γ ⊢ B
+Note that for modal operators’ introduction and elimination rules, we usually have two variants: one changing the current context to something from the background and the other leaving it untouched – this allows skip- ping get and fetch rules. Other than that, the rules correspond to ones from LIS5-L .
+The second logic is our contribution - a variant of IS5LF, but with explicit world names as in IS5L. We will call it IS5Hyb as it is a hybrid between the other two and it makes a stepping stone in connecting (formally) the two. The syntax is the same as in ND for IS5LF, except we name the contexts.
+IS5Hyb
+(hyp)
+A∈Γ
+￼￼￼(􏰉I )
+(􏰉E1) G ⊢ (w,Γ) ⊢ 􏰉A (􏰉E2) (w′,Γ′): G ⊢ (w,Γ) ⊢ 􏰉A
+G⊢(w,Γ)⊢A (w,Γ): G⊢(w′,Γ′)⊢A
+26
+￼G ⊢ (w, Γ) ⊢ 􏰉A
+￼￼
+G ⊢ (w,Γ) ⊢ A (♦I1) G ⊢ (w,Γ) ⊢ ♦A
+G⊢(w,Γ)⊢♦A
+(♦E1 )
+(w′,Γ′): G ⊢ (w,Γ) ⊢ ♦A
+2.4 Applications
+(♦I2) fresh w0
+(w′,Γ′): G ⊢ (w,Γ) ⊢ A
+(w,Γ): G ⊢ (w′,Γ′) ⊢ ♦A ((w0,A):∅):G⊢(w,Γ)⊢B
+￼￼￼(♦E2 )
+G ⊢ (w, Γ) ⊢ B
+fresh w0 (w0,A: ∅): (w,Γ): G ⊢ (w′,Γ′) ⊢ B
+(w,Γ): G ⊢ (w′,Γ′) ⊢ B
+￼What are possible applications of intuitionistic modal logics? They vary from programming languages to describing behavior of hardware circuits, from ap- plications in bisimularity to staged computations. We would now like to focus on applications for IS5, namely distributed programming, as it is our main motivation for investigating IS5.
+How do we define a problem for which, as we claim, IS5 is the solution? Imagine we have a number of hosts in the network. The connectivity relation R will determine how these hosts are connected. In a standard networking environment it is most natural to assume that all hosts are connected to one another, so R is an equivalence. This is exactly the case in IS5.
+Next, some resources are available only locally. It means that each host in the network has direct access to its own resources, but not to the resources of its neighbors. This characterizes type ♦: it is a type for local address. We can have such address, but unless we are at the host, at which this address was made, we cannot unpack it and use its value.
+Finally, for some programs to be run in a distributed environment, they need to be executable from any host within the network – we will call them mobile. We want to be able to express that for some computations it does not mat- ter where they are being run. This matches our understanding of necessity (“true everywhere“) – making 􏰉 type a good choice for such mobile programs.
+With such interpretation, what do we make of some of the the character- istic propositions from IS5?
+􏰉A → A is simple to interpret: mobile programs are executable
+A → ♦A is just as straightforward, stating that we can create an address of anything
+27
+♦􏰉A → 􏰉A states that if we have an address of a mobile value, then we can obtain such value
+Having said all that, it suggests that IS5 seems like a good type system for distributed programming languages. What is missing are actual terms. We will add them in the next chapter, but first let us talk a little bit about how we can actually put the logic into a good use as type system via Curry- Howard correspondence.
+2.4.1 Curry-Howard isomorphism
+Originally discovered by Haskell Curry and William Alvin Howard, by Curry- Howard isomophism we now understand a relationship between proofs in a logical system and programs. To put things simply: a proof is a program, the formula it proves is a type for this program. Furthermore, what this means is that reduction (when looking at terms) can be viewed as proof transfor- mation for logic.
+The simplest but perhaps most vivid example is the original observation of Howard, correlation between the intuitionistic natural deduction system and the simply typed λ-calculus. We will now give a brief overview of the two. For the sake of simplicity we will limit ourselves to a system with only → operator.
+Natural deduction
+Natural deduction system for implication has the following rules of inference, where α and β are judgments ”α is true” and ”β is true” respectively.
+(Ax) α ∈ Γ (→ I) α: Γ ⊢ β (→ E) Γ ⊢ α → β Γ ⊢ α Γ⊢α Γ⊢α→β Γ⊢β
+For example, a proof of the judgment (α → β) → α → β being true can be constructed as follows:
+(α → β) ∈ [α, α → β] α ∈ [α, α → β]
+[α, α → β] ⊢ α → β [α, α → β] ⊢ α
+[α, α → β] ⊢ β
+[α → β] ⊢ α → β
+[ ] ⊢ (α → β) → α → β
+Note that there may be more than one proof tree for a given statement.
+Take, for example, α → α. A proof for that can simply be
+28
+￼￼￼￼￼￼￼￼
+α ∈ [α]
+[α] ⊢ α
+[]⊢α→α
+But nothing stops us from producing the following proof:
+α ∈ [α]
+(α → α) ∈ [α → α] [α] ⊢ α
+[ ] ⊢ (α → α) → (α → α) [ ] ⊢ α → α
+[]⊢α→α
+λ-calculus with simple types
+Typing rules for simple λ-calculus are the following:
+x: α ∈ Γ
+￼￼￼￼￼￼(Var)
+(Lam) (x: α): Γ ⊢ M : β (Appl) Γ ⊢ M : α → β Γ ⊢ N : α
+Γ ⊢ λxα.M : α → β Γ ⊢ M · N : β Note that α and β are now types for terms in λ-calculus.
+Looking at the rules, the similarity is striking. Let us then take a look at two different terms: first is an identity function λxα.x, the second is more complex: (λf(α→α).f) · (λxα.x). We want to assign them types using typing rules we have just provided.
+￼Γ ⊢ x: α
+￼￼First the identity function:
+[ ] ⊢ λxα.x: α → α And then the more complex term:
+(f : α → α) ∈ [f : α → α]
+[ ] ⊢ λf(α→α).f(α → α) → (α → α)
+x: α ∈ [x: α]
+[x: α] ⊢ x: α
+[ ] ⊢ λxα.x: α → α
+x: α ∈ [x: α]
+[x: α] ⊢ x: α
+￼￼￼￼￼￼[ ] ⊢ (λf(α→α).f) · (λxα.x): α → α
+Not only they are of the same type, their typing trees look exactly like two proofs for α → α in natural deduction system. When checking the type of term λxα.x we did not have any choice – we had to build the simpler proof tree. This is true in general and this is what we mean by “programs encode proofs“.
+29
+Computations
+For λ-calculus the computation consists of applying β-reduction until a value is obtained: (λxα .M ) · N 􏰁→β [N |x]M . Without changing the final re- sult of the computation, we can also expand the term via η-expansion: M 􏰁→η λxα.(M · x) when x ∈/ FV M. What is the meaning of these oper- ations in logic?
+β-reduction corresponds to local soundness of → in natural deduction, a form of optimizing the proof. Looking at the proof tree:
+D
+(x: α): Γ ⊢ M : β
+E
+￼Γ ⊢ λxα.M : α → β Γ ⊢ N : α
+Γ ⊢ (λxα.M) · N : β
+we can see that it uses → introduction one step before elimination. In
+pure logic without terms, we can rewrite this proof as
+[E |α]D
+Γ⊢N:β
+Similarly, η-expansion is justified by local completeness of → operator.
+We have advocated the importance of finding an interpretation for some logic – it is not because we can formally describe e.g. distributed compu- tations using IS5, but because we can obtain a programming language that realizes this interpretation. In the next chapter we will present three such languages, one for each variant of IS5 natural deduction system.
+￼￼30
+Chapter 3
+Term languages for IS5
+In this chapter we describe syntax and operational semantics for lan- guages corresponding to three variants of IS5’s N D systems presented in the previous chapter. We also justify correctness of one of these languages by presenting proofs of progress and preservation.
+3.1 Syntax
+Keeping in mind applications mentioned in the previous chapter, we begin by describing the syntax of a prototypical programming language1 for dis- tributed computations. This language will use IS5 as a type system via the Curry-Howard isomorphism. This will allow us to relate proofs in IS5 with programs in LIS5, as mentioned previously.
+Note that as our interest lies in the properties of the formal system rather than the practicality of the language, our prototype is a λ-calculus-like lan- guage rather then, say, SML-like one. In particular, it is not intended for actual programming, but it could be enriched in various constructs like ML5, a real-life language with IS5-based type system([14], [13], [12]).
+3.1.1 Non-modal terms
+The specific language features we are interested concern mobility, therefore for the non-modal terms we limit ourselves to functions and variable usage – adding pairs as interpretation for conjunction should not cause problems,
+1When giving examples of inference rules throughout this section, we will use LIS5-L, which will be formally introduced later in this chapter.
+31
+￼
+other typing rules may prove more challenging – [7] is a good starting point for adding them.
+Our syntax for this part is identical to the standard lambda calculus:
+λ(v : A).M is a unary function term, taking one argument of type A and computing term M. Term M may contain free occurrences of variable v, which is bound under λ.
+M ·N is an application of term M to N.
+hyp v marks assumption of a certain variable v.
+Typing rules for λ(v : A).M and M · N correspond to → introduction and elimination rules in IS5.
+3.1.2 Mobile code
+The rest of the syntax for the language of distributed computations is new – we will start with type 􏰉A for mobile code of type A. When we say ’mobile code’ we mean code that can be executed in any location in the network, regardless of its place of origin.
+Since we want to be able to run mobile code in every accessible world, we need means to move between them. This is achieved using fetch w M, an operation explicitly moving execution from one place to another. We only want to allow mobile code to be moved in this manner. The rule (fetch) below captures this restriction in a type system for LIS5-L, one of the languages we will describe later in this chapter:
+(fetch)
+w′ ∈ Ω Ω; Γ ⊢ M : 􏰉A@w
+￼Ω;Γ⊢fetch wM:􏰉A@w′
+Note that the only requirement we have apart from M being of mobile
+type is that host w′ is known to us.
+We know how to move the mobile code from one world to another. What about declaring something to be mobile? This is done using box w M.
+As we have already mentioned, mobile code can be executed anywhere. Treat- ing this description as an actual specification, we may say that for code M to be mobile, we require it to have a certain type A in every accessible world. There is however a problem with such an approach.
+32
+What is the status of shared memory? Do we have it? Do we want it? Say that we have assumption v : A in each of known worlds. Does this mean that such assumption hyp v should be mobile? Probably not. One good reason is that we want to be able to expand the set of known worlds, possibly with a world that has no assumptions in its context. After such expansion (usually referred to as weakening) our once mobile code hyp v stops being mobile. But how do we prevent this from happening? The simplest way is to require for M to have type A in a fresh world, of which nothing is yet known. If we can construct a type without any assumptions, we can also do it with them. The appropriate rule in LIS5-L is of the form:
+(box)
+fresh w0 w∈Ω w0:Ω;Γ⊢M:A@w0
+￼Ω;Γ⊢box M:􏰉A@w
+Freshness of w0 in this case means that Γ does not contain any assump-
+tions of the form x: A@w0 and that w0 is not known in Ω.
+Lastly, to actually execute code that is considered to be mobile, we need to be able to remove the mobility marker 􏰉. This is done using the unbox operator and corresponds to 􏰉 elimination rule. Of course, if it happens that introduction and elimination rules are used one after the other when typing a term (unbox (box w0 M)), we can simply use construction used to type M in a fresh world w0. It will surely be a correct proof tree as it uses no assumptions about the current world.
+3.1.3 Addresses
+Dually to universally executable modal code, we can introduce remote ad- dresses. If code M has type A at world w, then in this very world we can obtain the address of such code, which will be a term here M of type ♦A. The modality ♦ denotes address.
+In order to move a term of address type between hosts, we will need a get operator, strongly resembling fetch, but used on addresses rather than mobile code.
+Finally, how do we use addresses? Suppose that in order to type a term N we require some knowledge about code of type A. We do not know what this code looks like or where it can be found, only that it is somewhere within the network. We can emulate such knowledge by adding a variable v of type A to a freshly created host w0.
+33
+Now, once we have found some term M that is of type ♦A, we can remove the fake fresh host. The operator to do so is called letdia.
+An example of its formalization in LIS5-L would look like this:
+(letdia)
+Ω;Γ⊢M:♦A@w fresh w0 w0:Ω;(v:A@w0):Γ⊢N:B@w
+Ω;Γ⊢letdia [vw0 :=M]N:B@w
+￼Note that we do not yet make any real substitutions - term N will still contain occurrences of variable v. Instead, we have knowledge of an address of A-typed term, thus ensuring that it will eventually be able to remove the variable v and use a real value instead. If, however, we happen to be in a situation where M = here M0, then intuitively we can replace v with M0, as it is of the right type – A.
+3.2 A labeled language
+The first formalization we will look into in more details comes from [14]. It focuses on the global state of a distributed system, as we only have one context containing all the assumptions.
+3.2.1 Type system
+We will start by giving typing rules for the system. Some of them are stan- dard and identical as in natural deduction systems for intuitionistic logic (except using slightly different judgments), others come from new operators, i.e.: box, unbox, fetch, here, letdia and get. The previous section pro- vides intent for their interpretation.
+Let us review the notations used in LIS5-L:
+Ω denotes a set of known worlds – hosts in the network
+Γ is a global context, containing assumptions of the form v: A@w. We require each assumption’s name v to be unique - not only within its host w, but globally.
+A@w reads “type A on host w“
+Syntax for terms of LIS5-L is summarized as:
+M := hypv|λ(v:τ).M|M·M|boxwM|unboxM
+|fetch wM |here M |letdia [v:=w]MM |get wM
+where w denotes worlds, v denotes variables and τ denotes types (with ι denotingthebasetype):τ := ι|τ→τ|􏰉τ|♦τ.
+34
+w ∈ Ω (v: A@w) ∈ Γ
+Ω; Γ ⊢ hyp v : A@w
+fresh v0 Ω;(v0:A@w):Γ⊢M:B@w
+(hyp)
+￼(lambda)
+(appl)
+(box)
+w ∈ Ω
+(fetch) Ω;Γ⊢fetch w′ M:􏰉A@w
+Ω; Γ ⊢ M : A@w
+(here) Ω;Γ⊢here M:♦A@w (get) Ω;Γ⊢get w′ M:♦A@w
+￼Ω;Γ⊢λ(v0 :A).M:(A→B)@w
+Ω; Γ ⊢ M : (A → B)@w Ω; Γ ⊢ N : A@w
+￼Ω; Γ ⊢ M · N : B@w
+w∈Ω fresh w0 w0:Ω;Γ⊢M:A@w0
+Ω;Γ⊢box w0 M:􏰉A@w
+Ω; Γ ⊢ M : 􏰉A@w (unbox) Ω;Γ⊢unbox M:A@w
+Ω;Γ⊢M:♦A@w fresh w0,fresh v w0:Ω;(v:A@w0):Γ⊢N:B@w
+Ω;Γ⊢letdia [vw0 :=M]N:B@w
+￼Ω; Γ ⊢ M : 􏰉A@w′
+￼￼w ∈ Ω Ω; Γ ⊢ M : ♦A@w′
+￼￼(letdia)
+￼3.2.2 Operational semantics
+We are now able to write type-correct programs in LIS5-L; the next step is to assign them meaning by giving structural operational semantics to each term. There are of course expressions we consider to be final – values. First, a function is a value as usual, since we do not know what is the given argu- ment and therefore cannot continue evaluation. Next, box w0 M is a value, as for the mobile code we do not know what host we will run it at. Finally, for an address get w (here M) to be a value we require that the term M is a value as well. We will denote the fact that M is a value by val(M) further on.
+For some of the reductions we are about to describe we will require op- erations we haven’t mentioned before – term substitution [M|v]N and world merge {w|w′}N. They are both defined inductively on N, their interpre- tations are standard: [M|v]N replaces each occurrence of hypv by M and {w|w′}N replaces each occurrence of world w′ by world w, effectively merg- ing these two into one.
+Final remark is that reduction in LIS5-L is a relation not just between terms. It requires also knowledge about the current host. To see that, con-
+35
+sider what should happen when we are evaluating a program of the form unbox (box w0 M). We want to use (that is, unbox) mobile code we have just created (box w0 M), but to do so, we need to know at what host we will evaluate M. We will denote reduction taking place at host w as 􏰁→w.
+The most interesting part of operational semantics comes from local soundness of the connectives. We begin with necessity introduction followed by its elimination case that we have used to motivate introduction of host parameter into reduction relation:
+unbox (box w0 M) 􏰁→w {w|w0}M
+Intuitively, this is clear – we want to execute code that has just been made mobile, so we are simply replacing fresh name w0 with the actual one – w. This can be justified by the following reduction (simplification) of the proof tree:
+D
+w0 : Ω; Γ ⊢ M : A@w0 {w|w0}D
+􏰉I Ω;Γ⊢box w0 M:􏰉A@w w∈Ω,fresh w0 ⇒R Ω;Γ⊢{w|w0}M:A@w 􏰉E Ω;Γ ⊢ unbox (box w0 M): A@w
+￼￼When writing {w|w0}D we mean merging w with w0 through all: w0 : Ω, Γ, the term, and the type part.
+In particular for the last judgment, we have an assumption w ∈ Ω and we treat Ω as a set. In addition {w|w0}Γ = Γ, since we chose w0 to be fresh - thus not known in Γ. Therefore:
+{w|w0}(w0 : Ω; Γ ⊢ M : A@w0) = Ω; Γ ⊢ {w|w0}M : A@w.
+Next, let us take a closer look at local soundness of addresses: letdia [vw0 := get w′ (here M)] N 􏰁→w [M|v]{w′|w0}N
+Again, the proof tree justifies the reduction (w0 and v are fresh outside E subtree):
+￼￼♦E
+D
+Ω; Γ ⊢ M : A@w′
+♦I Ω;Γ⊢here M:♦A@w′
+Ω;Γ⊢get w′ (here M):♦A@w
+E w0:Ω;(v:A@w0):Γ⊢N:B@w
+￼Ω;Γ⊢letdia [vw0 :=get w′ (here M)]N:B@w
+[D|v]{w′|w0}E
+Ω; Γ ⊢ [M|v]{w′|w0}N : B@w
+36
+⇒R
+We have discussed most substitutions used here in the previous case, the only new one is [D|v]{w′|w0}E – this just means using proof tree D whenever we want to use the fact that v is a variable of type A in a given context.
+Next, there are compatibility rules for the new connectives: if M 􏰁→w M′, then unbox M 􏰁→w unbox M′
+if M 􏰁→w′ M′, then fetch w′ M 􏰁→w fetch w′ M′
+ifM􏰁→w′ M′,thenget w′ M􏰁→w get w′ M′
+if M 􏰁→w M′, then letdia [vw0 := M] N 􏰁→w letdia [vw0 := M′] N if M 􏰁→w M′, then here M 􏰁→w here M′
+along with two special rules for moving between hosts, that do require a comment:
+if val(M), then fetch w′ M 􏰁→w M
+if val(M), then here M 􏰁→w get w (here M)
+The rule for here operator is motivated by looking at definitions of values in LIS5-L. get w (here M) will already be a value since M is a value – thus, the purpose of this rule is to mark the end of evaluation. Instead of this rule we can add ”if val(M), then val(here M)” to the set of values.
+The first rule also seems artificial, but note that in the fetch case for any well-typed program, M must be of the form box w0 M′ (since it is a value) - we can therefore safely skip any world merging and just choose a different host when declaring code to be mobile.
+Finally we have β-reduction and the rules expressing compatibility with respect to application:
+β-reduction: (λ(v : A).M) · N 􏰁→w [N|v]M compatibility with application: if M 􏰁→w M′, then M · N 􏰁→w M′ · N
+3.3 A label-free language
+Looking at the global state of the system, as in the previous section, is not the only possibility for environment formalization. The label-free logic IS5LF described in [7] uses a multi-contextual environment where each host has its
+37
+own context. There is however no language given as an application for IS5LF. We fill that gap here by introducing LIS5-LF.
+In this particular formalization we do not give names to the hosts at all. There is no way to distinguish between two hosts containing the same as- sumptions (or no assumptions at all). However, as we do require all variable names to be distinctive, only hosts with no assumptions are truly indistin- guishable one from another.
+This changes interpretation a little bit, as we cannot use host names in our programs. Therefore we have no way of delegating execution to some specific host. One might think that it should be possible to use sets of as- sumptions true in specific hosts instead of host names, but this does not seem feasible, as these assumptions may change during execution when contexts are expanded (e.g. rule for λ(v : A).M). As a result, having only code of a program in LIS5-LF does not give us enough information to tell if this program uses resources outside its host. Only a proof tree can show that information.
+We will split all contexts into the current context Γ and the background G. By that we mean that computations take place in Γ and all hosts which are connected to the current one are in G.
+3.3.1 Type system
+As there are no rules like (fetch) or (get) from LIS5-L, we can only move between hosts upon creating or using modal-typed terms. This is why there are two ways of creating terms here, unbox and letdia.
+In the article[7] that introduces this variant of IS5 logic the authors did not add terms at all. They did, however, use two variants of 􏰉E, ♦I and ♦E rules, one changing the current context into another one from the background and the other leaving it with no change. Our decision not to differentiate these two situations also at the term level was a technical one. Granted, using different terms (say, unbox and unbox-fetch) in these two situations would make it possible to tell – just from the program – if it is run locally or if it needs external resources. But there were too many complications arising from such decision; for example, when we are merging two hosts’ con- texts, how do we tell if some unbox-fetch instance should not be turned into unbox after the merge? This would require looking at the entire proof tree! Therefore, we have only one term for both variants of (unbox) rule (same for (here) and (letdia)).
+38
+Syntax for terms of LIS5-LF is summarized as:
+M := hypv|λ(v:τ).M|M·M|boxM|unboxM
+|here M |letdia [v:=M]M
+(hyp)
+(v : A) ∈ Γ
+￼(lambda)
+(appl)
+G ⊢ Γ ⊢ hyp v : A
+fresh v0 G⊢(v0:A):Γ⊢M:B
+￼G⊢Γ⊢λ(v0 :A).M:A→B G⊢Γ⊢M:A→B G⊢Γ⊢N:A
+￼G⊢Γ⊢M·N:B Γ: G ⊢ ∅ ⊢ M : A
+Γ:G⊢Γ′ ⊢unbox M:A (get-here) Γ′ : G ⊢ Γ ⊢ M : A
+G⊢Γ⊢letdia [v0 :=M]N:B
+Γ:G⊢Γ′ ⊢M:♦A fresh v0 [v0:A]:Γ′:G⊢Γ⊢N:B
+Γ′:G⊢Γ⊢letdia [v0 :=M]N:B
+(box)
+G ⊢ Γ ⊢ box M : 􏰉A
+(unbox-fetch) Γ′ : G ⊢ Γ ⊢ M : 􏰉A
+￼(unbox)
+(here)
+G ⊢ Γ ⊢ M : 􏰉A G⊢Γ⊢unbox M:A
+G ⊢ Γ ⊢ M : A
+G⊢Γ⊢here M:♦A
+Γ:G⊢Γ′ ⊢here M:♦A fresh v0 [v0:A]:G⊢Γ⊢N:B
+￼￼￼￼(letdia)
+(letdia-get)
+G⊢Γ⊢M:♦A
+￼￼As we can see, the rules of this language are a bit more natural; they do not use too many syntax extensions. Compare the rule for box operator in LIS5-LF with similar rule in LIS5-L:
+(boxLF) Γ:G⊢∅⊢M:A (boxL) w∈Ω fresh w0 w0:Ω;Γ⊢M:A@w0 G⊢Γ⊢boxM:􏰉A Ω;Γ⊢box w0 M:􏰉A@w
+We notice for example that to create a new world it is enough to just add an empty context to the environment. As there are no names, it must be fresh by definition.
+39
+￼￼
+Another fact to observe is the difference between (here) and (get-here) (or any other pair of constructors/destructors of the same type) and corre- sponding terms from LIS5-L. In particular, (get-here) is exactly a result of flattening rules (get) and (here):
+Ω; Γ ⊢ M : A@w′
+w∈Ω Ω;Γ⊢here M:♦A@w′ (here)
+Ω;Γ⊢get w′ (here M):♦A@w (get) 3.3.2 Operational semantics
+Operational semantics for LIS5-LF resembles the one for LIS5-L. Values are the same: val(λ(v : A).M), val(box M), except there is no get operation, therefore here itself can be a value: if val(M), then val(here M).
+Most reductions are also similar, but they do not use host name as an additional parameter.
+As per its name, label-free formalization does not use labels for contexts at any point, so there is no need to define world merging operation on terms. Soundness-motivated reduction for 􏰉 type is therefore as simple as the fol- lowing:
+unbox (box M) 􏰁→ M
+This is justified by the following proof trees – there are two as there are two possibilities of how unbox operation looks like – it either changes the host or it does not:
+′
+(get-here) Γ:G⊢Γ⊢M:A Γ:G⊢Γ′ ⊢here M:♦A
+￼￼￼D
+Γ: G ⊢ ∅ ⊢ M : A
+⇒R
+⇒R
+{Γ ∪ ∅}currD G⊢Γ⊢M:A
+G⊢Γ⊢boxM:􏰉A 􏰉I G⊢Γ⊢unbox (boxM):A 􏰉E
+￼￼D
+Γ′ : Γ: G ⊢ ∅ ⊢ M : A
+{Γ ∪ ∅}currD
+Γ′ : G ⊢ Γ ⊢ M : A
+􏰉I Γ:G⊢Γ′⊢boxM:􏰉A 􏰉E Γ′:G⊢Γ⊢unbox (boxM):A
+￼￼The operation {Γ ∪ ∆}curr merges Γ and ∆ when ∆ is the current con- text. So in this case it merges Γ with ∅, effectively moving Γ to be the current context. In terms there is no distinction between moving between contexts and staying in place, so we do not have to change anything in M.
+Note that {Γ ∪ ∅}curr(Γ: G ⊢ ∅ ⊢ M : A) = G ⊢ Γ ⊢ M : A and
+40
+{Γ ∪ ∅}curr(Γ′ : Γ: G ⊢ ∅ ⊢ M : A) = Γ′ : G ⊢ Γ ⊢ M : A.
+Similarly for ♦ type we have:
+if val(M), then letdia [v := here M] N 􏰁→ [M|v]N
+This is justified by:
+D
+♦I G⊢Γ⊢M:A E
+G⊢Γ⊢here M:♦A fresh v ((v:A):∅):G⊢Γ⊢N:B
+￼♦E
+=⇒R
+G⊢Γ⊢letdia [v:=here M]N:B@w [D|v]{(v,A):∅∪Γ}curr E
+G ⊢ Γ ⊢ [M|v]N : B@w
+￼This is just one possible proof tree for letdia [v := (here M)] N, as both letdia and here can exchange current context, giving a total of four combinations.
+The rest of the rules, including β−reduction and compatibility rules are as follows:
+(λ(v : A).M) · N 􏰁→ [N|v]M
+if M 􏰁→ M′, then M · N 􏰁→ M′ · N
+if M 􏰁→ M′, then unbox M 􏰁→ unbox M′ ifM􏰁→M′,thenhere M􏰁→here M′ ifM􏰁→M′,thenletdia [v:=M]N􏰁→letdia [v:=M′]N
+3.4 A hybrid language
+The third language we would like to introduce in this thesis, LIS5-Hyb, is a combination of both previous ones. It uses multi-contextual environment, but at the same time still uses names for hosts. It is fairly simple to turn any program written in LIS5-Hyb into both LIS5-L and LIS5-LF – as we will see in the next chapter. In that sense it acts as a bridge between these two languages.
+41
+3.4.1 Type system
+The type system for LIS5-Hyb is derived from the one for LIS5-LF, except each context has a name. We require that variable names be unique, as well as host names.
+Syntax for terms of LIS5-Hyb is summarized as follows:
+M := hypv|λ(v:τ).M|M·M|box wM|unbox-fetch wM
+| get-here w M | letdia-get w [vw := M] M
+(appl)
+G⊢(w,Γ)⊢λ(v0 :A).M:A→B
+G ⊢ (w, Γ) ⊢ M : A → B G ⊢ (w, Γ) ⊢ N : A
+(hyp)
+(v : A) ∈ Γ
+￼(lambda)
+G ⊢ (w, Γ) ⊢ hyp v : A
+fresh v0 G⊢(w,(v0:A):Γ)⊢M:B
+￼￼(box)
+G ⊢ (w, Γ) ⊢ M · N : B
+fresh w0 (w,Γ):G⊢(w0,∅)⊢M:A
+￼(unbox)
+(unbox-fetch)
+(here)
+(get-here)
+G⊢(w,Γ)⊢box w0 M:􏰉A G ⊢ (w, Γ) ⊢ M : 􏰉A
+G⊢(w,Γ)⊢unbox-fetch wM:A (w′,Γ′): G ⊢ (w,Γ) ⊢ M: 􏰉A
+(w,Γ):G⊢(w′,Γ′)⊢unbox-fetch wM:A G ⊢ (w, Γ) ⊢ M : A
+￼￼￼(letdia)
+G ⊢ (w, Γ) ⊢ M : ♦A (w0, [v : A]), G ⊢ (w, Γ) ⊢ N : B
+G⊢(w,Γ)⊢letdia-get w[vw0 :=M]N:B (w′,Γ′):G⊢(w,Γ)⊢M:♦A fresh w0,fresh v
+(w0,[v: A]): (w,Γ): G ⊢ (w′,Γ′) ⊢ N: B
+(w,Γ):G⊢(w′,Γ′)⊢letdia-get w[vw0 :=M]N:B
+42
+G⊢(w,Γ)⊢get-here wM:♦A (w′,Γ′): G ⊢ (w,Γ) ⊢ M: A
+￼(w,Γ):G⊢(w′,Γ′)⊢get-here wM:♦A fresh w0,fresh v
+￼(letdia-get)
+￼
+Note that despite the fact that this type system is so similar to the one for LIS5-LF, by adding host names in terms we are getting significantly more information. In LIS5-LF in order to decide whether or not contexts were swapped (e.g. in unbox rules) we needed to look at the whole proof tree. In LIS5-Hyb however, it is enough to know the name of current host: w - we can differentiate between, say, in-place unbox-fetch and host swapping one by simply comparing name of the current world w with name used in the term unbox-fetch w′ M. If w = w′ then there was no exchange, otherwise there was one.
+3.4.2 Operational semantics
+Just like the typing system, the operational semantics of LIS5-Hyb mimics that of LIS5-LF – except making explicit use of host names.
+The set of values is defined as:
+val(λ(A : v).M)
+val(box w0 M)
+if val(M), then val(get-here w M)
+Note that reductions again take host name as a parameter. (λ(v:A).M)·N􏰁→w [N|v]M
+ifM􏰁→w M′,thenM·N􏰁→w M′·N
+ifM􏰁→wM′,thenunbox-fetchwM→􏰁w′unbox-fetchwM′
+ifM􏰁→wM′,thenget-herewM→􏰁w′get-herewM′
+ifM→􏰁 wM′,
+then letdia-get w [vw0 := M] N 􏰁→w′
+letdia-get w [vw0 := M′] N unbox-fetch w′ (box w0 M) 􏰁→w {w|w0}M
+if val(M),
+then letdia-get w′ [vw0 := (get-here w′′ M)] N 􏰁→w
+[M|v0]{w′′|w0}N
+43
+As usual, proof trees for last two of these reduction rules look like this:
+D
+􏰉I fresh w0 (w′,Γ′):(w,Γ):G⊢w0:∅⊢M:A =⇒R
+(w,Γ):G⊢(w′,Γ′)⊢box w0 M:􏰉A
+􏰉E (w′, Γ′): G ⊢ (w, Γ) ⊢ unbox-fetch w′ (box w0 M): A
+{w|w0}D
+(w′,Γ′): G ⊢ (w,Γ) ⊢ {w|w0}M: A
+where: {w|w0}((w′,Γ′):(w,Γ):G⊢w0:∅⊢M:A)= (w′,Γ;): G ⊢ (w,Γ) ⊢ {w|w0}M: A.
+Let G′ = (w′,Γ′): (w,Γ): G, G′′ = (w′′,Γ′′): (w′,Γ′): G and let fresh v and fresh w0 in ⋆
+D
+♦I G′ ⊢(w′′,Γ′′)⊢M:A E
+♦E G′ ⊢(w′,Γ′)⊢get-here w′′ M:♦A (w0,[v:A]):G′′ ⊢(w,Γ)⊢N:B ⋆ G′′ ⊢(w,Γ)⊢letdia-get w′ [vw0 :=get-here w′′ M]N:B
+[D|v]{w′|w0}E
+G′′ ⊢(w,Γ)⊢[M|v]{w′′|w0}N:B
+Note that just like in LIS5-LF these trees are only one of several pos- sibilities, as there are a two for unbox-fetch (box M) case and four in letdia (get-here M).
+3.5 Progress and preservation
+Our goal in this section is to justify that the three previously introduced lan- guages behave the way we would expect them to. One measure we can take is checking if every term that we can type starting with an empty context, is either a value or there exists an evaluation step that we can make. This is usually referred to as progress.
+The second property that we want to hold in a system is preservation of types. Say we have a term M of certain type A (again, with empty context). If this term M reduces then to M′, then we want M′ to be of type A as well.
+What makes preservation and progress important? Progress ensures that we can continue evaluating every valid non-value expression – not necessarily to a value, but we will never be stuck with a computation due to a lack of
+44
+￼￼￼￼⇒R
+reduction rules. Preservation property allows us to be certain that evaluation will not change the type.
+3.5.1 Progress
+We have already given an informal definition of the progress property. The formal one of course depends on the language. We will use LIS5-L as an example, but in all three languages, the proof follows the same pattern and is rather straightforward.
+Theorem 3.1 (Progress). If Ω; ∅ ⊢ M : A@w then either M is a value or ∃M′,M 􏰁→w M′.
+Proof. By induction on M:
+− hyp v does not type in the empty environment, so it contradicts the
+precondition;
+− λ(v : A).M is a value;
+− M · N is never a value, what it evaluates to depends on the result of induction hypothesis for M:
+-ifM isavalue,then(fromthefactthatithasa→type)itmust be that M = λ(v : A).M0, and β-reduction can occur, resulting in M′ = [v|N]M0
+- otherwise we have M0 such that M 􏰁→w M0 and we can continue evaluation of M under application, so M′ = M0 · N;
+− box w0 M is a value;
+− unbox M is similar to M · N in that the reduction result depends on the induction hypothesis for M - if it turns out to be a value – box w0 M0 expression, then we can reduce unbox M to {w|w0}M0. Otherwise we continue evaluation under unbox ;
+− here M isthesame;ifM isavaluethenwereducetoget w (here M), otherwise continue evaluating under here;
+− letdia [vw0 := M] N follows the same pattern as M · N and unbox M;
+− fetch w M can be reduced either to M (when it is a value) or to
+fetch w M’ (when M 􏰁→w M′);
+− get wM may sometimes be a value - that is, when M is a value.
+Otherwise we continue execution under get.
+45
+3.5.2 Preservation
+Again we will state it formally for LIS5-L: (Preservation).IfΩ;∅⊢M:A@wandM→􏰁 wM′thenΩ;∅⊢M′:A@w.
+Preservation is a bit trickier to prove, we will therefore require a number of lemmas, in particular about type preservation through various substi- tutions – because of reductions such as (λ(v : A).M ) · N 􏰁→w [N |v]M and unbox (box w0 M) 􏰁→w {w|w0}M. To prove those lemmas we will in turn require properties that allow us to extend the assumptions list or the set of known worlds while preserving the typing. We will start with these, as we will call them, weakening properties.
+Property 3.5.2.1 (Context weakening). If Ω; Γ ⊢ M : A@w then for any ∆ s.t. ∆∩Γ=∅,wehaveΩ;Γ∪∆⊢M:A@w.
+Proof. Simple induction on the type derivation for M. We should note here that order of assumptions in context does not matter.
+Property 3.5.2.2 (Known worlds weakening). If Ω; Γ ⊢ M : A@w then for any w0 s.t. w0 ∈/ Ω, w0 : Ω; Γ ⊢ M : A@w.
+Proof. Simple induction on the type derivation for M.
+Next, two results regarding types preserved by substitution.
+Lemma 3.5.1. If Ω;(v: A@w′),Γ ⊢ N: B@w and Ω;∅ ⊢ M: A@w′ then Ω; Γ ⊢ [M|v]N : B@w.
+Proof. Induction on type derivation for N. One interesting case is hypv′ when v = v′. We then need to show that Ω;Γ ⊢ M: B@w. Uniqueness of variable names gives us A = B, w = w′. Then, using weakening variant from 3.5.2.1, we can remove context Γ and prove this case.
+Note that for box and letdia cases, simple as they are, we actually need 3.5.2.2 to be able to use induction hypothesis.
+Lemma 3.5.2. If w0 ∈ Ω and w1 : Ω; Γ ⊢ M : A@w then Ω; {w0|w1}Γ ⊢ {w0|w1}M : A@({w0|w1}w).
+Proof. Induction on type derivation for M. This proof involves a lot of careful case analysis, in particular for fetch and get cases, as the host name might have changed because of this substitution.
+Finally, the sketch of Preservation proof: 46
+Theorem 3.2 (Preservation). If Ω; ∅ ⊢ M : A@w and M 􏰁→w M ′ then Ω; ∅ ⊢ M ′ : A@w.
+Proof. Induction first on type derivation for M, then on reduction from M to M′.
+− (λ(v : A).M) · N 􏰁→w [N|v]M from 3.5.1
+− unbox (box w0 M) 􏰁→w {w|w0}M from 3.5.2
+−letdia[vw0:=getw′(hereM)]N→􏰁w[M|v]{w′|w0}Nrequiresboth 3.5.1 and 3.5.2, we also need to take into account that w may be equal to w′ or not
+− fetch w′ M 􏰁→w M knowing that val(M) we deduce M = box w0M0; we can then choose w instead of w′ in 􏰉-intro rule
+The rest of the cases are simple and follow directly from induction hypothesis.
+We have only talked about progress and preservation in LIS5-L. As it turns out, there aren’t any differences when one wants to do the same in LIS5-LF or LIS5-Hyb. In fact, these languages are similar enough to create translations between them.
+47
+Chapter 4
+Relations between languages
+In this chapter we establish relationship between LIS5-L, LIS5-LF and LIS5-Hyb. We do so by providing type-preserving transformations be- tween these languages.
+Just by looking at type systems for three languages presented in the pre- vious chapter, we can notice a lot of similarities. Our goal in this chapter is to formally describe these, either in terms of functional transformations or using relations between terms in different languages. We focus on both type and reduction preservation – as we will see it is not always possible to achieve both, though usually for technical reasons.
+As much as we would like to provide a functional translation on terms for each pair of languages that interests us, it has proven to be infeasible. Note for example that moving from LIS5-LF to LIS5-Hyb requires adding context names to both terms and context, in a controlled manner. It is much more natural to express this translation by using a proof tree to reconstruct term from LIS5-Hyb. Some of the difficulties come from our choice of implementation – these we will describe in full detail in Appendix A.
+First however, let us explain the motivation for creating such transforma- tions in the first place. As some of the proofs of language properties become technical, it is worth it to be able to prove a given property in one language and – through language transformations – extend its truthfulness to others. For example, proofs of normalization and termination properties seem to be less technically challenging in LIS5-LF than in any other language.
+In addition, as all the languages use the same logic as their type system, we want to know exactly how close they are to one another. Perhaps at first LIS5-L and LIS5-LF do not seem identical, but through transformations between each of them and the in-between hybrid language, we can be more
+48
+precise in where these differences lie.
+We have created hybrid language LIS5-Hyb with a single goal in mind: we wanted for it to be immersed in both LIS5-L and LIS5-LF. In this we have been successful, as both translations are done using easy to understand functions. We will begin by describing them, then move to other, more complex translations.
+4.1 From LIS5-Hyb to LIS5-L
+As the relation between LIS5-Hyb and LIS5-LF is trivial, we will begin with a more interesting case. We aim at creating a pair of translation functions HybtoL – one for contexts translation, one for terms. We want the following conditions to be satisfied:
+1 (Typing Preservation). Let HybtoL ((w, Γ) : G) = (Ω, ∆, w) and let M ′ be the result of HybtoL (M ). Then from G ⊢ (w, Γ) ⊢Hyb M : A, it follows that Ω;∆⊢L M′:A@w
+2 (Value Preservation). For any term M ∈ termHyb , if valHyb (M ) then valL(HybtoL(M)).
++
+For the next condition we require multi-step reductions (􏰁→). We define them inductively as:
+′+′ IfM􏰁→M thenM􏰁→M
+′′+′′ +′′ IfM􏰁→M andM 􏰁→M thenalsoM􏰁→M
+3 (Reduction Preservation). Assume that M 􏰁→w M′ in LIS5-Hyb and let ′′+′
+HybtoL(M) = N, HybtoL(M ) = N . Then N 􏰁→w N in LIS5-L.
+The first condition states that typing is preserved through HybtoL trans- lation, the second requires us to transform values to values, and the last talks about preservation of multi-step reduction. Of course, we would rather use a single-step reduction, but it is impossible, as for example in LIS5-L we have separate unbox and fetch operators, whereas in LIS5-Hyb we only have a com- bination of them, called unbox-fetch . It may therefore be the case that one-step reduction from LIS5-Hyb is simulated by two reduction steps in LIS5-L – in our example, one for unbox and one for fetch.
+Function HybtoL for contexts rewriting is easy to create. We want to gather all context names (worlds) from the environment (w,Γ): G into Ω
+49
+and annotate every assumption from this environment with the appropriate world. We define such annotation for any (w0,Γ0) ∈ (w,Γ): G as follows:
+annotateWorlds(w0, ∅) = ∅
+annotateWorlds(w0,(v: A): Γ′0) = (v: A@w0): annotateWorlds(w0,Γ′0)
+Next we simply concatenate all annotated contexts to create ∆1. Ω=map fst((w,Γ):G)
+∆ = flatmap annotateWorlds ((w,Γ): G)
+Note that we did not change any names in the environment, just reordered the assumptions – that way our requirement of non-duplicating world names and variable names is maintained through this transformation.
+Next let us create a translation for terms. It is fairly straightforward. The syntax we use here is Coq-like2, with pattern matching on constructors.
+HybtoL (M0) := match M0 with
+| hypHyb v ⇒ hypL v
+| λHyb(v : A).M ⇒ λL(v : A).(HybtoLM)
+| M ·Hyb N ⇒ (HybtoL M ) ·L (HybtoL N )
+| boxHyb w M ⇒ boxL w (HybtoL M)
+| unbox-fetchHyb w M ⇒ unboxL (fetchL w (HybtoL M )) | get-hereHyb w M ⇒ getL w (hereL (HybtoL M ))
+| letdia-getHyb w [vw0 := M] N ⇒
+letdiaL [vw0 := getL w (HybtoL M )] (HybtoL N )
+We can immediately notice that HybtoL (unbox-fetch w M ) along with HybtoL (get-here w M ) and HybtoL (letdia-get w [vw0 := M ] N ) could all be optimized into using get (or fetch) only when the world is really changing. Indeed, we could have kept current world as a parameter and rewritee.g. HybtoL(unbox-fetch w M,w)tounbox (HybtoL(M,w)). This additional world parameter would, however, complicate reasoning about such function – in particular for recursive call within the box case, where current world should be fresh.
+Our solution requires a possibly redundant use of get (or fetch) operator,
+1flatmap is concat over map for any function that returns a list type 2To be exact this is the syntax for fixpoint in Coq
+50
+￼
+but avoids such problems. Additionally, note that the following proof tree (and similar ones for get-here and letdia-get) justifies such step, at least typing-wise:
+D
+Ω;Γ⊢L M:􏰉A@w w∈Ω(asM typesinw)
+Ω; Γ ⊢L fetch w M : 􏰉A@w
+In order to show reduction preservation property we have mentioned at the beginning of this section, we will require these two lemmas regarding substitution and world renaming with relation to HybtoL :
+Lemma 4.1.1. [HybtoL (M )|v](HybtoL (N )) = HybtoL (([M |v]N )). Proof. Simple induction over N.
+Lemma 4.1.2. {w|w′}(HybtoL (N)) = HybtoL (({w|w′}N)).
+Proof. Simple induction over N.
+We are now ready to show the preservation properties. We begin with typing preservation:
+Theorem 4.1 (Typing Preservation). Let HybtoL ((w, Γ) : G) = (Ω, ∆, w) and let M′ be the result of HybtoL(M). Then from G ⊢ (w,Γ) ⊢Hyb M: A, itfollowsthatΩ;∆⊢L M′:A@w.
+Proof. Induction on type derivation for M. We will cover only selected cases:
+− G⊢(w,Γ)⊢Hyb hypv:A
+M ′ = hyp v and from correctness of contexts rewriting, since v : A ∈ Γ then also v : A@w ∈ ∆. From the definition of set of known worlds Ω: Ω=map fst((w,Γ):G)=w:(map fstG),weconcludew∈Ω.
+− G⊢(w,Γ)⊢Hyb λ(v:A).M0:A→B
+In this case M′ = λ(v : A).(HybtoL(M0)). For M′ to have the type A → B we require that Ω;(v: A@w): ∆ ⊢L HybtoL(M0): B. First, from the typing derivation of λ(v : A).M0 we obtain that in the case of M0,G⊢(w,(v,A):Γ)⊢Hyb M0:B. Tousetheinductionhypothesisit remains to check: HybtoL((w,(v: A): Γ): G) = (Ω,(v: A@w): ∆,w).
+−G⊢(w,Γ)⊢Hybbox w0M0:􏰉A
+M′ = box w0 (HybtoL(M0)); for it to type we require that both w ∈ Ω and w0:Ω;∆⊢L HybtoL(M0):A hold. The first condition was covered in hyp v case, the second is just as simple – we have (w,Γ): G ⊢ (w0,∅) ⊢Hyb M0: A, so we only have to check that in- deed HybtoL((w0,∅): (w,Γ): G) = (w0: Ω,∆,w). Then by induction hypothesis HybtoL (M0) is typing.
+51
+￼
+− (w′,Γ′):G⊢(w,Γ)⊢Hyb get-here w′ M0:♦A
+In this case M′ = get w′ (here (HybtoL(M0))). We also know that (w,Γ):G⊢(w′,Γ′)⊢Hyb M0:A.Next,byinductionhypothesiswehave: Ω;∆ ⊢L HybtoL(M0): A@w′ – this in turn allows to conclude that Ω;∆ ⊢L here (HybtoL(M0)): ♦A@w′. Finally, we can show that w ∈ Ω, and therefore Ω;∆ ⊢L M′ : ♦A@w.
+Theorem 4.2 (Value Preservation). For all M ∈ termHyb, if valHyb(M) then valL(HybtoL(M)).
+Proof. Case analysis on values from LIS5-Hyb. Compare the values from LIS5-Hyb with the ones from LIS5-L:
+valHyb(λ(A : v).M) valHyb(box w0 M) if valHyb(M)
+valL(λ(A : v).M) valL(box w0 M) if valL(M)
+then valL(get w (here M)) Theorem 4.3 (Reduction Preservation). Assume that M 􏰁→w M′ in LIS5-Hyb
+′′+′
+and let HybtoL(M) = N, HybtoL(M ) = N . Then N 􏰁→w N in LIS5-L.
+then valHyb(get-here w M)
+It is straightforward to notice that HybtoL preserves values.
+Proof. Simple induction on reduction M 􏰁→w M′. Note that in most cases, +
+􏰁→ relation is being interpreted as one-step reduction – with the exceptions of unbox-fetch, get-here and letdia-get, where two steps may be required.
+This concludes the translation from LIS5-Hyb to LIS5-L. 4.2 From LIS5-Hyb to LIS5-LF
+Translation from LIS5-Hyb to LIS5-LF is by far the simplest of all – we just remove world names from both the environment and terms. Again, we want to preserve types, values, and reductions. The complete transformation is given below:
+52
+HybtoLF ((w, Γ) : G) = ((map snd G), Γ) HybtoLF (M0) := match M0 with
+| hypHyb v ⇒ hypLF v
+| λHyb(v : A).M ⇒ λLF(v : A).(HybtoLFM)
+| M ·Hyb N ⇒ (HybtoLF M ) ·LF (HybtoLF N )
+| boxHyb w0 M ⇒ boxLF (HybtoLF M )
+| unbox-fetchHyb w M ⇒ unboxLF (HybtoLF M ) | get-hereHyb w M ⇒ hereLF (HybtoLF M )
+| letdia-getHyb w [vw0 := M] N ⇒
+letdiaLF [v := HybtoLF M ] (HybtoLF N )
+Again, the context transformation preserves variable uniqueness.
+The term substitution lemma and a variant of world substitution lemma are both given below.
+Lemma 4.2.1. [HybtoLF (M )|v](HybtoLF (N )) = HybtoLF ([M |v]N ). Proof. Simple induction over N.
+Note that there are no world names in LIS5-LF, therefore world substitution does not change the end result of HybtoLF :
+Lemma 4.2.2. HybtoLF (N) = HybtoLF ({w|w′}N). Proof. Simple induction over N.
+Similarly to previous case, we are interested in preservation of types, values and reductions – this time, single-step ones.
+Theorem 4.4 (Typing Preservation). Let M′ = HybtoLF(M); then from G⊢(w,Γ)⊢Hyb M:A,wecanconcludethat(map sndG)⊢Γ⊢LF M′:A.
+Proof. Induction on type derivation for M.
+Theorem 4.5 (Value Preservation). For all M ∈ termHyb, if valHyb(M) then valLF(HybtoLF(M)).
+53
+Proof. Again, comparing values in LIS5-Hyb and in LIS5-LF allows us to justify this theorem:
+valHyb(λ(A : v).M) valHyb(box w0 M) if valHyb(M)
+valLF(λ(A : v).M) valLF(box M )
+if valLF(M)
+then valLF(get-here M ) andletHybtoLF(M)=N,HybtoLF(M′)=N′.ThenN→􏰁 N′inLIS5-LF.
+Proof. Simple induction on M 􏰁→Hyb M′ using substitution lemmas men- tioned above.
+4.3 From LIS5-L to LIS5-Hyb
+The next two translations are incomplete – we can show that typing is pre- served, that values match in a certain sense, but not that reductions behave the way we would expect them to. We will briefly discuss the encountered problems, but first let us describe the actual transformations from LIS5-L to LIS5-Hyb .
+Rewriting contexts between these two languages can be seen simply as bucket-sorting. For each context from Ω, we extract its assumptions from Γ. The world marked as current and its corresponding context will be used as the current context in LIS5-Hyb, whereas the rest will be in the background. Note that we require the current context to be known in Ω for this procedure to return a correct result.
+Translation for terms is mostly straightforward, with two interesting cases: fetch and get operators. We do not have those in LIS5-Hyb – instead we allow unbox-fetch, get-here and letdia-get to possibly change worlds. This forces us to use a more complicated rewrite, where we aim at finding a term with adequate conclusions and premises in its typing rules.
+Compare (get) rule with its simulation in LIS5-Hyb:
+54
+then valHyb(get-here w M) Theorem4.6(ReductionPreservation).AssumethatM→􏰁 wM′inLIS5-Hyb
+D
+Ω; Γ ⊢L M : ♦A@w w′ ∈ Ω
+Ω; Γ ⊢L get w M : ♦A@w′
+D′ E
+(w′,Γ′):G⊢(w,Γ)⊢Hyb M:♦A (w′′,[v:A]):(w,Γ):G⊢(w′,Γ′)⊢N:♦A
+(w,Γ):G⊢(w′,Γ′)⊢Hyb letdia-get w[vw′′ :=M]N:♦A where N = get-here w′′ (hyp v) and E is the following:
+v : A ∈ [v : A]
+(w′,Γ′):(w,Γ):G⊢(w′′,[v:A])⊢Hyb hypv:A
+(w′′,[v:A]):(w,Γ):G⊢(w′,Γ′)⊢Hyb get-here w′′ (hypv):♦A
+So for a fresh v and w′′, getL w ML will be transformed into
+letdia-getHyb w [vw′′ := MHyb] (get-hereHyb w′′ (hypHyb v)). Similarly, for fetch:
+￼￼￼￼D
+Ω; Γ ⊢L M : 􏰉A@w w′ ∈ Ω
+Ω; Γ ⊢L fetch w M : 􏰉A@w′
+D′ (w′,Γ′):G⊢(w,Γ)⊢Hyb M:􏰉A
+(w,Γ):(w′,Γ′):G⊢(w0,∅)⊢Hyb unbox-fetch wM:A
+fresh w0
+￼￼￼(w,Γ):G⊢(w′,Γ′)⊢Hyb box w0 unbox-fetch wM:􏰉A
+For technical reasons, explained in full detail in Appendix A, we actually
+chose an alternative rewrite for fetch:
+D′ (w′,Γ′):G⊢(w,Γ)⊢Hyb M:􏰉A
+(w′,Γ′):G⊢(w,Γ)⊢Hyb get-here wM:♦􏰉A E
+(w,Γ):G⊢w′,Γ′ ⊢Hyb letdia-get w[vw′′ :=get-here wM]N:􏰉A
+where N = box w0 (unbox-fetch w′′ (hyp v)) and E is the following:
+v : A ∈ [v : A]
+(w0,∅):(w′,Γ′):(w,Γ):G⊢(w′′,[v:􏰉A])⊢Hyb hypv:􏰉A
+(w′′,[v:􏰉A]):(w′,Γ′):(w,Γ):G⊢(w0,∅)⊢Hyb unbox-fetch w′′ (hypv):A
+(w′′,[v:􏰉A]):(w,Γ):G⊢(w′,Γ′)⊢Hyb box w0 (unbox-fetch w′′ (hypv)):􏰉A Another important difference between LIS5-L and LIS5-Hyb is noticeable
+when comparing unbox with its equivalent, the in-place unbox-fetch. The 55
+￼￼￼￼￼
+latter explicitly puts the name of the current world in the term, while the former does not. It enforces the function LtoHyb to take the current world as a parameter.
+LtoHyb(M0, w) := match M0 with
+| hypL v ⇒ hypHyb v
+| λL(v : A).M ⇒ λHyb(v : A).(LtoHyb(M, w))
+| M ·L N ⇒ (LtoHyb(M, w))·Hyb(LtoHyb(N, w)) | boxL w0 M ⇒ boxHyb w0 (LtoHyb(M, w0))
+| unboxL M ⇒ unboxHyb (LtoHyb(M, w))
+| hereL M ⇒ hereHyb (LtoHyb(M, w))
+| letdiaL [vw0 := M] N ⇒
+letdia-getHyb w [vw0 := LtoHyb(M, w)] (LtoHyb(N, w)) | fetchL w′ M ⇒
+let w0 := freshWorld in
+let w′′ := freshWorld in
+let v := freshVar in
+let N := boxHyb w0 (unbox-fetch w′′(hyp v))in letdia-getHyb w′ [vw′′ :=] get-hereHyb w′ (LtoHyb(M, w′))N
+| getL w′ M ⇒
+let w′′ := freshWorld in
+let v := freshVar in
+letdia-getHyb w′ [vw′′ := LtoHyb(M, w′)]
+(get-hereHyb w′′ (hyp v))
+Another difficulty arising from the use of worlds in LtoHyb function for terms is not as easy to solve as the unbox vs unbox-fetch case: our function does not preserve term substitution the way we might want it to.
+For reduction preservation (e.g. β-reduction case) we need to have the following property:
+LtoHyb([M|v]N,w) = [LtoHyb(M,w)|v](LtoHyb(N,w)).
+The problem with this equality is clear when considering translation of term boxL w0 N:
+LtoHyb([M |v](boxL w0 N ), w) = LtoHyb(boxL w0 [M |v]N , w) = boxHyb w0 (LtoHyb([M|v]N, w0))
+56
+[LtoHyb(M,w)|v](LtoHyb(boxL w0 N,w)) = [LtoHyb(M, w)|v](boxHyb w0 (LtoHyb(N, w0))) = boxHyb w0 ([LtoHyb(M, w)|v](LtoHyb(N, w0)))
+Note the term under box is LtoHyb([M|v]N,w0) in the first equation and [LtoHyb(M, w)|v](LtoHyb(N, w0)) in the second. The property we have men- tioned above cannot guarantee these two to be equal – not without additional assumption that for any w, w′, LtoHyb(M,w) = LtoHyb(M,w′). We will call terms with such property w-stable. This stability requirement enforces in particular that M is not of the form unbox M′, letdia [vw := M′] N′ or here M′. For that reason we cannot prove any more than the following lemma for general term substitution:
+Lemma 4.3.1. If C is w-stable term from LIS5-L, then for any M, v, w it is the case that
+LtoHyb([C|v]N, w) = [LtoHyb(C, w)|v](LtoHyb(N, w)) Proof. By induction on N.
+For worlds renaming there are no such problems, therefore we have the following lemma:
+Lemma 4.3.2. For any worlds w0, w1, w and any term N ∈ termL: LtoHyb({w0|w1}N, {w0|w1}w) = {w0|w1}LtoHyb(N, w)
+Proof. By induction on N.
+As with all the other translations, we would like to prove type, value and
+reduction preservation. The first of those is standard:
+Theorem 4.7 (Type preservation). Let LtoHyb(Ω, Γ, w) = (G, ∆, w). As- sumingΩ;Γ⊢L M:A@w,letusdenoteLtoHyb(M,w)asN. ThenG⊢(w,∆)⊢Hyb N:A.
+Proof. By induction on type derivation for M.
+− hypv case requires that translation of contexts is proper, that is if (v: A@w)∈Γ then (v: A)∈∆ when ∆ is the context named w, ex- tracted from Γ;
+− fetch w′ M and get w′ M cases were covered in the proof trees at the beginning of this section;
+57
+− the rest of the cases follow directly from induction hypothesis.
+Next, value preservation ensures that every value is translated to a termi- nating term – that is, either to a value or to something reducible to a value in a finite number of reduction steps.
+Theorem 4.8 (Value preservation). For all M ∈ termL, if valL(M), ′′∗
+M = LtoHyb(M, w); then ∃V, M 􏰁→w V ∧ valHyb(V ).
+Proof. Induction on valL(M). Compare values in these two languages:
+valL(λ(A : v).M) valL(box w0 M) if valL(M)
+then valL(get w (here M))
+valHyb(λ(A : v).M) valHyb(box w0 M) if valHyb(M)
+then valHyb(get-here w M)
+For λ(A : v).M and box w0 M it is straightforward that values are pre- served (V = M′). For get w ′(here M) we need a couple of reductions to reach the value – that is due to the way we rewrite get.
+Let v and wf be fresh variable and world, respectively. Then: LtoHyb(get w ′(here M), w) =
+letdia-get w′ [vwf := LtoHyb(here M, w′)] (get-here wf (hyp v)) = letdia-get w′ [vwf := get-here w′ (LtoHyb(M, w′))]
+(get-here wf (hyp v)).
+We know that valL(M) holds and from induction hypothesis we can find
+VsuchthatvalHyb(V)andLtoHyb(M,w′)→􏰁∗ V. ′′∗′
+Thereforeget-herew(LtoHyb(M,w))→􏰁w′get-herewV.Thisisalso a value, by definition from LIS5-Hyb. Finally:
+letdia-get w′ [vwf := get-here w′ (LtoHyb(M, w′))] ∗
+(get-here wf (hyp v)) 􏰁→w
+letdia-get w′ [vwf := get-here w′ V ] (get-here wf (hyp v)) 􏰁→w [get-here w′ V|v]({w′|wf}(get-here wf (hypv)))=
+[get-here w′ V|v](get-here w′ (hypv))=
+get-here w′ (get-here w′ V).
+This indeed is a value.
+58
+Finally, a remark on reduction preservation. As we have mentioned, the term substitution lemma is not as strong as we wanted, which in turn causes problems for example in the β-reduction preservation. We cannot show any form of reduction preservation using LtoHyb(M, w).
+However, we can define a relation that mimics behavior of this function, except it is defined only between pairs of terms: LtoHybR(ML,MHyb). For terms like unbox or here, this relation accepts any world (LtoHybR(M, M′) → ∀w,LtoHybR(unbox M,unbox-fetch w M′). For LtoHybR(M,N) we can try to prove some variants of reduction preservation property:
+Theorem 4.9 (Reduction preservation). For any pair of terms M,M′ that do not contain fetch or get and such that M 􏰁→w M′, we can find N and N′ such that LtoHybR(M,N) and LtoHybR(M′,N′) and that N 􏰁→w N′.
+Proof. Simple induction on reduction step M 􏰁→w M′.
+An attempt to extend such theorem with terms containing get will re-
+quire a weaker conclusion: If M 􏰁→ M′ then there exists N, N′, N′′ such that ′ ′ ∗ ′′ ′∗ ′′
+LtoHybR(M,N),LtoHybR(M,N)andN→􏰁 N,N􏰁→N.Thischangeis a result of the variant of value preservation that we have.
+Another extension is allowing fetch in the term from LIS5-L. The rea- son for fetch to be problematic is the case fetch w′ M with val(M). In LIS5-L we reduce such term to M. After translation to LIS5-Hyb, we obtain a term that in many steps reduces also to a value – but a different one: box w0 (unbox-fetch w′ M′) where LtoHybR(M, M)′. As this latter term is in fact η-expansion of M′, we can try to adapt the theorem to accept also such reductions as connected.
+4.4 From LIS5-LF to LIS5-Hyb
+Finally, we want to talk about transition from LIS5-LF to LIS5-Hyb. It is by far the most complicated of the four presented here – this is due to the fact that in order to create a correct term in LIS5-Hyb in some cases we have to look at fragments of proof trees from LIS5-LF – e.g. to know if unboxLF M was local or did it change the current context.
+We will begin as usual, by context transformation.
+Suppose we have a multi-context environment G from LIS5-LF that is cor- rect (i.e. no variable is repeated). Let us take another multi-context envi- ronment G′, this time from LIS5-Hyb. We will say that G′ is compatible with
+59
+G when there are no repeated worlds in G′ and G ∼= map snd G′ – that is G is a permutation of contexts3 from G′, but without the names.
+It is easy to see that any function assigning name to each context Γ ∈ G without repeating these names, creates a compatible context.
+Next, how do we rewrite the terms? There are three problematic cases: unbox, here and letdia. Their counterparts from LIS5-Hyb explicitly name the world that has been exchanged with the current one or use the name of current world to express no change. We therefore need a way of differentiat- ing between these two rules in LIS5-LF – one exchanging worlds and the other leaving them as-is – when creating translation LFtoHyb:
+G⊢Γ⊢LF M:􏰉A Γ′:G⊢Γ⊢LF M:􏰉A
+G⊢Γ⊢LF unbox M:A Γ:G⊢Γ′ ⊢LF unbox M:A
+This means that the transformation will only work on terms that have a type. Note that it was not the case in any of the previous translations. Not only do we require M ∈ termLF to typecheck in order to produce its equivalent from LIS5-Hyb, we also need to look at the details of the proof to make such translation.
+Let us look at how we want LFtoHyb to work. In all cases assume: GLF ∼= map snd GHyb,
+w is a name of context Γ, w′ is a name of context Γ′ etc.,
+w0 is always a fresh world variable,
+MHyb is the equivalent of MLF in all the induction hypotheses, same for NLF and NHyb.
+￼￼Proof tree in LIS5-LF
+(v : A) ∈ Γ
+GLF ⊢Γ⊢hypLFv:A
+D
+GLF ⊢(v:A):Γ⊢MLF:B
+GLF ⊢Γ⊢λLF(v:A).MLF:A→B
+DE
+GLF ⊢ Γ ⊢ MLF : A → B GLF ⊢ Γ ⊢ NLF : A
+GLF ⊢ Γ ⊢ MLF ·LF NLF : A → B
+Result from LIS5-Hyb
+hypHyb v λHyb(v:A).MHyb MHyb ·Hyb NHyb
+￼￼￼￼￼3Not only can contexts occur in a different order, but assumptions can be shuffled within the context
+60
+Proof tree in LIS5-LF
+D
+Γ:GLF ⊢∅⊢MLF:A
+GLF ⊢Γ⊢boxLF MLF:􏰉A
+D
+GLF ⊢ Γ ⊢ MLF : 􏰉A
+GLF ⊢Γ⊢unboxLF MLF:A
+D
+Γ : GLF ⊢ Γ′ ⊢ MLF : 􏰉A
+Γ′:GLF ⊢Γ⊢unboxLF MLF:A
+D
+GLF ⊢ Γ ⊢ MLF : A
+GLF ⊢Γ⊢hereLF MLF:♦A
+D
+Γ: GLF ⊢ Γ′ ⊢ MLF : A
+Result from LIS5-Hyb
+￼boxHyb w0 MHyb unbox-fetchHyb
+￼w MHyb unbox-fetchHyb w′ MHyb
+￼￼get-hereHyb w MHyb get-hereHyb w′ MHyb
+￼￼Γ′:GLF ⊢Γ⊢hereLF MLF:♦A DE
+GLF ⊢Γ⊢MLF:♦A [(v:A)]:GLF ⊢Γ⊢NLF:B
+￼GLF ⊢ Γ ⊢ letdiaLF [v :=] MLFNLF : ♦A letdia-getHyb
+w [vw0 := MHyb] NHyb Γ:GLF ⊢Γ′ ⊢MLF:♦A [(v:A)]:Γ′:GLF ⊢Γ⊢NLF:B
+DE
+￼Γ′:GLF ⊢Γ⊢letdiaLF [v:=MLF]NLF:♦A
+letdia-getHyb w′ [vw0 := MHyb] NHyb
+Next we want to argue that this transformation preserves types and val- ues.
+Theorem 4.10 (Type preservation). Let Γ: GLF be compatible with
+tion shown above.
+Proof. Simple induction on type derivation for MLF.
+61
+D
+GLF ⊢Γ⊢MLF:A
+(w,Γ): GHyb. Assume:
+Then GHyb ⊢ (w, Γ) ⊢ MHyb : A where MHyb is obtained through transforma-
+Theorem 4.11 (Value preservation). For any MLF that is a value, let Γ : GLF
+valHyb(MHyb).
+Proof. Induction on valL(M). Compare values in these two languages:
+be compatible with (w, Γ) : GHyb and assume that we have:
+If MHyb is obtained through transformation mentioned previously, then
+valLF(λ(A : v).M) valLF(box M)
+if valLF(M)
+then valLF(here M)
+valHyb(λ(A : v).M) valHyb(box w0 M) if valHyb(M)
+then valHyb(get-here w M)
+The preservation of reductions theorem has not been formalized, but in- tuitively, the reductions for both languages are matching.
+LIS5-LF
+unbox (box M ) 􏰁→ M
+if val(M) then
+letdia[v:=hereM]N→􏰁 [M|v]N letdia-getw′[vw0:=get-herew′′M]
+LIS5-Hyb
+unbox-fetch w′ (box w0 M )
+􏰁→w {w|w0}M
+D
+GLF ⊢Γ⊢MLF:A
+￼N
+􏰁→w [M|v0]{w′′|w0}N
+(λ(v : A).M) · N 􏰁→w [N|v]M ifM􏰁→wM′then
+M·N􏰁→w M′·N
+ifM􏰁→wM′then unbox-fetchwM
+→􏰁 w′ unbox-fetch wM ′
+ifM􏰁→M′then
+hereM→􏰁hereM′ get-herewM→􏰁w′get-herewM′
+(λ(v : A).M) · N 􏰁→ [N|v]M ifM→􏰁 M′then
+M·N􏰁→M′·N ifM→􏰁 M′then
+unboxM→􏰁 unboxM′
+if M 􏰁→ M′ then
+letdia [v := M] N 􏰁→ letdia [v := M′] N
+if M 􏰁→w M′then
+letdia-get w [vw0 := M] N 􏰁→w′ letdia-get w [vw0 := M′] N
+if val(M) then
+ifM→􏰁 wM′then
+This concludes language translations between LIS5-L, LIS5-LF and LIS5-Hyb.
+62
+Chapter 5
+Termination of evaluation
+In this chapter we show termination of call-by-name evaluation for LIS5-LF. First we provide proof for sublanguage without the ♦ type. Next we discuss termination of full LIS5-LF language. All proofs of termination in this chapter use Tait’s method of logical relations as their base.
+Operational semantics for languages described in Chapter 3 provide us with strategies of evaluation. In the previous chapter we have (partially) shown that reductions and values are compatible across three described lan- guages, therefore there is a shared strategy of evaluation for all variants of LIS5. The question we want to answer in this chapter is whether the chosen strategy is terminating. If that is the case, then by careful proof construction we can automatically extract the evaluator in OCaml from the proof in Coq.
+Reason for choosing call by name evaluation strategy was the intended interpretation of the language, as described in Section 1 of Chapter 3. In this chapter we want to show that by evaluating a term that is typing in an empty environment we can eventually reach a term in the normal form (i.e. a value).
+∗
+We define termination of term M as M ↓ := ∃V,M 􏰁→ V ∧ val(V). Proof of this property will – in both presented variants – use logical rela- tions (Tait’s) method [8]. The first case described here, LIS5-LF without ♦, the proof will follow closely termination of simply-typed λ-calculus. The sec- ond one, termination of full LIS5-LF language, uses slightly different logical relations, inspired by [11] and [3].
+63
+5.1 LIS5-LF without ♦
+Termination of evaluation for LIS5-LF without ♦ (\♦LIS5-LF) can be proven sim- ilarly to the same property for simply-typed λ-calculus. The only significant change is adding definition of reducibility for the 􏰉 type constructor.
+Main goal of this section is to justify the following theorem: (Termination of \♦LIS5-LF). For every M, if emptyEquiv(G) ⊢ ∅ ⊢ M: A1,
+then M ↓.
+When trying to prove such property directly, by induction on type deriva- tion, we cannot get past the application case. We are unable to show (M · N) ↓ having only assumptions: M ↓ and N ↓.
+We therefore follow Tait’s method and define a family of relations, one for each type, containing reducibility candidates. This definition is the following (where ι denotes base type):
+RedιM :=M ↓
+RedA→B M := M ↓ ∧ ∀N, RedA N → RedB M · N Red􏰉A M := M ↓ ∧ RedA unbox M
+Note that we are allowed to require termination for reducible terms of complex types (A → B and 􏰉A) as we do not evaluate neither under λ expressions not under box – these are unconditional values in LIS5-LF2 and therefore also in \♦LIS5-LF.
+Let us first remark two observations for \♦LIS5-LF, that will make our reasoning simpler:
+Observation (Redex uniqueness). If M 􏰁→ N and M 􏰁→ N′ in \♦LIS5-LF then N = N′.
+Observation. If M 􏰁→ N then M ↓ if and only if N ↓. Proof. It follows from the uniqueness of redex.
+1As a reminder – emptyEquiv (G) replaces each context from G with an empty context
+2In contrast, in full LIS5-LF the term here M is a value conditionally – namely only when M itself is a value.
+64
+￼
+We require all variants of the RedA M relation to have the following prop- erties:
+Lemma 5.1.1 (CR1). If RedA M then M ↓.
+Proof. By induction on A; it follows directly from the definition of RedA M
+in each case.
+Lemma 5.1.2 (CR2). If RedA M and M 􏰁→ N then RedA N. Proof. By induction on A.
+Lemma 5.1.3 (CR3). If RedA N and M 􏰁→ N then RedA M. Proof. By induction on A.
+Having 5.1.1, in order to show the termination property it suffices to argue that emptyEquiv (G) ⊢ ∅ ⊢ M : A implies RedA M . This time we cannot work only on empty contexts, as in λ case we will need to use the induction hypothesis, and for typing of λ this has non-empty context. Therefore, we would like to prove the following:
+(Reducibility Theorem). For any given M, if G ⊢ Γ ⊢ M : A then RedA M.
+Unfortunately, the proof by induction on type derivation for M is again impossible. Consider the case λ(v : A).M. By the definition of RedA→B we need to show RedB [N|v]M. But from assumptions we only have RedB M and RedA N – and we know nothing about reducibility under substitution.
+To remedy that we introduce a variant of term substitution: [L|X]M. This substitution is simultaneous, with L being a list of terms to be sub- stituted and X being a list of variables. The final version of reducibility theorem is as follows:
+Theorem 5.1 (Reducibility Theorem). If G ⊢ Γ ⊢ M : A, X contains all free variables used in M and L contains reducible terms to be substituted for these variables, then RedA [L|X]M.
+Proof. By induction on type derivation of M. In λ(v : A).M and box w0 M cases we use the property 5.1.3. The previously problematic part of λ case proof, showing reducibility of [N|v]([L|X]M) in type B, is now solved simply by extending L and X by N and v, respectively.
+65
+Now it remains to prove the following:
+Theorem 5.2 (Termination Theorem). For any given M, if this term has a
+type in empty context: emptyEquiv (G) ⊢ ∅ ⊢ M : A, then M ↓.
+Proof. It is enough to notice that as there are no assumptions in the envi- ronment, there can be no free variables. Therefore X = ∅, L = ∅ and from 5.1.1 and 5.1 we can conclude that indeed M ↓.
+5.2 Complete LIS5-LF
+In a sublanguage without ♦ everything was simple and straightforward. Do we expect the same from the full LIS5-LF? Judging from the rules for re- ducibility we have so far, any attempts to extend Red to capture ♦A type as well would require using destructor of this type – letdia. Whether this is going to be problematic or not depends on the typing and reduction rules for the two operators that we add along with the ♦ type constructor. Let us remind them:
+(here)
+(letdia)
+G ⊢ Γ ⊢ M : A (get-here) Γ′ : G ⊢ Γ ⊢ M : A G⊢Γ⊢here M:♦A Γ:G⊢Γ′ ⊢here M:♦A
+￼￼G⊢Γ⊢M:♦A fresh v0 [v0:A]:G⊢Γ⊢N:B
+G⊢Γ⊢letdia [v0 :=M]N:B
+Γ:G⊢Γ′ ⊢M:♦A fresh v0 [v0:A]:Γ′:G⊢Γ⊢N:B
+Γ′:G⊢Γ⊢letdia [v0 :=M]N:B if val(M), then val(here M)
+if val(M), then letdia [v := here M] N 􏰁→ [M|v]N
+ifM→􏰁 M′,thenhere M􏰁→here M′ ifM􏰁→M′,thenletdia [v:=M]N→􏰁 letdia [v:=M′]N
+We do not expect here to give us much trouble – its typing is as simple as the one for unbox. letdia on the other hand uses arbitrary result type B. We do not know whether B is a smaller type than ♦A, so our usual inductive definition, along the lines of:
+Red♦A M := ∀N ∀B ∀v, fresh v → RedB N → RedB letdia [v := M] N will not be proper!
+The solution we propose uses the ideas described in [11] and [3]. First of these articles describes reducibility for strong normalization of a language
+66
+￼(letdia-get)
+￼
+with operator let, similar to letdia, except with more concrete type of resulting expression N3:
+M : ♦A N : ♦B
+(let)
+let [v:=M]N:♦B
+￼The authors propose the following definition of reduciblility for ♦A type: Red♦A M: Term M of type ♦A is reducible if for all reducible continuations
+K, the application K@M is strongly normalizing;
+RedK♦A K: Continuation K accepting terms of type ♦A is reducible if for all reducible V of type A, the application K (here V ) is strongly normal- izing.
+ThecontinuationsaredefinedthereasK: =IdKτ |K◦(let [v:=[]]N) and application of continuation is the following:
+IdKA@M = M
+(K◦(let [v:=[]]N))@M=K@(let [v:=M]N)
+We cannot use the proof method described there directly, as we have completely arbitrary result type of letdia while let always returns a com- putational (♦) result . Nevertheless, we can change the above definitions into termination-expressing variant. They become:
+Red♦AM:=∀K, RedK♦AK→K@M↓ RedK♦AK:=∀V, RedAV →K@(here M)↓
+Continuations and K@M operation are defined similarly as before: K: =IdKA |K◦(letdia [v:=[]]N)
+IdKA@M = M
+(K ◦ (letdia [v := [ ]] N))@M = K@(letdia [v := M] N)
+With that, the proposed definitions of Red relation are complete. How- ever, they turn out not to be enough to prove the following:
+(Reducibility Theorem). If G ⊢ Γ ⊢ M : A, X contains all free variables used in M and L contains reducible terms to be substituted for these variables, then RedA [L|X]M.
+3In the original article the type of computation is denoted as TA, but for the sake of consistency we will continue to use ♦A.
+67
+￼
+The problem arises when showing the required property for letdia. This operator is not used directly in the definition of Red♦A M, and the type of letdia is completely arbitrary.
+What we can do in this case is use the approach described in [3] and, instead of showing reducibility, prove that ∀ K, RedKA K → K@([L|X]M) ↓ (with the assumptions same as before). We will denote such property of a term as QA . The final variant of the reducibility theorem is the following:
+(Reducibility Theorem). If G ⊢ Γ ⊢ M : A, X contains all free variables used in M and L contains terms satysfying relation Q to be substituted for these variables, then QA ([L|X]M).
+We cannot leave the definitions of reducibility for types other than ♦ un- changed, rather we have to adapt them to the new goal similarly to Red♦A M . First however, let us create continuations for the destructors of all the types:
+K: =IdKA |K◦(letdia [v:=[]]N)|K◦([]·N)|K◦(unbox []) IdKA@M = M
+(K ◦ (letdia [v := [ ]] N))@M = K@(letdia [v := M] N)
+(K ◦ ([ ] · N))@M = K@(M · N)
+(K ◦ (unbox [ ]))@M = K@(unbox M)
+This will allow us to prove e.g. K@(unbox [L|X]M) ↓ by extending the continuation K into K ◦ (unbox [ ]) and using induction hypothesis on the remaining term, [L|X]M.
+The reason for creating exactly these continuations is the order in which reductions are made. In particular for the continuations defined as above the following is true:
+Property. For any M, N and K, if M 􏰁→ N then K@M 􏰁→ K@N.
+Next we have to define mutually recursive logical relations RedA M and RedKA K. Given that in the end, from reducibility theorem we want to prove “emptyEquiv(G) ⊢ ∅ ⊢ M: A → M ↓“, we need to ensure that ∀ A, RedKA (IdKA) holds, as this property will be required to make that final step.
+68
+We will begin with definitions for a basic type ι. RedιM :=M ↓
+RedKι K:=∀V, V ↓→K@V ↓
+The reducibility of terms is standard; for continuation the definition follows from the fact that, as mentioned above, we want identity continuation to be reducible.
+Now let us move to definitions for A → B type. These relations are consistent with those from [3]:
+RedA→BM:=M↓∧(∀N, QAN)−→QB(M·N)
+RedKA→BK:=∀M, RedA→BM→K@M↓
+Note that despite RedKA→B K calling RedA→B M, this definition stays correct
+as in RedA→B M we use only recursive calls for smaller types.
+For 􏰉A the pattern is similar:
+Red􏰉A M := M ↓ ∧ QA (unbox M) RedK􏰉AK:=∀M, Red􏰉AM→K@M↓
+Finally, it turns out that the previous definition of RedK♦A K has stronger assumptions than we desire for here M case (as now we aim at proving QA M rather than RedA M), we will therefore weaken them in the final version of the definition:
+Red♦AM:=∀K, RedK♦AK→K@M↓=Q♦AM RedK♦AK:=∀V, QAV →K@(here M)↓
+Now that the all reductions are all defined, let us first check the property of identity continuations we have mentioned previously:
+Lemma 5.2.1. ∀ A, RedKA (IdKA).
+Proof. By induction on type A. The only non-trivial case is ♦A, the rest follow directly from the definitions of RedA M.
+RedK♦A IdK = ∀ V, QA V → IdK@(here M) ↓. We want to show that here V ↓knowingthatV ↓(fromQA V). ButinLIS5-LF (M ↓ → (here M) ↓), because we have defined value on here as “if val(M), then val(here M)“.
+69
+We are now ready to prove the reducibility theorem,
+Theorem 5.3 (Reducibility Theorem). If G ⊢ Γ ⊢ M : A, X contains all free variables used in M and L contains terms satisfying relation Q to be substituted for these variables, then QA ([L|X]M).
+Proof. Proof is by induction on type derivation of M. We will describe only selected cases.
+− M · N: K@(([L|X]M) · ([L|X]N)) ↓
+Observe that by the definition of @ we have K@(([L|X]M) · ([L|X]N)) = (K◦([ ] · ([L|X]N))@([L|X]M)). By induction hypothesis on [L|X]M, such application terminates provided that RedKA→B K ◦ ([ ] · ([L|X]N)). But this follows directly from unfolding the definition.
+− unbox M: K@(unbox [L|X]M) ↓
+Again, K@(unbox [L|X]M) = (K ◦ (unbox [ ])@([L|X]M). Termina- tion of the latter follows directly from the induction hypothesis.
+− here M: K@(here ([L|X]M)) ↓
+From RedK♦A K we get ∀ V, QA V → K@(here M) ↓. It remains to show that QA ([L|X]M). This is exactly the conclusion from the in- duction hypothesis.
+Finally, the termination theorem is given below.
+Theorem 5.4 (Termination Theorem). For any given M, if this term has a
+type in empty context: emptyEquiv (G) ⊢ ∅ ⊢ M : A, then M ↓.
+Proof. Same as in the sublanguage variant, X = ∅, L = ∅ – therefore [L|X]M = M. Next, by 5.2.1 we know that RedKA (IdKA), therefore from 5.3 we conclude that M ↓.
+70
+Chapter 6 Summary
+In this thesis we have formalized languages for three variants of N D system for IS5. One of these systems, LIS5-L along with the corresponding language was known beforehand, as the work of Tom Murphy VII et al. [14]. For the second one, the logic (IS5LF) was described by Galmiche and Sahli [7], but the language itself is our contribution. Finally, LIS5-Hyb is a new language for logic IS5Hyb (our variant of IS5LF which is not syntacticly pure) we have proposed in this thesis.
+By creating an intermediate language between LIS5-LF and LIS5-L, we were able to determine the connection between these two languages. We have shown how to transform terms from one language to the other in a type- preserving manner, using a two-step transformation with LIS5-Hyb as an in- termediate step. This immediately provides an equivalence of type systems (N D systems) for all three of these languages – that is, for three variants of IS5.
+Further in Chapter 4 we have managed to immerse LIS5-Hyb into both LIS5-LF and LIS5-L in a reduction-preserving manner. Moving in the other di- rection (from LIS5-L and LIS5-LF to LIS5-Hyb) while preserving reductions is an interesting future challenge, that would allow to identify syntactically pure LIS5-LF with nicely interpretable LIS5-L.
+We have discussed the termination of LIS5-LF in Chapter 5. Using a sim- ple adaptation of Tait’s method, we provided termination result for LIS5-LF without ♦. We have also automatically extracted the evaluator for \♦LIS5-LF from the proofs.
+Finally, what we consider the biggest contribution of this thesis, we have shown termination of full LIS5-LF using continuations.
+71
+We believe that an interesting extension of this thesis would be to con- sider termination of LIS5-Hyb and compare the obtained evaluator with both the one extractable from our proof of LIS5-LF termination and the one de- scribed in [13] for LIS5-L.
+It is worth noting that all the above mentioned contributions were for- malized using Coq proof assistant. Most of this work has not been formalized ever before, and to the best of our knowledge none of it was defined in a proof assistant using the representation and system that we have chosen.
+72
+Appendix A Implementation in COQ
+Starting from chapter 3, all the formalizations and lemmas described in this thesis are implemented in the Coq proof assistant. This guarantees correct- ness of proofs and allows extracting evaluation algorithm from the formal- ization of termination proof. We will describe some of the technical aspects of our implementation, as well as a technique used for formalizing λ-calculus and its variants in a tool such as Coq, with no built-in α-conversion.
+A.1 Representation of terms
+When formalizing a programming language in a proof assistant such as Coq, we have to make a number of decisions, including the one regarding the way we represent terms and manipulate them – in particular, when dealing with variable binding. In “pen-and-paper“ proofs, the standard approach is to use α-conversion when talking about variable binding – this allows us to consider λ(v : A).v and λ(v′ : A).v′ as α-equivalent. Coq is not equipped with tools that could help mimic this behavior (as is e.g. Twelf), so if we wanted to use α-conversion it would actually have to be implemented manually in some way. One possible approach is using variable names as usual and ensuring by a series of lemmas that α-equivalent terms are treated as such. What seems simple and natural to reason about is actually extremely complicated to implement.
+Another possible implementation is de Bruijn indices. Instead of using named variables which have to match some binding (e.g. in λ), it uses indices indicating ”how many bindings ago was this variable bound?”. Compare these two formulas for a function that takes two arguments and returns the first one: λ(x : A).λ(y : B).x is a standard term, λA.λB.1 is a version using de Bruijn indices.
+73
+This is without doubt something simple to implement in Coq. It is also fairly easy to use in case of term variables. One drawback of using this idea is that de Bruijn indices are far from natural to read and reason about. When for- malizing a language we want to be as close to an actual language description, as possible – and with these, we are actually quite far away. Especially for languages like LIS5-Hyb or LIS5-L, where not only do we have term variables, but also world variables, this becomes a serious problem when trying to relate traditional proof with its Coq code. Additional problems arise from using in- dices in formalizations of LIS5-LF and LIS5-Hyb. With de Bruijn indices, order of elements matters within each context. This makes merging two contexts together very unnatural and hard to implement.
+Each of these representations for variables has its flaws. The combination of them as proposed in [1] tries to minimize them.
+A.1.1 Locally nameless representation
+In locally nameless (LN) representation terms under binding are still encoded using de Bruijn indices. However, variables from the context occurring free in the term are represented using names. For α-equivalence the problems arise only with binding, so we can safely use names for free variables. On the other hand, for bound variables de Bruijn indices remain the simplest to im- plement and since the indices are not used for free variable binding, order of elements in contexts does not matter anymore, and merging worlds is simple.
+In order to use LN representation we also need a way of moving from bound variables (written with numbers and underline: k) to free ones (usual variable names like v, w, . . . and overline: v) and vice versa. Take for instance the original λ-introduction from LIS5-LF:
+￼￼(lambda)
+fresh v0 G⊢(v0:A):Γ⊢M:B
+G⊢Γ⊢λ(v0 :A).M:A→B
+￼To represent it using LN we have to change this rule into one where term under λ does not use a named variable anymore, but rather an in- dex. We define two operations dual to each other: opening and closing the term. Opening (Mx) replaces last introduced bound variable with a free variable, closing (\xM) does the reverse. For example: (hyp 0A)x = hyp xA, \x(hyp xA) = hyp 0A
+We can think of opening and closing operations in terms of substitu- tion. Opening can then be expressed as simply Mx = [hypxA|0]M, closing
+74
+￼￼￼￼￼￼￼￼￼￼￼
+similarly as \xM = [hyp0A|x]M1 Note that substitution accepts both free and bound variables as arguments. For bound variables, whenever moving through a variable binder like λ or letdia, we increase the index of substi- tuted variable, like so:
+(λA.hyp 1A)x = [hyp xA|0](λA.hyp 1A) = λA.([hyp xA|1](hyp 1A)) = λA.hyp xA
+New λ-introduction rule in LIS5-LF will look like this:
+￼￼￼￼￼￼￼￼￼￼￼￼(lambda)
+fresh v0 G⊢(v0:A):Γ⊢Mv0 :B
+G ⊢ Γ ⊢ λA.M : A → B
+￼One might notice that our example with λ-opening used a term we would not consider proper: in the body of λA.hyp 1B we use variable bound two bindings away (1), but the term has only one binder (λ). This leads to the definition of locally closed terms: terms that use bound variables only after their binder. In particular, λA.hyp 1B is not locally closed, but λA.hyp 0A is.
+For two other languages, LIS5-Hyb and LIS5-L, we use not only term vari- ables, but also variables for worlds. We define similar opening and closing operationsforthem,againdefinedintermsofsubstitutionastw ={w|0}tand \wt = {0|w}t. We change substitution to accept both bound and free world variables and make a shift for bound variables whenever moving through a binder – in this case, box or letdia. Finally, we define the second version of locally closed terms - this time with respect to world variables.
+In our formalization we hardly ever use term closing, but term opening (both with world and term variables) is used extensively. Additionally, many of the lemmas we aim at proving in Coq require that terms are locally closed. Below we provide sample implementations of term and world substitution, as well as both definitions of locally closed terms – all are given for LIS5-Hyb case, but they are similar in other languages.
+We begin with a shifting operation, defined for both free and bound vari- ables. For bound variables (be it world or term ones), we increase the binding by one, for free variables we make no change.
+1We will actually abuse this notation and allow opening with arbitrary term: MC = [C|0]M. For variables we will use Mx as a short form of Mhyp xA.
+75
+￼￼￼￼￼￼￼￼￼￼￼￼￼￼
+x↑ := match x with |v⇒v
+|k⇒k+1
+The term substitution is defined as the following:
+[C0|x0]M0 := match M0 with
+|hypxA⇒ifx0 =x,thenC0 elsehypxA
+| λA.M ⇒ λA.([C0|x0↑]M)
+| M · N ⇒ ([C0|x0]M) · ([C0|x0]N)
+| box M ⇒ box ([C0|x0]M)
+| unbox-fetch w M ⇒ unbox-fetch w ([C0|x0]M)
+| get-here w M ⇒ get-here w ([C0|x0]M)
+| letdia-get Aw[M]N ⇒ letdia-get Aw[[C0|x0]M]([C0|x0↑]N)
+Note that world substitution shifts both sides of {w0|w1}:
+{w0|w1}M0 := match M0 with
+| hypxA ⇒ hypxA
+| λA.M ⇒ λA.({w0|w1}M)
+| M · N ⇒ ({w0|w1}M) · ({w0|w1}N) | box M ⇒ box ({w0↑|w1↑}M)
+| unbox-fetch w M ⇒ unbox-fetch ({w0|w1}w) ({w0|w1}M) | get-here w M ⇒ get-here ({w0|w1}w) ({w0|w1}M)
+| letdia-get Aw[M]N ⇒
+letdia-get A({w0|w1}w)[{w0|w1}M]({w0↑|w1↑}N)
+We finish this part by giving definitions of locally closed terms. LCt M denotes that term M is closed with respect to term variables, LCw M states the same for world variables.
+76
+￼￼￼￼
+￼￼A.1.2
+LCt(n)M0 := match M0 with
+| hyp vA ⇒ true
+| hyp kA ⇒ if k < n, then true else false
+| λA.M ⇒ LCt(n + 1)M
+| M · N ⇒ LCt(n)M ∧ LCt(n)N
+| box M ⇒ LCt(n)M
+| unbox-fetch w M ⇒ LCt(n)M
+| get-here w M ⇒ LCt(n)M
+| letdia-get Aw[M]N ⇒ LCt(n)M ∧ LCt(n + 1)N
+LCt M = LCt(0)M
+LCw(n)M0 := match M0 with
+| hyp vA ⇒ true
+| λA.M ⇒ LCw(n)M
+| M · N ⇒ LCw(n)M ∧ LCw(n)N | box M ⇒ LCw(n + 1)M
+| unbox-fetch w M ⇒ LCw(n)M
+| get-here w M ⇒ LCw(n)M
+| letdia-get Aw[M]N ⇒ LCw(n)M ∧ LCw(n + 1)N
+LCw M = LCw(0)M Cofinite quantification
+Another concept mentioned in Chargu ́eraud’s et al. article [1] that we have used in formalization of variants of LIS5 is cofinite quantification. It is used to strengthen the induction principle on typing derivation.
+After changes mentioned in the previous section, the rule for λ-introduction is the following:
+￼(lambda)
+fresh v0 G⊢(v0:A):Γ⊢Mv0 :B
+G ⊢ Γ ⊢ λA.M : A → B
+￼What is of interest to us now is the “fresh v0“ statement. What we usu- ally mean by freshness is simply v0 ∈/ FV(M). Sometimes such assumption is weak – not necessarily weak enough to make some property not true, but
+77
+enough to make it very challenging to formalize the proof, i.e. requiring re- naming of variables.
+To overcome such difficulties we use alternative approach – cofinite quan- tification. Instead of showing that some property holds for a given x outside of FV(M), we want to state that it holds for all x ∈/ L for some finite set L. This changes our λ-introduction rule into:
+￼(lambda)
+∀v0 ∈/ L, G ⊢ (v0 : A) : Γ ⊢ M v0 : B
+￼G ⊢ Γ ⊢ λA.M : A → B
+The equivalence of cofinite definitions with their more standard counter-
+parts for λ-calculus is shown in [1]. A.2 Languages for IS5
+Languages used throughout this thesis – LIS5-L, LIS5-LF and LIS5-Hyb – were all formalized using the representation of terms mentioned in the previous section. In this and the subsequent sections we would like to discuss the changes between description and actual formalization.
+A.2.1 Environment representation
+We have not yet mentioned how environments are encoded. For all the lan- guages, a single context is represented as a list modulo permutation. For that we use permutations from tlc library, extended with some additional lemmas. To express that one context is a permutation of the other we use Γ ≈ Γ′ notation.
+Since in LIS5-LF and LIS5-Hyb there are multiple contexts within an environ- ment, we have another notion of permutation. G ∼= G′ expresses the fact that two multi-context environments are a permutation of each other. The order of contexts in G and G′ is irrelevant, as is order of assumption within one context. In LIS5-LF it is therefore the case that Γ ≈ Γ′ → Γ: G ∼= Γ′ : G; similar property in LIS5-Hyb looks like this: Γ ≈ Γ′ → (w,Γ): G ∼= (w,Γ′): G. We may think of ∼= as a “two-level“ permutation.
+In LIS5-L the Ω set (containing all the known worlds) is also formalized as a list modulo permutation.
+Another aspect of environment representation is its correctness – that is, our requirement that no variable (neither world not term one) can be re- peated. We will use a predicate like Ok (Ω, Γ), or Ok (G) to express that.
+78
+Finally, for properties like preservation, we need to be able to find an environment containing no assumptions at all, but with all the worlds intact. This we will denote as emptyEquiv (G). As for LIS5-L this is simply setting Γ = ∅, there we will omit the use of such function.
+A.2.2 LIS5-L
+Differences between description and implementation of type system for LIS5-L come from the change in term representation and follow the scheme presented for λ in previous section. All the rules below are also extended with a re- quirement Ok (Ω, Γ) and all occurrences of variables in terms are now free variables (v instead of v, w instead of w).
+fresh v0 Ω;(v0:A@w):Γ⊢M:B@w
+￼￼￼Ω;Γ⊢λ(v0 :A).M:(A→B)@w
+→
+∀v0 ∈/L, Ω;(v0:A@w):Γ⊢Mv0 :B@w
+Ω; Γ ⊢ λA.M : (A → B)@w
+→
+∀w0 ∈/ L, w0 : Ω; Γ ⊢ M w0 : A@w0
+Ω; Γ ⊢ box M : 􏰉A@w
+￼￼w∈Ω
+fresh w0 w0:Ω;Γ⊢M:A@w0
+Ω;Γ⊢box w0 M:􏰉A@w
+w ∈ Ω
+￼￼￼fresh w0, fresh v Ω;Γ⊢M: ♦A@w w0: Ω;(v: A@w0): Γ⊢N: B@w
+→
+Ω;Γ⊢M:♦A@w ∀w0 ∈/Lw, ∀v∈/Lt, w0:Ω;(v:A@w0):Γ⊢(Nw0)v:B@w
+Ω; Γ ⊢ letdia [A]M N : B@w
+Typing is implemented in Coq as an inductive predicate; we will only give a snippet with two cases:
+Inductive types_L:
+    worlds_L -> ctx_L -> te_L -> ty -> var -> Prop :=
+| t_hyp_L: forall Omega Gamma v A w
+79
+￼Ω;Γ⊢letdia [vA :=w0]MN:B@w
+￼￼￼
+  (Ok: ok_L Omega Gamma)
+  (World: Mem w Omega)
+  (HT: Mem (w, v, A) Gamma),
+  Omega; Gamma |- hyp_L (fte v) ::: A @ w
+| t_lam_L: forall L Omega Gamma w A B M
+  (Ok: ok_L Omega Gamma)
+  (HT: forall x, x \notin L ->
+    Omega; (w, x, A)::Gamma |-
+           (M ^t^ (hyp_L (fte x))) ::: B @ w),
+  Omega; Gamma |- lam_L A M ::: A ---> B @ w
+(...)
+where " Omega ’;’ Gamma ’|-’ M ’:::’ A ’@’ w " :=
+    (types_L Omega Gamma M A w): labeled_is5_scope.
+The operational semantics do not differ much from the description either. We only add a requirement that terms are locally closed: LCt M, LCw M. Reduction step, M 􏰁→w N is again an inductive predicate, same as val(M). These are again small snippets from the actual implementation:
+Inductive value_L: te_L -> Prop :=
+| val_lam_L: forall A M, value_L (lam_L A M)
+| val_box_L: forall M, value_L (box_L M)
+| val_get_here_L: forall M w (HT: value_L M),
+    value_L (get_L w (here_L M)).
+Inductive step_L: te_L * vwo -> te_L * vwo -> Prop :=
+| red_appl_lam_L: forall A M N w,
+   lc_w_L M -> lc_t_L (M ^t^ N) ->
+   lc_w_L N -> lc_t_L N ->
+   (appl_L (lam_L A M) N, w) |-> (M ^t^ N, w)
+| red_unbox_box_L: forall M w,
+   lc_t_L M -> lc_w_L (M ^w^ w) ->
+   (unbox_L (box_L M), w) |-> (M ^w^ w, w)
+| red_letd_get_here_L: forall M N w w’,
+   lc_t_L M -> lc_w_L M ->
+   lc_t_L (N ^t^ M) -> lc_w_L (N ^w^ w’) -> value_L M ->
+   (letd_L (get_L w’ (here_L M)) N, w) |-> ((N ^w^ w’) ^t^ M, w)
+| red_appl_L: forall M N M’ w (HRed: (M, w) |-> (M’, w)),
+   lc_t_L M -> lc_w_L M ->
+80
+   lc_t_L N -> lc_w_L N ->
+   (appl_L M N, w) |-> (appl_L M’ N, w)
+(...)
+where " M |-> N " := (step_L M N ) : labeled_is5_scope.
+Proof of the progress property remains straightforward – we have not changed anything in the definition of reduction, so there is no reason why it should be any different. The preservation proof has changed a little bit, as we use the locally nameless representation and cofinite quantification. In particular for variable-binding terms, λ, box and letdia, we now have a different-looking induction hypothesis.
+The lemma that we are proving is the following:
+Lemma PreservationL:
+forall Omega M N A w w’
+  (HType: Omega; nil |- M ::: A@w)
+  (HStep: (M, fwo w) |-> (N,fwo w’)),
+  Omega; nil |- N ::: A@w’.
+Let us discuss only the β-reduction case.
+We have to show Ω;∅ ⊢ MN : B@w′. From typing of λA.M we can conclude that ∀v ∈/ L, Ω;(v: A@w′): Γ ⊢ Mv : B@w′.
+It suffices to express MN as a combination of two substitutions using a fresh variable as the “in between“ argument. M N = [N |0]M = [N |v][v|0]M = [N|v]Mv. Now, for this equality to hold we simply take v that is not in L and not used anywhere in N.
+We then use typing preservation under term substitution, which leaves us with showing that Ω;(v: A@w′): Γ ⊢ Mv : B@w′ – but that follows from the fact that v ∈/ L.
+Proofs for two other cases that have changed compared to the proof described in Chapter 3, unbox (box M ) 􏰁→w M w and letdia [A]get w′ (here M )N 􏰁→w (Nw′)M, use the same idea of split substitution.
+A.2.3 LIS5-LF and LIS5-Hyb
+Despite the fact that in LIS5-LF we do not use worlds and in LIS5-Hyb we do, these languages are similar enough that formalization and most of the proofs are almost identical, even in a proof assistant such as Coq. Most of the difficulties with both of these systems come from the background vs. current context split – with world-changing operations we need to control the exchange, but at the same time allow arbitrary order of contexts in the background (via two-level permutations, G ∼= G′). To give an example look at a fragment of typing predicate for two versions of unbox in LIS5-LF:
+81
+￼￼￼￼￼￼￼￼
+Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
+(...)
+| t_unbox_LF: forall G Gamma M A
+  (Ok: ok_Bg_LF (Gamma :: G))
+  (H: G |= Gamma |- M ::: [*] A),
+  G |= Gamma |- unbox_LF M ::: A
+| t_unbox_fetch_LF: forall G Gamma Gamma’ M A
+  (Ok: ok_Bg_LF (Gamma:: G & Gamma’))
+  (H: G & Gamma’ |= Gamma |- M ::: [*] A),
+  forall G’, G & Gamma ~=~ G’ ->
+    G’ |= Gamma’ |- unbox_LF M ::: A
+(...)
+where " G ’|=’ Gamma ’|-’ M ’:::’ A" := (types_LF G Gamma M A).
+Here we explicitly use permutations of background contexts in order to ex- press that in context-changing version of unbox operation, we can choose any context from the background.
+Unfortunately, this leads to a lot of overhead, as if almost every proof we are forced to show that two environments are each other’s permutation. We rely heavily on Coq’s notion of setoids and morphisms to reduce that overhead as much as possible.
+Another technical difficulty becomes visible when looking at lemmas on type preserving substitutions and merges. In Chapter 3 we have described worlds merging for LIS5-L; the formulation for LIS5-Hyb would be the following:
+If G ⊢ (w,Γ) ⊢ M: A then {w0|w1}((w,Γ): G) ⊢ {w0|w1}M: A.
+Here “{w0|w1}((w,Γ): G)“ merges contexts of w0 and w1. It then returns the after-merge equivalent of (w, Γ) as the current context and puts the rest to the background.
+Note that there are three distinctive cases: w0 = w, w1 = w or none of them are equal.
+In the first case, we add something from the background, enriching the current context (e.g. {w0|w1}((w0,Γ): ((w1,Γ′): G)) = ((w0,Γ + Γ′), G)).
+In the second, the current context changes its name and is enriched again: {w0|w1}((w1,Γ):((w0,Γ′):G))=((w0,Γ+Γ′),G).
+82
+In the last case, two contexts from the background are merged: {w0|w1}((w,Γ):((w0,Γ′):(w1,Γ′′):G))=((w,Γ),(w0,Γ′ +Γ):G).
+This is already a lot of case analysis! But now consider that for term like unbox-fetch w′ M we have to distinguish all these cases again, this time for w′ instead of w.
+Similar problems arise when dealing with type preservation under term substitution:
+If (w,Γ): G ∼= (w′,Γ′): G′, emptyEquiv(G′) ⊢ w′,∅ ⊢ M: A and G∗ ⊢(w,Γ)∗ ⊢N:B2,thenG⊢(w,Γ)⊢[M|v]N:B
+Either w = w′ and we extend current context, or not – and additional assumption is added to one of the contexts in the background. Again, for context-changing terms like unbox-fetch w′′ M, we have to consider cases w′′ = w′ and w′′ ̸= w′.
+Proofs of preservation and progress – except for requiring more case anal- ysis and term rewriting – are no different than in LIS5-L case.
+A.3 Languages equivalence
+Relations between languages described in Chapter 4 are also formalized in Coq. Conversions of terms usually turn out to be simple and straightforward – almost exactly like the pseudo-code we have shown in their descriptions. It is actually contexts rewriting that requires more work. When describing the translations we almost did not mention properties of rewritten contexts, as their correctness was intuitive and matched our expectations (e.g. bucket- sorting a context does not change its correctness with respect to variable repetition). In Coq we have to formalize all these properties. Additionally, we now want the translations to preserve locally closed properties – this is something we did not have to consider previously.
+Rewriting contexts and terms for translations from LIS5-Hyb to LIS5-L and to LIS5-LF is very simple; Coq implementation of these rewrites is exactly as described in Chapter 4. The proofs are also straightforward and easy to follow, allowing us to skip description of these translations and focus on the two remaining cases.
+2(w, Γ)∗ means that if w = w′ then we extend context with a pair (v, A); G∗ does that for every context in the background
+83
+￼
+A.3.1 From LIS5-L to LIS5-Hyb
+When describing this translation we have mentioned that rewriting contexts between LIS5-L and LIS5-Hyb is done via bucket-sort procedure. This proves to be particularly tricky to formalize – even more so to prove correctness.
+Fixpoint gather_keys_L (k: var) (l: ctx_L) :=
+match l with
+| nil => nil
+| (k’, v) :: l’ =>
+  if (eq_var_dec k k’)
+  then v :: (gather_keys_L k l’)
+  else gather_keys_L k l’
+end.
+Fixpoint bucket_sort_L
+         (keys: worlds_L)
+         (l: ctx_L) :=
+match keys with
+| nil => nil
+| k :: keys’ =>
+  (k, gather_keys_L k l) :: bucket_sort_L keys’ l
+end.
+So far there is nothing worrying here – for each world k we gather all as- sumptions regarding k from l. The problematic part begins when we want to obtain the result as a pair (background, current context). We cannot be sure that the world marked as current in LIS5-L is actually in Ω – therefore we have to make the current context optional:
+Fixpoint split_at_Hyb (l: bg_Hyb) (k: var) :=
+match l with
+| nil => (nil, None)
+| (k’, l) :: l’ =>
+  if (eq_var_dec k k’)
+    then (l’, Some (k’, l))
+  else
+    let res := split_at_Hyb l’ k in
+    ((k’,l) :: fst res, snd res)
+end.
+84
+Definition L_to_Hyb_ctx
+         (Omega_L: worlds_L)
+         (Gamma_L: ctx_L)
+         (w_L: var) :
+         (bg_Hyb * option ctx_Hyb) :=
+  let G := bucket_sort_L Omega_L Gamma_L in
+  split_at_Hyb G w_L.
+In order for this procedure to be useful we have to show that if wL ∈ Ω then the result is not None.
+When using permutations, in many lemmas for LIS5-Hyb (and LIS5-LF) we do not care about the distinction between current context and background – it is therefore useful to realize, that bucket-sort result is in fact a permuta- tion LtoHybCtx result. This will be used in the proof that a correct (OkL ) context from LIS5-L rewrites to a correct one from LIS5-Hyb (OkHyb ).
+As to the rewrite of terms – there are two things to notice, highlighted also in Chapter 4. First is that in LIS5-L, in terms like unbox M or here M, there is no mention of the current world within them. To rewrite them into LIS5-Hyb without the knowledge of current world is impossible – thus, our function takes current world (be it bound or free) as an argument, resulting in the following signature:
+Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb
+Second, as LIS5-Hyb does not have fetch or get operations, we need to simulate them somehow. Back in Chapter 4 we said that for technical reasons we want to rewrite fetch w′ M in world w into an overly complicated term:
+fetchL w′ M ⇒
+let w0 := freshWorld in
+let w′′ := freshWorld in
+let v := freshVar in
+let N := boxHyb w0 (unbox-fetch w′′(hyp vA)) in letdia-getHyb w′ [vA := w′′] get-hereHyb w′ (LtoHyb(M, w′))N
+In current term representation this does not require generation of fresh variables:
+fetchL w′ M ⇒
+let N := boxHyb (unbox-fetch 0(hyp 1A)) in
+￼￼letdia-get Aw′[get-here Hyb Hyb
+85
+w′ (LtoHyb(M,w′))]N,
+but this is still not an obvious rewrite to propose. The most natural way to rewrite fetch w M is by using box (unbox-fetch w (LtoHyb(M, w))). What is the problem with such approach? Let us take a closer look.
+If there are no bound world variables3 in fetch w′ M, then indeed LtoHyb(fetch w′ M,w) = box(unbox-fetch w (LtoHyb(M,w))). Other- wise we need to take into account that box adds one bound world variable – simplest example to observe how such a rewrite works is to take w′ = 0. Then LtoHyb(fetch 0 M, w) = box (unbox-fetch 0 LtoHyb(M, w′)). This does not look right - we started with a term in LIS5-L that was not locally closed, but ended up with one that is!
+We can of course try to fix it by shifting: LtoHyb(fetch w′ M,w) ⇒ box(unbox-fetch w′↑ (LtoHyb(M,w′))),butthesameproblemmayre-appear in the result of LtoHyb(M, w′).
+Another solution is to actually shift the resulting term4 – that is: LtoHyb(fetch w′ M, w) = box (unbox-fetch w′↑ (LtoHyb(M, w′))↑). This
+is better, but very unnatural to work with – for example, how do we tell when
+a shifted term types?
+Our solution is to ignore this problem for as long as possible by postponing the introduction of new world variable (in box). Note that in
+HybtoL (fetchL w′ M )w =
+let N := boxHyb (unbox-fetch 0(hyp 1)A) in
+a recursive call.
+Complete term rewriting function is as follows:
+Fixpoint L_to_Hyb_term (w: vwo) (M0: te_L) : te_Hyb :=
+match M0 with
+| hyp_L v => hyp_Hyb v
+| lam_L A M => lam_Hyb A (L_to_Hyb_term w M)
+| appl_L M1 M2 =>
+      appl_Hyb (L_to_Hyb_term w M1) (L_to_Hyb_term w M2)
+| box_L M => box_Hyb (L_to_Hyb_term (bwo 0) M)
+| unbox_L M =>  unbox_fetch_Hyb w (L_to_Hyb_term w M)
+| here_L M => get_here_Hyb w (L_to_Hyb_term w M)
+3Note that this is a stronger requirement than LCw M
+4We define such operation inductively as a shift on each world in the term
+86
+￼￼￼￼￼w′ (LtoHyb(M,w′))]N,
+we do not create any new world variables for the subterm in which we make
+letdia-get Aw′[get-here Hyb Hyb
+￼
+| letd_L M1 M2 =>
+      letdia_get_Hyb w
+           (L_to_Hyb_term w M1)
+           (L_to_Hyb_term (shift_vwo w) M2)
+| fetch_L w’ M =>
+      letdia_get_Hyb w’
+           (get_here_Hyb w’ (L_to_Hyb_term w’ M))
+           (box_Hyb (unbox_fetch_Hyb (bwo 1) (hyp_Hyb (bte 0))))
+| get_L w’ M =>
+      letdia_get_Hyb w’
+          (L_to_Hyb_term w’ M)
+          (get_here_Hyb (bwo 0) (hyp_Hyb (bte 0)))
+end.
+Note that in the box case recursion call we use a bound world variable instead of a fresh one. This is fine because we open this term with a fresh world in the premise of typing rule for box.
+Proof of typing preservation is again simple, but with a lot of overhead coming from context rewriting.
+We also provide an alternative translation using a relation. It is defined based on the function described above, except it connects unboxL M with every unbox-fetchHyb w M′ for which M is connected to M′ (same for here and letdia). Obviously this relation is capturing too many pairs or terms, but – as it does not use world as a parameter – it is much simpler to work with. In particular, we can prove lemma regarding term substitution without requiring any term to be stable.
+Lemma L_to_Hyb_term_R_subst_t:
+forall M M’ C1 C2 v,
+  L_to_Hyb_term_R C1 C2 ->
+  L_to_Hyb_term_R M M’ ->
+  L_to_Hyb_term_R (subst_t_L C1 v M) (subst_t_Hyb C2 v M’).
+It is trivial to see that pair (M, LtoHyb(M,w)) will satisfy this relation. We can then show the value preservation lemma for relation and use this result for a function:
+Lemma L_to_Hyb_term_R_value:
+forall M M’,
+ lc_w_Hyb M’ -> lc_t_Hyb M’ ->
+87
+  value_L M -> L_to_Hyb_term_R M M’ ->
+  value_Hyb M’ \/
+  forall w, exists M’’, steps_Hyb (M’, w) (M’’, w) /\ value_Hyb M’’.
+Lemma L_to_Hyb_term_value:
+forall M M’ w,
+ lc_w_Hyb M’ -> lc_t_Hyb M’ ->
+  value_L M -> (M’ = L_to_Hyb_term w M) ->
+  value_Hyb M’ \/
+  exists M’’, steps_Hyb (M’, w) (M’’, w) /\ value_Hyb M’’.
+intros; destruct L_to_Hyb_term_R_value with M M’; subst; eauto.
+Qed.
+As the relation does not need worlds, the proof of value preservation for it is almost trivial.
+A.3.2 From LIS5-LF to LIS5-Hyb
+In the second translation we will describe here, we cannot use functions to rewrite neither contexts nor terms. For contexts, our motivation is mostly pragmatic – a function assigning fresh names to contexts would most prob- ably be order-dependent. It is very likely that we will need permutations in some of the proofs, therefore it is preferable to define a relation accepting any unique assignment of names to contexts. The relation we define is simply:
+Definition LF_to_Hyb_ctx (G: bg_LF) (G’: bg_Hyb) :=
+  PPermut_LF (map snd_ G’) G /\ ok_Hyb G’ nil.
+In case of terms, we do not have much of a choice. This transformation can only work for well-typed terms – and we do actually use type trees to create resulting term in LIS5-Hyb. In a way, this development is formalizing the table we have shown in chapter 4.
+Signature of the relation is the following:
+Inductive LF_to_Hyb_term_R: ctx_LF  -> te_LF  -> ty ->
+                         bg_Hyb -> var -> te_Hyb -> Prop
+In each case, the relation will require that the term from LIS5-LF types in the environment passed as one of the arguments. If that is the case, we can reconstruct the corresponding LIS5-Hyb term.
+Note that we use only the environment from LIS5-Hyb – this is to provide consistency with the induction hypothesis. For example in case of unbox:
+88
+| unbox_LF_Hyb:
+    forall G Gamma G’ w M N A,
+      G |= Gamma |- (unbox_LF M) ::: A ->
+      LF_to_Hyb_ctx (Gamma::G) ((w, Gamma)::G’) ->
+      LF_to_Hyb_term_R Gamma M ([*]A) G’ w N ->
+      LF_to_Hyb_term_R Gamma (unbox_LF M) A
+                    G’ w (unbox_fetch_Hyb (fwo w) N)
+| unbox_fetch_LF_Hyb:
+    forall G Gamma Gamma’ G’ w w’ M N A G’’,
+      w <> w’ ->
+      (Gamma’::G) |= Gamma |- (unbox_LF M)  ::: A ->
+      LF_to_Hyb_ctx (Gamma::Gamma’::G)
+                    ((w, Gamma)::(w’, Gamma’)::G’) ->
+      LF_to_Hyb_term_R Gamma’ M ([*]A)
+                    ((w, Gamma)::G’) w’ N ->
+      ((w’, Gamma’)::G’) ~=~ G’’ ->
+      LF_to_Hyb_term_R Gamma (unbox_LF M) A
+                    G’’ w (unbox_fetch_Hyb (fwo w’) N)
+we need to be certain that there was no change in assignment of worlds to contexts. Otherwise we will not be able to distinguish two above cases.
+It is not a surprise that a relation using typing preserves types. The preservation of values is also trivial to show.
+A.4 Termination of evaluation
+Termination of evaluation is particularly interesting to formalize in Coq be- cause from it we can extract the evaluator. This requires the definitions to be in sort Type rather than Prop, but this is usually easy to change – in most cases with minimal effort. In our formalization we give a proof of LIS5-LF without ♦ in an extractable form, leaving the rest of languages formalized with proof-irrelevance.
+This is a technical decision. We normally treat permutations as equiv- alence relations with all the benefits of rewriting using Setoid type. When moving from Prop to Type it turns out to be necessary to change the def- inition of permutation ( ∼= ) as well – and this of course disallows us from
+89
+treating permutations as relations5. Such change is surely not critical – we can still prove everything we could before – but it requires all rewrites to be more manual, as we cannot use setoid rewrites.
+It is worth noting that these technical difficulties are most probably due to ambiguity of typing. When using a la Church type system with disam- biguous typing, changes going so deeply would most likely be avoidable.
+We should also mention that to prove termination for a sublanguage with- out ♦, we actually have to re-create such language with type ♦ and terms that use it (here, letdia, etc.) removed – it is a bit cumbersome, but oth- erwise analysis of ♦ type has to be included in the proof.
+In the next part of this section we intend to describe the ♦-free sublan- guage of LIS5-LF. Next we turn our attention to the complete LIS5-LF laguage.
+A.4.1 LIS5-LF without ♦
+The definitions of properties and lemmas formalized in Coq differ from the ones described in the thesis only in that the former have to ensure that terms are locally closed and contexts correct. Therefore, the definitions of termination and reducibility in LIS5-LF are as follows:
+Inductive WHT: te_LF -> Type :=
+| val_WHT: forall M, value_LF M -> WHT M
+| step_WHT: forall M,
+              { V & (value_LF V) * (steps_LF M V)) -> WHT M.
+Fixpoint Red (M: te_LF) (A: ty) : Type :=
+match A with
+| tvar => WHT M
+| tarrow A1 A2 =>
+    (WHT M) *
+    (forall N,
+lc_t_LF N ->
+       Red N A1 ->
+      Red (appl_LF M N) A2)
+| tbox A1 => (WHT M) * (Red (unbox_LF M) A1)
+end.
+5This is because in Coq relation is a defined as A → A → Prop
+90
+￼
+As this sublanguage has the property that every term has at most one redex, we can show that
+Lemma WHT_step:
+forall M M’,
+  WHT M ->
+  M |-> M’ ->
+  WHT M’.
+Lemma WHT_step_back:
+forall M M’,
+  M |-> M’ ->
+WHT M’ -> WHT M.
+Next, we can define and prove the three properties (CR1 – CR3) that we require to hold for reducibility relation; these proofs are completely straight- forward, we will therefore omit their descriptions. They state that reduction preserves reducibility (in both directions) and that every reducible term’s evaluation terminates.
+With these definitions and properties ready, the next step is defining simultaneous substitution.
+Fixpoint SL (L: list (var * ty * te_LF)) (M: te_LF) : te_LF :=
+match M with
+| hyp_LF (bte v) => M
+| hyp_LF (fte v) =>
+  let x := find_var L v in
+  match x with
+    | Some (v, A, M) => M
+    | None => hyp_LF (fte v)
+  end
+| lam_LF A M => lam_LF A (SL L M)
+| appl_LF M N => appl_LF (SL L M) (SL L N)
+| box_LF M => box_LF (SL L M)
+| unbox_LF M => unbox_LF (SL L M)
+end.
+When describing the properties of this substitution ([L|X]N) in Chapter 5, we have mentioned that the list of variables X should contain all free variables from term M. For this concrete implementation, we might want to be more specific. There is a number of options:
+91
+1. We may require exactly variables from FV(M) – this causes a number of problems for example in (othewise trivial) M · N case, as free variables from M and N do not have to be exactly the same;
+2. We may require at least the variables from FV(M) to be present, which solves the above problem;
+3. We can also simply take all the known variables, that is every variable present in the environment.
+The second variant will require an additional lemma stating that “a term well-typed in an empty environment has no free term variables“ to obtain the termination result; the third one makes transition between reducibility theorem and termination theorem the simplest. We therefore chose to use all known term variables in the substitution.
+The complete formalization of reducibility theorem in LIS5-Hyb is therefore the following:
+Theorem red_theorem:
+forall G Gamma M A,
+  lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+  forall L,
+    OkL L nil ->
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Red c b) ->
+    Red (SL L M) A.
+There are three cases worth mentioning: hyp, λ and box.
+− In hyp vA case (with (v, A) ∈ Γ) we have to show that the substitution was indeed done – that is, by the definition, that we have found a tuple containing variable v in L. Then the term substituted for hyp vA is, by our assumptions on L, reducible. It remains to argue that it is in fact reducible exactly at A.
+− For λA.M we have to show that for every reducible term N, it is the case that RedB ((λA.(SL L W M )) · N ). By using one of the properties of reducibility (CR3), we end up having to prove:
+92
+￼￼
+       n : x \notin (...)
+       X1 : forall V : te_LF,
+            Red V A ->
+            lc_t_LF V ->
+            Red (SL ((x, A, V) :: L0)
+            [hyp_LF (fte x) // bte 0]M) B
+       N : te_LF
+       H3 : lc_t_LF N
+       X2 : Red N A
+       ============================
+        Red (SL L0 M ^t^ N) B
+We will use the same split of substitution as we have described for the PreservationproofinSection1: (SLL0 W M)N =[N|x](SLL0 W M)x. Now we can extend L0 with (x, A, V ) and change (SL L0 W M)x into SLL0 W Mx, as all terms in L0 are locally closed – therefore opening does not affect them.
+− Lastly, box M follows the same pattern as λA.M, except extending W rather than L.
+Finally, the termination theorem is simply given as:
+Theorem termination_theorem:
+forall G M A,
+  emptyEquiv_LF G |= nil |- M ::: A ->
+  WHT M.
+A.4.2 Complete LIS5-LF
+In the description of termination for the complete LIS5-LF language we have introduced some new concepts, not present in the sublanguage variant. These include continuations and mutually inductive logical relations.
+First, as conceptually complicated as they are, continuations are actually almost trivial to formalize:
+Inductive Cont :=
+| IdK: ty -> Cont
+| ConsU: Cont -> ty -> Cont
+| ConsD: Cont -> te_LF -> ty -> ty -> Cont
+| ConsA: Cont -> te_LF -> ty -> ty -> Cont.
+93
+Fixpoint ContAppl (K: Cont) (M: te_LF) : te_LF :=
+match K with
+| IdK A => M
+| ConsU K’ A => ContAppl K’ (unbox_LF M)
+| ConsD K’ N A B => ContAppl K’ (letdia_LF M N)
+| ConsA K’ N A B => ContAppl K’ (appl_LF M N)
+end.
+Notation " K ’@’ M " := (ContAppl K M) (at level 65).
+Inductive ContLC: Cont -> Prop :=
+| ContId_lc: forall A, ContLC (IdK A)
+| ContU_lc: forall K A, ContLC K -> ContLC (ConsU K A)
+| ContD_lc: forall K N A B,
+                 ContLC K -> lc_t_n_LF 1 N ->
+                 ContLC (ConsD K N A B)
+| ContA_lc: forall K N A B,
+                 ContLC K -> lc_t_LF N ->
+                 ContLC (ConsA K N A B)
+Logical relations for LIS5-LF on the other hand, however rather straight- forward and simple to describe on paper, are actually quite tricky6 to encode in Coq. There are two reasons for this – first is that we cannot define these relations as inductive types (just as we couldn’t do it in the sublanguage), since Coq requires strictly positive occurrences of inductively defined types in their definitions. Second, when using fixpoint (or function) with mutually recursive definitions, the system requires such recursion to be structural – meaning that we have to explicitly use “smaller“ argument for the recursion call.
+￼6And mostly unreadable.
+94
+This leads to the following definition of logical relations:
+Fixpoint R M A {struct A} : Prop :=
+let Q M A := forall K,
+               lc_t_LF M -> ContLC K -> RC K A ->
+               WT (K @ M) in
+match A with
+| tvar => WT M
+| A1 ---> A2 => WT M /\
+                (forall N,
+                   lc_t_LF N ->
+Q N A1 ->
+                   Q (appl_LF M N) A2)
+| [*]A1 => WT M /\ forall K, RC K A1 -> WT (K @ (unbox_LF M))
+| <*>A1 => forall K, ContLC K ->
+                     (forall V,
+                        lc_t_LF V ->
+                        R V A1 ->
+                        WT (K @ (here_LF V))) ->
+WT (K @ M)
+end
+with RC K A {struct A} : Prop :=
+let Q M A := (..) (* same as above *)
+match A with
+| tvar => forall V, lc_t_LF V -> WT V -> WT (K @ V)
+| tbox A1 => forall V, lc_t_LF V ->
+                       (WT V /\
+                        forall K0, ContLC K0 ->
+                                   RC K0 A1 ->
+                                   WT (K0 @ (unbox_LF V))) ->
+                       WT (K @ V)
+| A1 ---> A2 => forall V, lc_t_LF V ->
+                  (WT V /\
+                   (forall N,
+                      lc_t_LF N ->
+                      Q N A1 ->
+                      Q (appl_LF V N) A2)) ->
+                  WT (K @ V)
+| <*> A1 => forall V, lc_t_LF V ->
+end.
+Q V A1 -> WT (K @ (here_LF V))
+95
+Luckily, the proof of reducibility is straightforward enough that complex analysis of these two relations is not required.
+Theorem red_theorem:
+forall G Gamma M A,
+lc_t_LF M ->
+  G |= Gamma |- M ::: A ->
+ forall L,
+    OkL L nil ->
+    concat(Gamma::G) *=* map fst_ L ->
+    (forall a b c, Mem (a,b,c) L -> lc_t_LF c) ->
+    (forall a b c, Mem (a,b,c) L -> Q c b) ->
+    forall K,
+      ContLC K ->
+      RC K A ->
+      WT (K @ (SL L M)).
+Main result – the termination theorem – is defined exactly as in the sublanguage case.
+A.4.3 Evaluator extraction
+One final piece of code that deserves mention in the technical part of this thesis is the evaluator extracted from termination proof for \♦LIS5-LF. The code that – upon running – produces the (almost) complete evaluator can be as simple as:
+Extraction "termination_LF_nodia" termination_language.
+If however we feel that there is no need to re-define types such as list, nat, bool etc – we can add the following lines:
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+Extract Inductive prod => "(*)"  [ "(,)" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+Extract Inductive nat => "int"
+  [ "0" "(fun x -> x + 1)" ]
+  "(fun zero succ n ->
+      if n=0 then zero () else succ (n-1))".
+This is completely optional. What is not is the realization of axioms. When extracting code with unrealized axioms, we are being warned:
+96
+Warning: The following axioms must be realized in the
+extracted code:
+  eq_var_dec LibAxioms.indefinite_description.
+In case of the evaluator we have extracted, the two axioms both have to do with variables – decidability of their equality and creation of a fresh one. Looking into the extracted code (or an external Coq library that produces it – tlc) makes us realize that var is defined as interger, so eq_var_dec can
+be realized using equality for integers.
+As for the other axiom – it comes from the same tlc library and is used
+only in the definition of fresh variable generator taking a finite set as an argument.
+(** val indefinite_description : __ -> ’a1 **)
+let indefinite_description =
+  failwith "AXIOM TO BE REALIZED"
+(** val classicT : bool **)
+let classicT =
+  let h = indefinite_description __ in if h then true else false
+(...)
+(** val epsilon_def : __ -> ’a1 **)
+let epsilon_def _ =
+  if classicT then indefinite_description __ else inhab_witness __
+(** val epsilon : __ -> ’a1 **)
+let epsilon _ =
+  epsilon_def __
+module Variables =
+ struct
+  type var = int
+(...)
+  type vars = var FsetImpl.fset
+  (** val var_gen_list : int list -> int **)
+  let var_gen_list l =
+97
+    plus ((fun x -> x + 1) 0) (fold_right plus 0 l)
+  (** val var_gen : vars -> var **)
+  let var_gen e =
+    var_gen_list (epsilon __)
+(...)
+In this case we might want to replace the entire finite set module with a standard set implementation. Then, we can use standard function elements to move from var_gen to var_gen_list.
+After making these two changes we have a complete evaluator of \♦LIS5-LF extracted from the proof.
+98
+Bibliography
+[1] Brian E. Aydemir, Arthur Chargu ́eraud, Benjamin C. Pierce, Randy Pollack, and Stephanie Weirich. Engineering formal metatheory. In George C. Necula and Philip Wadler, editors, Proceeding of the 35th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (POPL), pages 3–15. ACM, 2008.
+[2] Roberta Ballarin. Modern origins of modal logic. In Edward N. Zalta, editor, The Stanford Encyclopedia of Philosophy. Winter 2010 edition, 2010.
+[3] Ma􏰀lgorzata Biernacka and Dariusz Biernacki. A context-based approach to proving termination of evaluation. Electron. Notes Theor. Comput. Sci., 249:169–192, August 2009.
+[4] Arthur Chargu ́eraud. The locally nameless representation. Journal of Automated Reasoning, pages 1–46, 2011. 10.1007/s10817-011-9225-2.
+[5] Thierry Coquand and Gerard Huet. The calculus of constructions. Inf. Comput., 76(2-3):95–120, February 1988.
+[6] Frederic Brenton Fitch. Symbolic logic : An introduction. The Ronald Press Company, Cop., New York, 1952.
+[7] Didier Galmiche and Yakoub Salhi. Label-free proof systems for intu- itionistic modal logic is5. In Proceedings of the 16th international con- ference on Logic for programming, artificial intelligence, and reasoning, LPAR’10, pages 255–271, Berlin, Heidelberg, 2010. Springer-Verlag.
+[8] Jean-Yves Girard, Paul Taylor, and Yves Lafont. Proofs and types. Cambridge University Press, New York, NY, USA, 1989.
+[9] Simo Knuuttila. Medieval theories of modality. In Edward N. Zalta, editor, The Stanford Encyclopedia of Philosophy. Spring 2013 edition, 2013.
+99
+[10] Saul Kripke. A completeness theorem in modal logic. J. Symb. Log., 24(1):1–14, 1959.
+[11] Sam Lindley and Ian Stark. Reducibility and ⊤⊤-lifting for computa- tion types. In Proceedings of the 7th international conference on Typed Lambda Calculi and Applications, TLCA’05, pages 262–277, Berlin, Hei- delberg, 2005. Springer-Verlag.
+[12] Tom Murphy, VII, Karl Crary, and Robert Harper. Type-safe dis- tributed programming with ML5. In Trustworthy Global Computing 2007, November 2007.
+[13] Tom Murphy VII. Modal types for mobile code. PhD thesis, Pittsburgh, PA, USA, 2008. AAI3314655.
+[14] Tom Murphy VII, Karl Crary, Robert Harper, and Frank Pfenning. A symmetric modal lambda calculus for distributed computing. In Pro- ceedings of the 19th Annual IEEE Symposium on Logic in Computer Science, LICS ’04, pages 286–295, Washington, DC, USA, 2004. IEEE Computer Society.
+[15] Frank Pfenning and Rowan Davies. A judgmental reconstruction of modal logic. Mathematical. Structures in Comp. Sci., 11(4):511–540, August 2001.
+[16] Gordon D. Plotkin and Colin Stirling. A framework for intuitionistic modal logics. In Joseph Y. Halpern, editor, Proceedings of the 1st Con- ference on Theoretical Aspects of Reasoning about Knowledge, Monterey, CA, March 1986, pages 399–406. Morgan Kaufmann, 1986.
+[17] A. N. Prior. Time and Modality. Greenwood Press, 1955.
+[18] Alex K. Simpson. The Proof Theory and Semantics of Intuitionistic
+Modal Logic. PhD thesis, University of Edinburgh, 1994.
+100
