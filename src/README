@@ -1,0 +1,27 @@
+FIXME:
+3 repositories should be merged
+
+This developement formalizes the IS5 logic. Two formalizations are used:
+
+* "A Symetric Modal Lambda calculus for Distributed Computing" by Tom Murphy VII, Karl Crary, Robert Harper and Frank Pfenning provides labeled approach
+
+* "Label-free Proof Systems for Intuitionistic Modal Logic IS5" by Didier Galmiche and Yakoub Salhi provides label-free approach
+
+On a technical side, we are using tlc and Metatheory libraries available at http://www.chargueraud.org/softs/ln/
+
+
+Installation instructions
+-------------------------
+
+Coq proof assistant is required for this code to be compiled and the proofs checked. The current version of coq can be downloaded from http://coq.inria.fr.
+In addition, a non-standard library tlc is used throughtout the development. The last verfied to be working version is available under http://github.com/Ayertienna/IS5-libs, but there is a good chance that a more recent version will work as well. This library has to be installed under user-contrib directory (or in any other place where it will be visible for coqtop).
+
+Next, to compile the language definitions, we need some shared libraries compiled as well.
+A complete script checking proofs for languages is the following (starting from the main repository directory):
+make
+cd Labeled && make && cd ..
+cd LabelFree && make && cd NoDiamond && make && cd .. && cd ..
+cd Hybrid && make && cd ..
+coqc Labeled.v && coqc LabelFree.v && coqc LabelFreeNoDia.v && coqc Hybrid.v
+
+Results regarding relations between languages reside in LanguagesEquivalence directory; termination of LF language can be found in Termination directory.
