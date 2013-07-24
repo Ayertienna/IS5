@@ -222,11 +222,15 @@ Qed.
 
 (* Termination *)
 
-Inductive WT: te_LF -> Prop :=
+Definition WT M : Type := (* sigT (fun V => prod (value_LF V) (M |->* V)). *)
+  { V | prod (value_LF V)  (M |->* V) }.
+(*
+Inductive WT: te_LF -> Type :=
 | val_WT: forall V, value_LF V -> WT V
-| step_WT: forall M, (exists V, value_LF V /\ steps_LF M V) -> WT M
+| step_WT: forall M,  sigT (fun V => prod (value_LF V) (steps_LF M V)) -> WT M
 .
-
+*)
+Check WT.
 Hint Resolve lc_t_step_LF lc_t_steps_LF.
 
 Lemma step_LF_unique:
@@ -247,18 +251,38 @@ inversion H2; subst.
   rewrite IHstep_LF with M'0; auto.
 Qed.
 
+Lemma steps_LF_val:
+forall V V', 
+  value_LF V ->
+  V |->* V' ->
+  V' = V.
+intros. induction H0. auto.
+apply value_no_step_LF in H0; auto; contradiction.
+Qed.
+
+Lemma steps_LF_val_steps:
+forall M V,
+  M |->* V -> value_LF V ->
+  forall N,
+    M |->* N ->
+    N |->* V.
+intros.
+induction H1. auto.
+destruct H. apply value_no_step_LF in H1; auto; contradiction.
+apply step_LF_unique with (N:=y) in H; auto; subst.
+apply IHclos_refl_trans_1n. auto.
+Qed.
+
 Theorem WT_step:
 forall M M',
   WT M ->
   M |-> M' ->
   WT M'.
-intros; inversion H; subst.
-apply value_no_step_LF with (N:=M') in H1; contradiction.
-destruct H1 as (V, (H1, H2)).
-inversion H2; subst.
-apply step_LF_unique with (N':=V) in H0; subst; auto; constructor; auto.
-apply step_WT; exists V; split; auto.
-apply step_LF_unique with (N':=M'0) in H0; subst; auto.
+intros. unfold WT in *. 
+destruct X as (V, X). exists V. destruct X as (Val, HT); split; auto.
+induction HT.
+  apply value_no_step_LF with (N:=M') in Val; contradiction.
+apply step_LF_unique with (N:=M') in H0; subst; auto.
 Qed.
 
 Lemma WT_step_back:
@@ -266,24 +290,27 @@ forall M N,
   WT N ->
   M |-> N ->
   WT M.
-intros; inversion H; subst.
-apply step_WT; exists N; split; auto; constructor; auto.
-destruct H1 as (V, (H1, H2)); apply step_WT; exists V; split; auto.
-apply multi_step_LF with (M':=N); auto.
+intros. destruct X as (V, X); exists V; destruct X as (Val, HT); split; auto.
+induction HT. econstructor; eauto. constructor.
+constructor 2 with (y:=x); auto. constructor 2 with (y:=y); auto.
 Qed.
 
 Lemma WT_steps:
 forall M N,
-  steps_LF M N ->
+  M |->* N ->
   WT M -> WT N.
-intros; induction H; apply WT_step in H; auto.
+intros; destruct X as (V, (Val, HT)); exists V; split; auto;
+apply steps_LF_val_steps with (M:=M); auto.
 Qed.
+
+Import Setoid.
 
 Lemma WT_steps_back:
 forall M N,
-  steps_LF M N ->
+  M |->* N ->
   WT N -> WT M.
-intros; induction H; apply WT_step_back in H; auto.
+intros; destruct X as (V, (Val, HT)); exists V; split; auto.
+transitivity N; auto.
 Qed.
 
 Lemma here_val:
@@ -292,41 +319,24 @@ forall M V,
   exists M', V = here_LF M'.
 intros; remember (here_LF M) as M0; generalize dependent M.
 induction H0; intros; subst.
-inversion H0; subst. eexists; eauto.
+eexists; eauto.
 inversion H0; subst.
-apply IHsteps_LF with (M:=M'0); auto.
+apply IHclos_refl_trans_1n with (M:=M'); auto.
 Qed.
 
 Lemma WT_here:
 forall M,
   lc_t_LF M ->
-  (WT M <-> WT (here_LF M)).
-split.
-intros; inversion H0; subst.
-constructor; constructor; auto.
-destruct H1 as (V, (H1, H2)).
-apply step_WT; exists (here_LF V); split.
-constructor; auto.
-induction H2; intros; subst.
-  constructor; constructor; auto.
-  apply multi_step_LF with (here_LF M').
+  WT M ->
+  WT (here_LF M).
+intros. destruct X as (V, (Val, H1)).
+exists (here_LF V); split; [constructor; auto | ].
+induction H1. 
+  constructor.
+  constructor 2 with (here_LF y).
     constructor; auto.
-    apply IHsteps_LF; auto.
-    apply lc_t_step_LF in H2; auto.
-    apply WT_step in H2; auto.
-intros. remember (here_LF M) as T; generalize dependent M.
-induction H0; intros; subst.
-inversion H; constructor; subst; auto.
-destruct H as (V, (H, H1)).
-assert ( steps_LF (here_LF M0) V) by auto.
-apply here_val in H1; auto; destruct H1; subst.
-apply step_WT; exists x; split; inversion H; subst; auto.
-remember (here_LF M0) as hm; remember (here_LF x) as hx; generalize dependent x;
-generalize dependent M0; induction H2; intros; subst.
-inversion H0; subst; constructor; auto.
-inversion H0; subst.
-apply multi_step_LF with M'0; auto. apply IHsteps_LF; auto.
-apply lc_t_step_LF in H6; auto.
+    apply IHclos_refl_trans_1n; auto.
+    apply lc_t_step_LF in H0; auto.
 Qed.
 
 Hint Resolve WT_step.
@@ -384,27 +394,28 @@ Lemma steps_KApplSteps:
 forall K M M',
   ContLC K ->
   lc_t_LF M ->
-  steps_LF M M' ->
-  steps_LF (K @ M) (K @ M').
+  M |->* M' ->
+  (K @ M) |->* (K @ M').
 intros; generalize dependent K; induction H1; intros.
 constructor; apply Step_KApplStep; auto.
-apply multi_step_LF with (M':=(ContAppl K M')).
+constructor 2 with (K @ y).
 apply Step_KApplStep; auto.
-apply IHsteps_LF; auto. apply lc_t_step_LF in H; auto.
+apply IHclos_refl_trans_1n; auto.
+apply lc_t_step_LF in H; auto.
 Qed.
 
-Fixpoint R M A {struct A} : Prop :=
+Fixpoint R M A {struct A} : Type :=
 let Q M A := forall K,
                lc_t_LF M -> ContLC K -> RC K A ->
                WT (K @ M) in
 match A with
 | tvar => WT M
-| A1 ---> A2 => WT M /\
+| A1 ---> A2 => prod (WT M)
                 (forall N,
                    lc_t_LF N ->
                    Q N A1 ->
                    Q (appl_LF M N) A2)
-| [*]A1 => WT M /\ forall K, RC K A1 -> WT (K @ (unbox_LF M))
+| [*]A1 => prod (WT M) (forall K, RC K A1 -> WT (K @ (unbox_LF M)))
 | <*>A1 => forall K, ContLC K ->
                      (forall V,
                         lc_t_LF V ->
@@ -412,24 +423,24 @@ match A with
                         WT (K @ (here_LF V))) ->
                      WT (K @ M)
 end
-with RC K A {struct A} : Prop :=
+with RC K A {struct A} : Type :=
 let Q M A := forall K,
                lc_t_LF M -> ContLC K -> RC K A ->
                WT (K @ M) in
 match A with
 | tvar => forall V, lc_t_LF V -> WT V -> WT (K @ V)
 | tbox A1 => forall V, lc_t_LF V ->
-                       (WT V /\
-                        forall K0, ContLC K0 ->
+                       prod (WT V)
+                        (forall K0, ContLC K0 ->
                                    RC K0 A1 ->
                                    WT (K0 @ (unbox_LF V))) ->
                        WT (K @ V)
 | A1 ---> A2 => forall V, lc_t_LF V ->
-                  (WT V /\
+                  prod (WT V)
                    (forall N,
                       lc_t_LF N ->
                       Q N A1 ->
-                      Q (appl_LF V N) A2)) ->
+                      Q (appl_LF V N) A2) ->
                   WT (K @ V)
 | <*> A1 => forall V, lc_t_LF V ->
                        Q V A1 -> WT (K @ (here_LF V))
@@ -444,10 +455,10 @@ Hint Unfold Q.
 Lemma RCIdK:
 forall t, RC (IdK t) t.
 induction t; simpl in *; intros; auto.
-destruct H0; auto.
-destruct H0; auto.
-assert (WT ((IdK t) @ V));
-[apply H0; auto; constructor | rewrite <- WT_here; auto].
+destruct X; auto.
+destruct X; auto.
+assert (WT ((IdK t) @ V)) by (apply X; auto; constructor).
+apply WT_here; auto.
 Qed.
 
 Lemma steps_letdia:
@@ -456,17 +467,19 @@ forall N t, lc_t_LF M -> lc_t_n_LF 1 N ->
             steps_LF (letdia_LF t M N) (letdia_LF t M' N).
 intros M M' H; induction H; intros; simpl in *.
 constructor; constructor; auto.
-apply multi_step_LF with (M':=letdia_LF t M' N); auto.
-constructor; auto. apply IHsteps_LF; auto. apply lc_t_step_LF in H; auto.
+constructor 2 with (y:=letdia_LF t y N); auto.
+constructor; auto. 
+apply IHclos_refl_trans_1n; auto. 
+apply lc_t_step_LF in H; auto.
 Qed.
 
 Lemma steps_here:
 forall M M', steps_LF M M' -> lc_t_LF M -> steps_LF (here_LF M) (here_LF M').
 intros; induction H; simpl in *.
 repeat constructor; auto.
-apply multi_step_LF with (M':=here_LF M').
-repeat constructor; auto.
-apply IHsteps_LF; apply lc_t_step_LF in H; auto.
+constructor 2 with (here_LF y). constructor; auto.
+apply IHclos_refl_trans_1n; auto. 
+apply lc_t_step_LF in H; auto.
 Qed.
 
 Lemma Q_SL_hyp:
@@ -476,15 +489,22 @@ forall L G Gamma v A,
   (forall a b c, Mem (a, b, c) L -> Q c b) ->
   G |= Gamma |- hyp_LF (fte v) ::: A ->
   Q (SL L (hyp_LF (fte v))) A.
-intros.
-inversion H2; subst.
+intros. 
 assert (Mem (v, A) (map fst_ L)).
   apply Mem_permut with (l:=concat (Gamma::G)); auto.
   rew_concat; rewrite Mem_app_or_eq; left; auto.
-apply Mem_find_var_type in H3; auto. destruct H3.
+  inversion H1; subst; auto.
+apply Mem_find_var_type in H2; auto. destruct H2.
 simpl; rewrite e.
-apply H1 with v.
+apply X with v.
 apply find_var_Mem; auto.
+Qed.
+
+Lemma Fresh':
+forall (L: fset var), {w0 : var | w0 \notin L}.
+intro;
+exists (var_gen L);
+apply var_gen_spec.
 Qed.
 
 Theorem main_theorem:
@@ -500,7 +520,10 @@ forall G Gamma M A,
       ContLC K ->
       RC K A ->
       WT (K @ (SL L M)).
-intros G Gamma M A LC HT;
+intros G Gamma M A LC HT. 
+(* We cannot do induction on HT, as it is not in Type *)
+Admitted.
+(*
 induction HT;
 intros; simpl in *.
 (* hyp *)
@@ -689,7 +712,7 @@ simpl in H9; inversion H9; subst.
     apply WT_steps with (M:=K0 @ V).
       apply steps_KApplSteps; auto. apply H8; auto.
 Qed.
-
+*)
 Lemma lc_t_n_LF_subst_t:
 forall N M n,
 lc_t_n_LF n M ->
@@ -746,3 +769,18 @@ intros; rewrite Mem_nil_eq in *; contradiction.
 constructor.
 apply RCIdK.
 Qed.
+
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+Extract Inductive prod => "(*)"  [ "(,)" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+
+Extract Inductive nat => "int"
+  [ "0" "(fun x → x + 1)" ]
+  "(fun zero succ n →
+      if n=0 then zero () else succ (n-1))".
+Extract Constant plus => "( + )".
+
+Extract Constant eq_var_dec => "( = )".
+Extraction Language Haskell.
+Extraction "termination_LF" WT_Lang.

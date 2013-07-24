@@ -116,11 +116,17 @@ Inductive step_LF: te_LF -> te_LF -> Prop :=
 
 where " M |-> N " := (step_LF M N ).
 
+Require Export Relations.
+
+Definition steps_LF := clos_refl_trans_1n _ step_LF.
+
+(*
 Inductive steps_LF : te_LF -> te_LF -> Prop :=
 | single_step_LF: forall M M', M |-> M' -> steps_LF M M'
 | multi_step_LF: forall M M' M'',
   M |-> M' -> steps_LF M' M'' -> steps_LF M M''
 .
+*)
 
 Lemma PPermutationG_LF:
 forall G Gamma M A G',
@@ -1665,11 +1671,13 @@ apply lc_t_subst_t_LF_bound; auto.
 eapply IHM1; eauto.
 Qed.
 
+Notation " M |->* N " := (steps_LF M N) (at level 70).
+
 Lemma lc_t_steps_LF:
-forall M N, lc_t_LF M -> steps_LF M N -> lc_t_LF N.
-intros; induction H0.
+forall M N, lc_t_LF M -> M |->* N -> lc_t_LF N.
+intros; induction H0. auto.
+apply IHclos_refl_trans_1n.
 apply lc_t_step_LF in H0; auto.
-apply IHsteps_LF; apply lc_t_step_LF in H0; auto.
 Qed.
 
 Lemma value_no_step_LF:
@@ -1690,3 +1698,15 @@ apply eq_ty_dec.
 apply eq_ty_dec.
 Qed.
 
+Import Classes.RelationClasses.
+Instance Steps_Reflexive: Reflexive steps_LF := {
+}.
+unfold Reflexive. intros; constructor.
+Qed.
+
+Instance Steps_Transitive: Transitive steps_LF := {
+}.
+unfold Transitive. intros.
+induction H; auto. constructor 2 with (y:=y); auto.
+apply IHclos_refl_trans_1n. auto.
+Qed.
