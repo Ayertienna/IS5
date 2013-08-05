@@ -3,11 +3,62 @@ Require Export LF_Syntax.
 Require Export LF_Substitution.
 Require Export LF_OkLib.
 Require Export LF_EmptyEquivLib.
+Require Export Classes.RelationClasses.
 
 Open Scope permut_scope.
 Open Scope is5_scope.
 
 Reserved Notation " G  '|=' Gamma '|-' M ':::' A" (at level 70).
+
+Section UnsafeTypes.
+Print ty.
+Definition defaultType := tvar.
+SearchAbout var.
+
+Fixpoint apply_unsafe t1 t2 : ty :=
+match t1 with
+| a ---> b => if eq_ty_dec a t2 then b else defaultType
+| _ => defaultType
+end. 
+
+Fixpoint unbox_unsafe t: ty :=
+match t with
+| [*] t' => t'
+| _ => defaultType
+end.
+
+Fixpoint find_unsafe v G : ty :=
+match G with
+| nil => defaultType
+| (x, a)::G' => if eq_var_dec x v then a else find_unsafe v G'
+end.
+
+Fixpoint nth_unsafe n L : ty :=
+match L with
+| nil => defaultType
+| (x::xs) =>
+  match n with
+    | 0 => x
+    | S n' => nth_unsafe n' xs
+  end
+end.
+
+Fixpoint types_unsafe (G: ctx_LF) (Gamma: list ty) (M0: te_LF) : ty :=
+match M0 with
+| hyp_LF (bte n) => nth_unsafe n Gamma
+| hyp_LF (fte v) => find_unsafe v G
+| lam_LF t M => t ---> types_unsafe G (t::Gamma) M
+| appl_LF M N => apply_unsafe (types_unsafe G Gamma M) (types_unsafe G Gamma N)
+| box_LF M => [*] (types_unsafe G Gamma M)
+| unbox_LF M => unbox_unsafe (types_unsafe G Gamma M)
+| here_LF M => <*> (types_unsafe G Gamma M)
+| letdia_LF t M N => 
+  if (eq_ty_dec t (types_unsafe G Gamma M)) then
+    types_unsafe G (t::Gamma) N
+  else defaultType
+end.
+
+End UnsafeTypes.
 
 Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
 
@@ -73,6 +124,62 @@ Inductive types_LF : bg_LF -> ctx_LF -> te_LF -> ty -> Prop :=
     G0 |= Gamma' |- letdia_LF (<*> A) M N ::: B
 
 where " G '|=' Gamma '|-' M ':::' A" := (types_LF G Gamma M A).
+
+Section SafeUnsafe.
+
+Fixpoint flatten {A: Type} (G: list (list A)) : list A :=
+match G with
+| nil => nil
+| x::xs => x ++ flatten xs
+end.
+
+Lemma Mem_find_unsafe:
+forall Gamma v A , Mem (v, A) Gamma -> forall Delta, find_unsafe v (Gamma++Delta) = A.
+induction Gamma; intros; simpl. 
+  rewrite Mem_nil_eq in H; contradiction.
+  destruct a; rewrite Mem_cons_eq in H. 
+Admitted.
+Hint Resolve Mem_find_unsafe.
+
+Lemma types_unsafe_subst:
+ forall M L Gamma A,
+   forall v : var,
+       v \notin L ->
+       types_unsafe Gamma (A :: nil) M = 
+       types_unsafe ((v, A) :: Gamma) nil (M ^t^ hyp_LF (fte v)).
+Admitted.
+
+Lemma types_unsafe_permut:
+forall G G' Gamma M, G *=* G' -> types_unsafe G Gamma M = types_unsafe G' Gamma M.
+Admitted.
+
+Lemma typing_unsafe:
+forall G Gamma M A, G |= Gamma |- M ::: A -> types_unsafe (flatten (Gamma::G)) nil M = A.
+intros; induction H; simpl in *; eauto.
+(* lam *)
+assert (types_unsafe (Gamma ++ flatten G) (A :: nil) M = B) by
+  (assert {x | x \notin L} by (exists (var_gen L); apply var_gen_spec);
+   destruct H1 as (v, H1); rewrite types_unsafe_subst with (L:=L)(v:=v); auto; rewrite <- H0 with v; auto);
+rewrite H1; auto.
+(* appl *)
+rewrite IHtypes_LF1; rewrite IHtypes_LF2; simpl; case_if; auto.
+(* box *)
+rewrite types_unsafe_permut with (G':=nil ++ flatten (G & Gamma)). 
+rewrite IHtypes_LF; auto. (* ! *) skip.
+(*unbox *)
+rewrite IHtypes_LF; simpl; auto.
+rewrite types_unsafe_permut with (G':=Gamma ++ flatten (G & Gamma')). 
+rewrite IHtypes_LF; simpl; auto. (* ! *) skip.
+(* here *)
+rewrite IHtypes_LF; simpl; auto.
+rewrite types_unsafe_permut with (G':=Gamma ++ flatten (G & Gamma')). 
+rewrite IHtypes_LF; simpl; auto. (* ! *) skip.
+(*letdia *)
+rewrite IHtypes_LF; case_if. skip.
+skip.
+Qed.
+
+End SafeUnsafe.
 
 Inductive value_LF: te_LF -> Prop :=
 | val_lam_LF: forall A M, value_LF (lam_LF A M)
@@ -1698,7 +1805,6 @@ apply eq_ty_dec.
 apply eq_ty_dec.
 Qed.
 
-Import Classes.RelationClasses.
 Instance Steps_Reflexive: Reflexive steps_LF := {
 }.
 unfold Reflexive. intros; constructor.
