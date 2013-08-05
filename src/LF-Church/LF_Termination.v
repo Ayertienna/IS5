@@ -508,7 +508,7 @@ apply var_gen_spec.
 Qed.
 
 Theorem main_theorem:
-forall G Gamma M A,
+forall M G Gamma A,
   lc_t_LF M ->
   G |= Gamma |- M ::: A ->
  forall L,
@@ -520,18 +520,19 @@ forall G Gamma M A,
       ContLC K ->
       RC K A ->
       WT (K @ (SL L M)).
-intros G Gamma M A LC HT. 
-(* We cannot do induction on HT, as it is not in Type *)
-Admitted.
-(*
-induction HT;
-intros; simpl in *.
+induction M; intros.
 (* hyp *)
+assert (ok_Bg_LF (Gamma::G)) by (inversion H0; auto);
+destruct v.
+assert False; [inversion H; omega | contradiction].
+assert (Mem (v, A) Gamma) by (inversion H0; auto);
+apply typing_unsafe in H0; 
+simpl in *; 
 assert (lc_t_LF (SL L (hyp_LF (fte v)))) by
   (apply lc_SL; auto; constructor);
 simpl in *;
 assert (Q (SL L (hyp_LF (fte v))) A);
-[apply Q_SL_hyp with G Gamma; auto; constructor | apply H7]; auto.
+[apply Q_SL_hyp with G Gamma; auto; constructor | ]; auto.
 (* lam *)
 autounfold in *; inversion LC; subst; apply H6; simpl;
 [ constructor; apply lc_SL; auto |];
