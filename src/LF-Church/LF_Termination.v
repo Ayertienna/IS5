@@ -526,7 +526,6 @@ assert (ok_Bg_LF (Gamma::G)) by (inversion H0; auto);
 destruct v.
 assert False; [inversion H; omega | contradiction].
 assert (Mem (v, A) Gamma) by (inversion H0; auto);
-apply typing_unsafe in H0; 
 simpl in *; 
 assert (lc_t_LF (SL L (hyp_LF (fte v)))) by
   (apply lc_SL; auto; constructor);
@@ -534,19 +533,26 @@ simpl in *;
 assert (Q (SL L (hyp_LF (fte v))) A);
 [apply Q_SL_hyp with G Gamma; auto; constructor | ]; auto.
 (* lam *)
-autounfold in *; inversion LC; subst; apply H6; simpl;
-[ constructor; apply lc_SL; auto |];
-split; intros; [repeat constructor | ];
-apply WT_step_back with (N:=ContAppl K0 (((SL L0 M) ^t^ N)));
+destruct A. 
+assert False; [inversion H0 |]; contradiction.
+Focus 2. assert False; [inversion H0 |]; contradiction.
+Focus 2. assert False; [inversion H0 |]; contradiction.
+simpl in *.
+apply X0.
+inversion H; constructor; apply lc_SL; auto.
+split; intros.
+unfold WT; exists (lam_LF t (SL L M)); split; constructor; auto.
+apply WT_step_back with (N:=ContAppl K0 (((SL L M) ^t^ N)));
 [ unfold open_LF in *;
-  assert (exists x, x \notin L \u used_vars_te_LF (SL L0 M) \u FV_L L0
-       \u  from_list (map fst_ (map fst_ L0))  \u from_list nil)
-  as HF by apply Fresh; destruct HF | ];
-[ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto];
+  assert ({ x | x \notin used_vars_te_LF (SL L M) \u FV_L L
+       \u  from_list (map fst_ (map fst_ L))  \u from_list nil})
+  as HF by apply Fresh'; destruct HF | ];
+[ | apply Step_KApplStep; auto; repeat constructor; auto; apply lc_SL; auto].
+Focus 2. inversion H; auto.
 rewrite subst_t_neutral_free_LF with (v:=x); auto;
 rewrite SL_bte_subst; auto;
-[rewrite <- SL_extend with (A:=A) | apply notin_Mem]; auto;
-[|apply notin_Mem]; auto;
+[rewrite <- SL_extend with (A:=A2) | apply notin_Mem]; auto;
+[|apply notin_Mem]; auto.
 apply H0; auto.
   apply lc_t_subst_t_LF_bound; [constructor | inversion LC; auto].
   constructor; [ rewrite Mem_nil_eq | apply OkL_fresh]; auto.

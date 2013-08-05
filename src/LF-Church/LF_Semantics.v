@@ -127,18 +127,25 @@ where " G '|=' Gamma '|-' M ':::' A" := (types_LF G Gamma M A).
 
 Section SafeUnsafe.
 
-Fixpoint flatten {A: Type} (G: list (list A)) : list A :=
-match G with
-| nil => nil
-| x::xs => x ++ flatten xs
-end.
-
 Lemma Mem_find_unsafe:
-forall Gamma v A , Mem (v, A) Gamma -> forall Delta, find_unsafe v (Gamma++Delta) = A.
-induction Gamma; intros; simpl. 
+forall Gamma v A , 
+  Mem (v, A) Gamma -> forall Delta, ok_LF (Gamma++Delta) nil -> find_unsafe v (Gamma++Delta) = A.
+induction Gamma; intros; simpl.
   rewrite Mem_nil_eq in H; contradiction.
   destruct a; rewrite Mem_cons_eq in H. 
-Admitted.
+  case_if.
+  destruct H. 
+    inversion H; subst; auto.
+    apply Mem_split in H; destruct H as (hd, (tl, H)).
+    assert False; [ | contradiction]. subst. 
+    assert ((v,t)::(v,A)::hd ++ tl *=* (v, t) :: hd & (v, A) ++ tl) by permut_simpl.
+    apply ok_LF_permut with (G':=( (v, t) :: (v, A) :: hd ++ tl) ++ Delta) in H0; eauto.
+    inversion H0; inversion H6; subst; elim H11; apply Mem_here. rewrite H; auto.
+  destruct H.    
+    inversion H; subst; elim H1; auto.
+    rewrite <- IHGamma with v A Delta; auto.
+    rew_app in *; inversion H0; eapply ok_LF_used_weakening; eauto.
+Qed.
 Hint Resolve Mem_find_unsafe.
 
 Lemma types_unsafe_subst:
@@ -154,25 +161,27 @@ forall G G' Gamma M, G *=* G' -> types_unsafe G Gamma M = types_unsafe G' Gamma 
 Admitted.
 
 Lemma typing_unsafe:
-forall G Gamma M A, G |= Gamma |- M ::: A -> types_unsafe (flatten (Gamma::G)) nil M = A.
+forall G Gamma M A, G |= Gamma |- M ::: A -> types_unsafe (concat (Gamma::G)) nil M = A.
 intros; induction H; simpl in *; eauto.
+(* hyp *)
+apply Mem_find_unsafe; auto.
 (* lam *)
-assert (types_unsafe (Gamma ++ flatten G) (A :: nil) M = B) by
+assert (types_unsafe (Gamma ++ concat G) (A :: nil) M = B) by
   (assert {x | x \notin L} by (exists (var_gen L); apply var_gen_spec);
-   destruct H1 as (v, H1); rewrite types_unsafe_subst with (L:=L)(v:=v); auto; rewrite <- H0 with v; auto);
-rewrite H1; auto.
+   destruct H1 as (v, H1); rewrite types_unsafe_subst with (L:=L)(v:=v); auto; rewrite <- H0 with v; auto).
+rewrite <- H1; auto.
 (* appl *)
 rewrite IHtypes_LF1; rewrite IHtypes_LF2; simpl; case_if; auto.
 (* box *)
-rewrite types_unsafe_permut with (G':=nil ++ flatten (G & Gamma)). 
-rewrite IHtypes_LF; auto. (* ! *) skip.
+rewrite types_unsafe_permut with (G':=concat ( nil :: G & Gamma)). 
+rewrite <- IHtypes_LF; auto. (* ! *) skip.
 (*unbox *)
 rewrite IHtypes_LF; simpl; auto.
-rewrite types_unsafe_permut with (G':=Gamma ++ flatten (G & Gamma')). 
+rewrite types_unsafe_permut with (G':=concat (Gamma::G & Gamma')). 
 rewrite IHtypes_LF; simpl; auto. (* ! *) skip.
 (* here *)
 rewrite IHtypes_LF; simpl; auto.
-rewrite types_unsafe_permut with (G':=Gamma ++ flatten (G & Gamma')). 
+rewrite types_unsafe_permut with (G':=concat (Gamma :: G & Gamma')). 
 rewrite IHtypes_LF; simpl; auto. (* ! *) skip.
 (*letdia *)
 rewrite IHtypes_LF; case_if. skip.
