@@ -160,29 +160,33 @@ match L with
 | v :: L' => listSubst L' (S c) ([hyp_LF (fte v)//bte c] M)
 end.
 
-Lemma types_unsafe_subst:
- forall M L G G',
-   (forall v t, Mem (v,t) G' -> v \notin L) ->       
-   types_unsafe G (map snd G') M = 
-   types_unsafe (G'++ G) nil (listSubst (map fst G') 0 M).
-(*
-induction M; intros; simpl in *.
-(* hyp *)
-destruct v; simpl.
-destruct n; simpl in *. case_if; auto;
-[simpl; case_if; auto | destruct n; simpl; auto].
-case_if; simpl; case_if; auto; rewrite notin_union in H; destruct H; apply notin_singleton in H1;
-elim H1; auto.
-(* lam *)
-*)
-Admitted.
+Lemma lc_t_list_subst:
+forall L M n, lc_t_LF M -> listSubst L n M = M.
+induction L; intros; simpl in *; auto.
+rewrite IHL. 
+rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
+rewrite closed_subst_t_bound_LF with (n:=0); auto; omega.
+Qed.
 
 Lemma find_unsafe_permut:
-forall G G' v, ok_LF G nil -> ok_LF G nil -> G *=* G' -> find_unsafe v G = find_unsafe v G'.
-induction G; intros; simpl.
-apply permut_nil_eq in H1; subst; auto.
-apply permut_split_head in H1; destruct H1 as (hd, (tl, H1)); subst; destruct a; simpl in *.
-case_if.
+forall G G' v, ok_LF G nil -> G *=* G' -> find_unsafe v G = find_unsafe v G'.
+intros. apply permut_equiv in H0.
+induction H0; auto.
+simpl; destruct x; case_if; auto.
+rewrite IHPermutation; auto. inversion H; subst; apply ok_LF_used_weakening in H7; auto.
+destruct x; destruct y; simpl; repeat case_if; simpl; auto.
+inversion H; subst; inversion H5; subst; elim H6; apply Mem_here.
+rewrite IHPermutation1; auto; rewrite IHPermutation2; auto.
+apply ok_LF_permut with (G:=l); auto. apply permut_equiv; auto.
+Qed.
+
+Lemma types_unsafe_subst:
+ forall M L G G' K i,
+   (forall v t, Mem (v,t) G' -> v \notin L) ->
+   ok_LF (G' ++ G) nil ->
+   length K = i ->
+   types_unsafe G (K ++ map snd G') M = 
+   types_unsafe (G'++ G) nil (listSubst (map fst G') i M).
 Admitted.
 
 Lemma types_unsafe_permut:
@@ -208,11 +212,14 @@ intros; induction H; simpl in *; eauto.
 apply Mem_find_unsafe; auto.
 (* lam *)
 assert (types_unsafe (Gamma ++ concat G) (A :: nil) M = B).
-   assert {x | x \notin L} by (exists (var_gen L); apply var_gen_spec);
-   destruct H1 as (v, H1). replace (A::nil) with (map snd ((v,A)::nil)) by (simpl; auto).
-   rewrite types_unsafe_subst with (L:=L); auto; 
-   [rewrite <- H0 with v; auto | intros; simpl; rewrite Mem_cons_eq in H2; destruct H2].
+   assert {x | x \notin L \u (from_list ((map fst_ (Gamma ++ concat G))))} 
+  by (exists (var_gen  (L \u (from_list ((map fst_ (Gamma ++ concat G)))))); apply var_gen_spec);
+   destruct H1 as (v, H1). replace (A::nil) with (nil ++ map snd ((v,A)::nil)) by (simpl; auto);
+   rewrite types_unsafe_subst with (L:=L) (i:=0); auto;
+   [rewrite <- H0 with v; auto | intros; simpl; rewrite Mem_cons_eq in H2; destruct H2 |].
    inversion H2; subst; simpl; auto. rewrite Mem_nil_eq in H2; contradiction.
+   rew_concat. unfold ok_Bg_LF in *. constructor. rewrite Mem_nil_eq; tauto.
+   apply ok_LF_fresh_used; rew_concat in *; auto. apply notin_Mem; rewrite notin_union in H1; destruct H1; auto. 
 rewrite <- H1; auto.
 (* appl *)
 rewrite IHtypes_LF1; rewrite IHtypes_LF2; simpl; case_if; auto.
@@ -241,8 +248,8 @@ apply PPermut_concat_permut; rewrite <- H0; PPermut_LF_simpl.
 rewrite IHtypes_LF; case_if. 
 assert {x | x \notin L \u from_list (map fst_ (Gamma ++ concat G))} by 
     (exists (var_gen (L \u from_list (map fst_ (Gamma ++ concat G)))); apply var_gen_spec);
-destruct H1 as (v, H1); replace (A::nil) with (map snd ((v, A)::nil)) by (simpl; auto).
-rewrite types_unsafe_subst with (L:=L); unfold open_LF in *; simpl.
+destruct H1 as (v, H1); replace (A::nil) with (nil ++ map snd ((v, A)::nil)) by (simpl; auto).
+rewrite types_unsafe_subst with (L:=L)(i:=0); unfold open_LF in *; simpl.
 rewrite types_unsafe_permut with (G' := concat (Gamma :: ((v, A) :: nil) :: G)).
 rewrite H0; auto.
 rew_concat; constructor; [rewrite Mem_nil_eq; tauto | apply ok_LF_fresh_used; auto].
@@ -250,12 +257,15 @@ apply notin_Mem; rewrite notin_union in H1; destruct H1; rew_concat; auto.
 rew_concat; permut_simpl.
 intros; rewrite Mem_cons_eq in H2; destruct H2; [inversion H2; subst | rewrite Mem_nil_eq in H2]; auto;
 contradiction.
+rew_concat; constructor; [rewrite Mem_nil_eq; tauto | apply ok_LF_fresh_used; auto].
+apply notin_Mem; rewrite notin_union in H1; destruct H1; rew_concat; auto.
+simpl; auto. 
 rewrite types_unsafe_permut with (G':=concat (Gamma :: G & Gamma')).
 rewrite IHtypes_LF; case_if.
 assert {x | x \notin L \u from_list (map fst_ (Gamma ++ concat G ++ Gamma'))} by 
     (exists (var_gen (L \u from_list (map fst_ (Gamma ++ concat G ++ Gamma')))); apply var_gen_spec);
-destruct H2 as (v, H2); replace (A::nil) with (map snd ((v, A)::nil)) by (simpl; auto).
-rewrite types_unsafe_subst with (L:=L); unfold open_LF in *; simpl.
+destruct H2 as (v, H2); replace (A::nil) with (nil ++ map snd ((v, A)::nil)) by (simpl; auto).
+rewrite types_unsafe_subst with (L:=L) (i:=0); unfold open_LF in *; simpl.
 rewrite types_unsafe_permut with (G' := concat (Gamma' :: ((v, A) :: nil) :: G & Gamma)).
 rewrite H0; auto.
 apply ok_LF_permut with (G:=(v,A) :: concat (Gamma :: G & Gamma')).
@@ -267,6 +277,12 @@ rew_concat; permut_simpl. replace (concat G ++ Gamma) with (concat (G & Gamma)).
 apply PPermut_concat_permut; rewrite <- H1; PPermut_LF_simpl. rew_concat; auto.
 intros; rewrite Mem_cons_eq in H3; destruct H3; [inversion H3; subst | rewrite Mem_nil_eq in H3]; auto;
 contradiction.
+apply ok_LF_permut with (G:=(v,A) :: concat (Gamma :: G & Gamma')).
+rew_concat; constructor; [rewrite Mem_nil_eq; tauto | apply ok_LF_fresh_used; auto];
+unfold ok_Bg_LF in *; rew_concat in *; auto.
+apply notin_Mem; rewrite notin_union in H2; destruct H2; rew_concat; auto.
+permut_simpl; apply PPermut_concat_permut; rewrite <- H1; PPermut_LF_simpl.
+simpl; auto.
 apply ok_LF_permut with (G:=concat (Gamma :: G & Gamma')). unfold ok_Bg_LF in *; auto.
 apply PPermut_concat_permut; rewrite <- H1; PPermut_LF_simpl.
 apply PPermut_concat_permut; rewrite <- H1; PPermut_LF_simpl.
